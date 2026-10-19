@@ -1,5 +1,5 @@
 # Energiehuis — Home Assistant dashboardkaart
-
+![Energiehuis v1 dashboard](energiehuis-preview.png)
 Een **alleen-lezen** dashboardkaart voor het tonen van HomeWizard P1, GoodWe PV, Alfen laadvermogen en Zonneplan-prijzen. De kaart verstuurt geen laadcommando's.
 
 ## Vereisten
