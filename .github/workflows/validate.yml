@@ -1,0 +1,32 @@
+name: Energiehuis controles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Broncode ophalen
+        uses: actions/checkout@v4
+
+      - name: Bestanden controleren
+        run: |
+          test -f hacs.json
+          test -f README.md
+          test -f energiehuis-card.js
+          python -m json.tool hacs.json > /dev/null
+
+      - name: JavaScript controleren
+        run: node --check energiehuis-card.js
+
+      - name: HACS repository controleren
+        uses: hacs/action@main
+        with:
+          category: plugin
