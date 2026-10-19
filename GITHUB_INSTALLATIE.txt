@@ -1,0 +1,15 @@
+ENERGIEHUIS - GITHUB/HACS STAPPEN
+
+1. Maak op GitHub een lege repository genaamd energiehuis-card (openbaar (HACS vereist een publieke GitHub-repository)).
+2. Voeg alle bestanden UIT deze energiehuis-card map aan de hoofdmap van de repository toe.
+   Makkelijk via GitHub Desktop: clone de lege repository, kopieer de inhoud van deze map erin,
+   Commit to main > Push origin.
+3. Open HACS > ⋮ > Custom repositories / Aangepaste repositories.
+4. Vul je eigen GitHub-repository-URL in; kies type Dashboard.
+5. Zoek Energiehuis in HACS en download de kaart.
+6. LAAT de bestaande resource /local/energiehuis/energiehuis-card.js voorlopig staan.
+7. Test pas later /hacsfiles/energiehuis-card/energiehuis-card.js in plaats van de oude resource.
+   Registreer niet allebei tegelijk: dezelfde custom elementnaam kan anders problemen geven.
+8. De packages YAML wordt niet door HACS bijgewerkt.
+
+Repositorynaam moet energiehuis-card blijven: zo kan HACS dist/energiehuis-card.js vinden.
