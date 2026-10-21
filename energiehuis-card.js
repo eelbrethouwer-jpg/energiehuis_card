@@ -62,6 +62,11 @@ const EH_DEFAULTS = {
   cupra_charge_speed: '',         // optioneel: laadsnelheid
   cupra_portalfeed: '',           // optioneel: status portalfeed
   cupra_doors: '',                // optioneel: deuren/portierenstatus
+  cupra_outside_temp: '',         // optioneel: buitentemperatuur
+  cupra_target_temp: '',          // optioneel: doeltemperatuur
+  cupra_climate_usage: '',        // optioneel: klimaatverbruik
+  cupra_charge_target: '',        // optioneel: laaddoel
+  cupra_onboard_usage: '',        // optioneel: verbruik boordnet
   cupra_image: '',                // optioneel: /local/ of https:// afbeelding
   sim_laadvermogen_kw: 3.7,       // alleen rekenvoorbeeld, bestuurt Alfen niet
   sim_laadbehoefte_kwh: 30,       // handmatig aanpasbare planningsaanname
