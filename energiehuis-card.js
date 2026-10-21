@@ -543,6 +543,164 @@ function ehHourlyFromPrices(quarter,hour){
  return [...result.values()].sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
 }
 
+const EH_CUPRA_PERIODS=[['today','Vandaag'],['7d','7 dagen'],['30d','30 dagen'],['year','Dit jaar']];
+const ehCupraPeriodLimits=(p,now=new Date())=>{
+ const day=(delta=0)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()+delta);
+ if(p==='today')return {from:day(),to:now,label:'Vandaag'};
+ if(p==='7d')return {from:day(-6),to:now,label:'Laatste 7 dagen'};
+ if(p==='year')return {from:new Date(now.getFullYear(),0,1),to:now,label:'Dit jaar'};
+ return {from:day(-29),to:now,label:'Laatste 30 dagen'};
+};
+function ehHistoryEntity(data,id){
+ if(!id)return [];
+ if(Array.isArray(data)){
+  const exact=data.find(arr=>Array.isArray(arr)&&arr.some(x=>x?.entity_id===id));
+  return exact||[];
+ }
+ return Array.isArray(data?.[id])?data[id]:[];
+}
+function ehNumericHistory(data,id,h){
+ const unitNow=String(h?.states?.[id]?.attributes?.unit_of_measurement||'').trim();
+ return ehHistoryEntity(data,id).map(o=>{
+   const raw=o.s??o.state,v=ehNum(raw),ts=o.lu??o.lc??o.last_updated??o.last_changed;
+   const t=typeof ts==='number'?ts*1000:Date.parse(ts);
+   const unit=String(o.a?.unit_of_measurement||o.attributes?.unit_of_measurement||unitNow).trim();
+   return {t,v,unit};
+ }).filter(o=>o.v!==null&&Number.isFinite(o.t)).sort((a,b)=>a.t-b.t);
+}
+function ehNearestPoint(series,t,maxGap=30*60*1000){
+ if(!series?.length)return null;
+ let best=null,bestGap=Infinity;
+ for(const p of series){
+   const gap=Math.abs(p.t-t);
+   if(gap<bestGap){best=p;bestGap=gap;}
+   if(p.t>t&&gap>bestGap)break;
+ }
+ return bestGap<=maxGap?best:null;
+}
+function ehToKwh(value,unit){
+ if(!Number.isFinite(value))return null;
+ const u=String(unit||'').toLowerCase().replace(/\s/g,'');
+ if(u==='wh')return value/1000;
+ if(u==='mwh')return value*1000;
+ if(u==='kwh'||!u)return value;
+ return value;
+}
+function ehCupraKmDaily(stats,id){
+ const rows=Array.isArray(stats?.[id])?stats[id].slice().sort((a,b)=>ehStatTime(a.start)-ehStatTime(b.start)):[];
+ return rows.map(row=>{
+   const t=ehStatTime(row.start),change=ehNum(row.change),min=ehNum(row.min),max=ehNum(row.max);
+   let km=change!==null?change:(min!==null&&max!==null?max-min:null);
+   if(km!==null&&(!Number.isFinite(km)||km<-.01||km>1500))km=null;
+   return Number.isFinite(t)?{t,km:km===null?null:Math.max(0,km)}:null;
+ }).filter(Boolean);
+}
+function ehCupraDistanceSummary(daily,now=new Date()){
+ const startToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+ const start7=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime();
+ const start30=new Date(now.getFullYear(),now.getMonth(),now.getDate()-29).getTime();
+ const startYear=new Date(now.getFullYear(),0,1).getTime();
+ const sumSince=from=>{const v=daily.filter(x=>x.t>=from&&x.t<=now.getTime()&&Number.isFinite(x.km)).map(x=>x.km);return v.length?v.reduce((a,b)=>a+b,0):null;};
+ return {today:sumSince(startToday),d7:sumSince(start7),d30:sumSince(start30),year:sumSince(startYear)};
+}
+function ehCupraKmBuckets(daily,period,now=new Date()){
+ const lim=ehCupraPeriodLimits(period,now);
+ if(period==='year'){
+   const months=new Map();
+   for(const d of daily){
+    if(d.t<lim.from.getTime()||d.t>lim.to.getTime()||!Number.isFinite(d.km))continue;
+    const x=new Date(d.t),key=x.getFullYear()+'-'+x.getMonth();
+    const old=months.get(key)||{t:new Date(x.getFullYear(),x.getMonth(),1).getTime(),km:0,label:x.toLocaleDateString('nl-NL',{month:'short'})};
+    old.km+=d.km;months.set(key,old);
+   }
+   return [...months.values()].sort((a,b)=>a.t-b.t);
+ }
+ return daily.filter(d=>d.t>=lim.from.getTime()&&d.t<=lim.to.getTime()&&Number.isFinite(d.km)).map(d=>({...d,label:new Date(d.t).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}));
+}
+function ehCupraSegments(history,c,h,from,to,capacity){
+ const ids={soc:c.cupra,mileage:c.cupra_mileage,range:c.cupra_range,temp:c.cupra_outside_temp,target:c.cupra_target_temp,climate:c.cupra_climate_usage,board:c.cupra_onboard_usage,alfen:c.laad_energie};
+ const series=Object.fromEntries(Object.entries(ids).map(([k,id])=>[k,ehNumericHistory(history,id,h)]));
+ const anchors=series.mileage.filter(p=>p.t>=from.getTime()&&p.t<=to.getTime());
+ const snapshots=anchors.map(m=>{
+   const read=(key)=>key==='mileage'?m:ehNearestPoint(series[key],m.t);
+   const s={t:m.t,mileage:m.v};
+   for(const key of ['soc','range','temp','target','climate','board']){const p=read(key);s[key]=p?.v??null;}
+   const ap=read('alfen');s.alfen=ap?ehToKwh(ap.v,ap.unit):null;
+   return s;
+ });
+ const segments=[];let homeChargeExcluded=0,externalChargeSuspected=0,noiseExcluded=0;
+ for(let i=1;i<snapshots.length;i++){
+   const a=snapshots[i-1],b=snapshots[i],km=b.mileage-a.mileage;
+   if(!Number.isFinite(km)||km<=.2||km>400)continue;
+   const alfenDelta=Number.isFinite(a.alfen)&&Number.isFinite(b.alfen)?b.alfen-a.alfen:null;
+   const homeCharged=Number.isFinite(alfenDelta)&&alfenDelta>.08;
+   const socDrop=Number.isFinite(a.soc)&&Number.isFinite(b.soc)?a.soc-b.soc:null;
+   const externalCharge=Number.isFinite(socDrop)&&socDrop<-.5&&!homeCharged;
+   if(homeCharged)homeChargeExcluded++;if(externalCharge)externalChargeSuspected++;
+   const temp=Number.isFinite(a.temp)&&Number.isFinite(b.temp)?(a.temp+b.temp)/2:(Number.isFinite(b.temp)?b.temp:a.temp);
+   const target=Number.isFinite(a.target)&&Number.isFinite(b.target)?(a.target+b.target)/2:(Number.isFinite(b.target)?b.target:a.target);
+   const climate=Number.isFinite(a.climate)&&Number.isFinite(b.climate)?(a.climate+b.climate)/2:(Number.isFinite(b.climate)?b.climate:a.climate);
+   const board=Number.isFinite(a.board)&&Number.isFinite(b.board)?(a.board+b.board)/2:(Number.isFinite(b.board)?b.board:a.board);
+   let valid=!homeCharged&&!externalCharge&&Number.isFinite(socDrop)&&socDrop>=1&&socDrop<=40&&km>=3;
+   let energy=valid?capacity*socDrop/100:null;
+   let kwh100=valid?energy/km*100:null;
+   let practicalRange=valid?km/socDrop*100:null;
+   if(valid&&(!Number.isFinite(kwh100)||kwh100<7||kwh100>45||practicalRange<120||practicalRange>850)){valid=false;noiseExcluded++;energy=null;kwh100=null;practicalRange=null;}
+   const predictedFull=Number.isFinite(a.range)&&Number.isFinite(a.soc)&&a.soc>5?a.range*100/a.soc:null;
+   const rangeError=valid&&Number.isFinite(predictedFull)&&predictedFull>0?(practicalRange-predictedFull)/predictedFull*100:null;
+   segments.push({start:a.t,end:b.t,km,socDrop,alfenDelta,homeCharged,externalCharge,valid,energy,kwh100,practicalRange,predictedFull,rangeError,temp,target,setpointGap:Number.isFinite(temp)&&Number.isFinite(target)?target-temp:null,climate,board});
+ }
+ return {segments,anchors:snapshots.length,homeChargeExcluded,externalChargeSuspected,noiseExcluded,coverageFrom:snapshots[0]?.t??null,coverageTo:snapshots.at(-1)?.t??null};
+}
+function ehWeighted(items,key,weight='km'){
+ const valid=items.filter(x=>Number.isFinite(x[key])&&Number.isFinite(x[weight])&&x[weight]>0);
+ if(!valid.length)return null;
+ const w=valid.reduce((a,b)=>a+b[weight],0);return w?valid.reduce((a,b)=>a+b[key]*b[weight],0)/w:null;
+}
+function ehPearson(items,xKey,yKey){
+ const a=items.filter(x=>Number.isFinite(x[xKey])&&Number.isFinite(x[yKey]));
+ if(a.length<8)return null;
+ const mx=a.reduce((s,x)=>s+x[xKey],0)/a.length,my=a.reduce((s,x)=>s+x[yKey],0)/a.length;
+ const num=a.reduce((s,x)=>s+(x[xKey]-mx)*(x[yKey]-my),0),dx=Math.sqrt(a.reduce((s,x)=>s+(x[xKey]-mx)**2,0)),dy=Math.sqrt(a.reduce((s,x)=>s+(x[yKey]-my)**2,0));
+ return dx&&dy?num/(dx*dy):null;
+}
+function ehTempGroups(segments,capacity){
+ const defs=[[-Infinity,0,'< 0°C'],[0,5,'0–5°C'],[5,10,'5–10°C'],[10,15,'10–15°C'],[15,20,'15–20°C'],[20,Infinity,'≥ 20°C']];
+ const valid=segments.filter(s=>s.valid&&Number.isFinite(s.temp));
+ const groups=defs.map(([lo,hi,label])=>{
+  const rows=valid.filter(s=>s.temp>=lo&&s.temp<hi),km=rows.reduce((a,b)=>a+b.km,0),energy=rows.reduce((a,b)=>a+(b.energy||0),0);
+  const kwh100=km>0?energy/km*100:null,range=Number.isFinite(kwh100)&&kwh100>0?capacity*100/kwh100:null;
+  return {label,lo,hi,count:rows.length,km,kwh100,range};
+ });
+ const base=groups.find(g=>g.label==='15–20°C'&&g.km>=10&&Number.isFinite(g.range));
+ for(const g of groups)g.delta=base&&Number.isFinite(g.range)?(g.range-base.range)/base.range*100:null;
+ return {groups,baseline:base};
+}
+function ehCupraInsightMetrics(result,capacity){
+ const valid=(result?.segments||[]).filter(s=>s.valid);
+ const km=valid.reduce((a,b)=>a+b.km,0),energy=valid.reduce((a,b)=>a+(b.energy||0),0);
+ const kwh100=km>0?energy/km*100:null,range=Number.isFinite(kwh100)&&kwh100>0?capacity*100/kwh100:null;
+ const avgTemp=ehWeighted(valid,'temp'),avgTarget=ehWeighted(valid,'target'),avgGap=ehWeighted(valid,'setpointGap');
+ const predicted=ehWeighted(valid,'predictedFull'),rangeDelta=Number.isFinite(range)&&Number.isFinite(predicted)&&predicted>0?(range-predicted)/predicted*100:null;
+ const tempCorrelation=ehPearson(valid,'temp','kwh100'),gapCorrelation=ehPearson(valid,'setpointGap','kwh100');
+ const quality=valid.length>=10&&km>=200?'Sterk':valid.length>=4&&km>=60?'Opbouwend':'Beperkt';
+ return {valid,km,energy,kwh100,range,avgTemp,avgTarget,avgGap,predicted,rangeDelta,tempCorrelation,gapCorrelation,quality};
+}
+function ehCupraKmChart(buckets,period){
+ const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
+ if(!rows.length)return '<div class="no-chart">Nog geen kilometerhistorie voor deze periode beschikbaar.</div>';
+ const W=690,H=220,L=48,R=12,T=18,B=38,CW=W-L-R,CH=H-T-B,max=Math.max(1,...rows.map(x=>x.km));
+ const minT=Math.min(...rows.map(x=>x.t)),maxT=Math.max(...rows.map(x=>x.t));
+ const step=rows.length>1?CW/(rows.length-1):CW/2,bw=Math.max(3,Math.min(28,CW/Math.max(1,rows.length)*.62));
+ const xp=(row,i)=>rows.length===1?L+CW/2:L+i*step;
+ const yp=v=>T+(max-v)/max*CH;
+ const grid=Array.from({length:4},(_,i)=>max-max*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
+ const bars=rows.map((r,i)=>{const x=xp(r,i)-bw/2,y=yp(r.km),h=Math.max(1,T+CH-y);return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#69b8ff" opacity=".9"><title>'+ehEsc(r.label||'')+' · '+ehEsc(ehFmt(r.km,1))+' km</title></rect>';}).join('');
+ const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1].filter((v,i,a)=>a.indexOf(v)===i);
+ const ticks=tickIdx.map(i=>'<text x="'+xp(rows[i],i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===rows.length-1?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(rows[i].label||'')+'</text>').join('');
+ return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
+}
+
 class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
