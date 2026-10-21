@@ -1241,6 +1241,7 @@ class EnergiehuisCard extends HTMLElement {
       <div class="cupra-car-copy"><div class="cupra-name">Cupra Born</div><div class="cupra-connection">${ehEsc(connectionText)}</div><div class="cupra-big">${soc===null?'—':ehEsc(ehFmt(soc,0)+'%')} <span>SOC</span></div><div class="cupra-small">${range===null?'Actieradius niet gekoppeld':ehEsc(ehFmt(range,0)+' km geschatte actieradius')}</div></div>
     </section>
     <section class="cupra-card vehicle-dashboard"><div class="section-title">${ehIcon('car')} Huidige voertuigstatus</div>${vehicleStatusCards}<button type="button" class="vehicle-details-toggle" data-eh-cupra-details="1">${this._cupraDetails?'Minder details':'Uitgebreide voertuigdetails'} <span>${this._cupraDetails?'↑':'→'}</span></button>${vehicleDetails}</section>
+    ${this._cupraInsightsHtml(h,c)}
     <section class="cupra-card"><div class="section-label">Huidige laadstatus</div><div class="charge-row"><div><strong class="charge-power">${ehEsc(ehPower(ev))}</strong><p>${ehEsc(chargeLabel)}</p></div><div class="charge-amps"><span>Stroom L1</span><strong>${amps===null?'—':ehEsc(ehFmt(amps,1)+' A')}</strong></div></div><div class="charge-progress"><div style="width:${Math.min(100,Math.max(0,soc??0))}%"></div></div><p class="subtle">Actueel laadvermogen: Alfen · ${soc===null?'Cupra-accustand niet gekoppeld':'Accustand: Cupra-sensor'}</p></section>
     <section class="cupra-card"><div class="section-title">${ehIcon('clock')} Jouw laadscenario <span class="only-sim">Niet actief</span></div>
       <div class="planning-inputs">
@@ -1508,5 +1509,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.5.0',description:'Interactieve cumulatieve kostenvergelijking per maand en jaar, naast Cupra, batterij, gas en water.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.6.0',description:'Cupra Insights met kilometers, praktijkactieradius, temperatuur- en doeltemperatuuranalyse.'});
 }
