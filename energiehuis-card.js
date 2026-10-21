@@ -705,7 +705,7 @@ class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;this._cupraInsightsPeriod='30d';this._cupraInsightsResult=null;this._cupraInsightsCache=new Map();this._cupraInsightsLoadingKey=null;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -715,9 +715,16 @@ class EnergiehuisCard extends HTMLElement {
        this._view=next;this._detail=null;
        this._schedule();
        if(next==='costs')this._loadCostCompare();
+       if(next==='cupra')this._loadCupraInsights();
        requestAnimationFrame(()=>{if(this.isConnected)this.scrollIntoView({behavior:'smooth',block:'start'});});
        // De pagina blijft binnen dezelfde Lovelace kaart: geen route of backend wijziging.
      }
+     return;
+   }
+   const insightPeriod=e.target.closest('[data-eh-cupra-insight-period]');
+   if(insightPeriod){
+     const p=insightPeriod.dataset.ehCupraInsightPeriod;
+     if(EH_CUPRA_PERIODS.some(x=>x[0]===p)){this._cupraInsightsPeriod=p;this._cupraInsightsResult=null;this._schedule();this._loadCupraInsights();}
      return;
    }
    const costPeriod=e.target.closest('[data-eh-cost-period]');
@@ -1030,14 +1037,14 @@ class EnergiehuisCard extends HTMLElement {
  }
  setConfig(config){
   if(!config || typeof config!=='object')throw new Error('Ongeldige Energiehuis-configuratie');
-  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._schedule();this._loadMetricData();this._loadCostCompare();
+  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._cupraInsightsResult=null;this._cupraInsightsCache.clear();this._cupraInsightsLoadingKey=null;this._schedule();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();
  }
- set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();}
+ set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();}
  getCardSize(){return 9}
  static getStubConfig(){return {type:'custom:energiehuis-card'}}
  connectedCallback(){
-  this._loadHistory();this._loadMetricData();this._loadCostCompare();
-  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();},5*60*1000);
+  this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();
+  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();this._loadCupraInsights();},5*60*1000);
  }
  disconnectedCallback(){if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}}
  _schedule(){
