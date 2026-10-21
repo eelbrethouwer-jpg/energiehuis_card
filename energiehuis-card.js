@@ -135,6 +135,20 @@ function ehMeasure(h,id,digits=2){
  const unit=String(st?.attributes?.unit_of_measurement||'').trim();
  return {n,unit,text:n===null?'—':ehFmt(n,digits)+(unit?' '+unit:'')};
 }
+function ehCupraByName(h,configuredId,label){
+ if(configuredId&&h?.states?.[configuredId])return h.states[configuredId];
+ const wanted=String(label||'').toLowerCase();
+ return Object.values(h?.states||{}).find(st=>{
+   const id=String(st.entity_id||'').toLowerCase();
+   if(!id.includes('cupra')&&!id.includes('born'))return false;
+   return String(st.attributes?.friendly_name||'').toLowerCase().includes(wanted);
+ })||null;
+}
+function ehCupraText(st,digits=1){
+ if(!st||['unknown','unavailable','none',''].includes(String(st.state).toLowerCase()))return '—';
+ const n=ehNum(st.state),unit=String(st.attributes?.unit_of_measurement||'').trim();
+ return n===null?String(st.state):ehFmt(n,digits)+(unit?' '+unit:'');
+}
 const ehDayKey=(date)=>`${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
 const ehMidnight=(now)=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
 function ehSamplesFromHistory(history, ids, h, now){
