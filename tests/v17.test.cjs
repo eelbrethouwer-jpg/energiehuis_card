@@ -7,7 +7,7 @@ const src=fs.readFileSync(require('node:path').join(__dirname,'..','energiehuis-
 const registry=new Map();
 class FakeElement {attachShadow(){return {addEventListener(){}}}}
 const context={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,window:{customCards:[]},customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
-vm.runInNewContext(src+'\n;globalThis.TEST={eh17Plan,eh17Health,eh17Hash,eh17ResetState,eh17BatteryFromStats,eh17SessionsFromHistory,eh17N,EnergiehuisCard};',context);
+vm.runInNewContext(src+'\n;globalThis.TEST={eh17Plan,eh17Health,eh17Hash,eh17ResetState,eh17BatteryFromStats,eh17SessionsFromHistory,eh17N,EnergiehuisCard,EH_DEFAULTS};',context);
 const {eh17Plan,eh17ResetState,eh17Hash,EnergiehuisCard}=context.TEST;
 const hour=i=>new Date(Date.UTC(2026,9,22,i)).toISOString();
 const prices=[{t:hour(0),p:.29},{t:hour(1),p:.12},{t:hour(2),p:.22},{t:hour(3),p:.09}];
@@ -71,4 +71,39 @@ test('Reset zonder expliciete confirm start geen service',async()=>{
 test('Alleen JavaScript-frontend; geen laadservice aanroepen',()=>{
   assert.doesNotMatch(src,/callService\s*\(\s*['"](?:alfen|switch|number|button|cupra)/);
   assert.match(src,/input_text","set_value"/);
+});
+
+test('Meer toont systeemcontrole en verborgen reset, bij openen meterselectie',()=>{
+ const c=context.TEST.EH_DEFAULTS;
+ const card=Object.create(EnergiehuisCard.prototype);
+ card._eh17ResetKeys=new Set();card._eh17ResetOpen=false;
+ const h={states:{}};
+ const collapsed=card._moreHtml(h,c);
+ assert.match(collapsed,/Systeemcontrole/);
+ assert.match(collapsed,/Geavanceerd · Meterbeheer/);
+ assert.doesNotMatch(collapsed,/data-eh17-preview/);
+ card._eh17ResetOpen=true;
+ const open=card._moreHtml(h,c);
+ assert.match(open,/data-eh17-preview/);
+ assert.match(open,/P1 afname/);
+ assert.match(open,/Alfen geladen energie/);
+ assert.match(open,/geen resetcommando's/i);
+});
+test('Kosten toont een prognose zonder onbetrouwbaar volledig totaal',()=>{
+ const c=context.TEST.EH_DEFAULTS,card=Object.create(EnergiehuisCard.prototype);
+ card._costCompareResult=null;card._costComparePeriod='month';
+ const h={states:{[c.cost_zonneplan_month]:{state:'72.50'}}};
+ const html=card._costsHtml(h,c);
+ assert.match(html,/Maandprognose en budget/);
+ assert.match(html,/totaaldoel is niet toetsbaar/i);
+});
+test('Laadpagina bevat scenariovergelijking en blijft een veilige simulatie',()=>{
+ const c=context.TEST.EH_DEFAULTS,card=Object.create(EnergiehuisCard.prototype);
+ card._view='charge';card._targetSoc=80;card._simNeed=10;card._simPower=3.7;card._chargeMode='slim';
+ const dep=new Date(Date.now()+2*86400000);card._departure=dep.toISOString().slice(0,16);
+ const h={states:{}};
+ const html=card._cupraHtml(h,c);
+ assert.match(html,/Slim laden 2.0/);
+ assert.match(html,/geen laadcommando’s|geen laadcommando's|geen laadopdrachten/i);
+ assert.match(html,/Zonneladen/);
 });
