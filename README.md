@@ -4,7 +4,46 @@
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis v1.4.0 blijft voor laadsturing **alleen-lezen**. De Cupra-planner is een simulatie en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis v1.6.0 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+
+## Nieuw in v1.6.0
+
+- Nieuwe **Cupra Insights**-sectie op de Cupra-pagina.
+- Kilometers: vandaag, 7 dagen, 30 dagen en dit jaar.
+- Kilometerhistorie per dag; bij jaarweergave per maand.
+- Praktijkactieradius uit werkelijk gereden kilometers en SOC-verlies.
+- Geschat verbruik in kWh/100 km op basis van 59 kWh bruikbare accucapaciteit.
+- Temperatuuranalyse in zes temperatuurklassen.
+- Vergelijking tussen genormaliseerde Cupra-range en gerealiseerde praktijkrange.
+- Verwachte praktijkrange bij de huidige buitentemperatuur zodra voldoende eigen historie beschikbaar is.
+- Cabine-doeltemperatuur als extra analysefactor.
+- Samenhang tussen buitentemperatuur / setpointverschil en geschat verbruik.
+- Alfen wordt gebruikt om thuislaadmomenten uit rijsegmenten te filteren.
+- Een SOC-stijging zonder overeenkomstige Alfen-laadenergie wordt gemarkeerd als vermoedelijk extern laden.
+- Empirische thuislaadefficiëntie uit gekoppelde Cupra-SOC- en Alfen-energie-intervallen.
+- Datakwaliteitslabel **Beperkt / Opbouwend / Sterk**.
+- De analyse gaat uit van de bewust gekozen Cupra/VW Group Connect-verversing van circa **15 minuten**.
+
+### Cupra Insights databronnen
+
+Standaard gebruikt Energiehuis:
+
+```yaml
+cupra: sensor.garage_cupra_born_accuniveau
+cupra_mileage: sensor.garage_cupra_born_kilometerstand
+cupra_range: sensor.garage_cupra_born_actieradius
+cupra_outside_temp: sensor.garage_cupra_born_buitentemperatuur
+cupra_target_temp: sensor.garage_cupra_born_doeltemperatuur
+cupra_charged_energy: sensor.garage_cupra_born_geladen_energie
+cupra_charge_target: sensor.garage_cupra_born_laaddoel
+cupra_climate_usage: sensor.garage_cupra_born_klimaatverbruik
+cupra_onboard_usage: sensor.garage_cupra_born_verbruik_boordnet
+laad_energie: sensor.alfen_geleverde_actieve_energie_totaal
+cupra_usable_kwh: 59
+cupra_refresh_minutes: 15
+```
+
+Voor kilometerstanden gebruikt Energiehuis waar mogelijk Home Assistant-langetermijnstatistieken. De fijnmazige efficiëntie- en temperatuurcorrelatie gebruikt de detailhistorie die Recorder daadwerkelijk beschikbaar heeft. De getoonde dekkingsperiode maakt daarom zichtbaar hoeveel historie voor die analyse is gebruikt.
 
 ## Nieuw in v1.4.0
 
@@ -133,4 +172,4 @@ De batterij-businesscase en het contractvoordeel worden bewust gescheiden.
 
 ## Ontwikkelrichting
 
-De volgende stappen zijn verdere modularisering, instellingen vanuit Energiehuis zelf, uitgebreidere water/gas-grafieken, slimme inzichten en uiteindelijk minder handmatige YAML-wijzigingen.
+Na Cupra Insights volgen verdere modularisering, instellingen vanuit Energiehuis zelf, uitgebreidere water/gas-grafieken en verdere verfijning van de persoonlijke energie- en mobiliteitsanalyse.
