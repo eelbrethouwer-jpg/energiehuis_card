@@ -4,7 +4,18 @@
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis v1.6.0 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis v1.6.1 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+
+## Nieuw in v1.6.1 — Cupra & Slim laden
+
+De onderste navigatie heeft nu **zes tabbladen**: Overzicht, Cupra, **Cupra & Slim laden**, Batterij, Kosten en Meer.
+
+- **Cupra:** voertuigstatus en alle historische **Cupra Insights** (kilometers, temperatuur, actieradius en verbruik).
+- **Cupra & Slim laden:** opent direct de praktische laadomgeving, zonder eerst door Cupra Insights te scrollen.
+- De nieuwe laadpagina begint met **actuele Alfen-laadstatus**, gevolgd door **laadscenario**, **planningsmodus** en **Zonneplan-prijsgrafiek / verwachte laadplanning**.
+- Op smalle telefoons heet de nieuwe navigatieknop kort **Slim laden**, met de volledige toegankelijke naam **Cupra & Slim laden**.
+- Behoud van simulatiewaarden (SOC-doel, vertrek, kWh, kW, laadmodus) bij wisselen van tabbladen zolang de kaart open staat.
+- **Geen wijzigingen** aan gebruikte entiteiten, prijsberekeningen of actieve laadsturing; de kaart blijft alleen uitlezen.
 
 ## Nieuw in v1.6.0
 
