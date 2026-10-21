@@ -4,9 +4,19 @@
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis v1.7.0 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis v1.7.1 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
 
-## Nieuw in v1.7.0 — Smart Energy Intelligence (RC)
+## Nieuw in v1.7.1 — Gas & Water hotfix
+
+- Gas vandaag gebruikt nu standaard de bestaande sensor `sensor.gas_vandaag_2`; cumulatieve gasmeter `sensor.gas_meter_gas` blijft apart.
+- Watermeter en live waterdebiet worden automatisch herkend indien er precies één goed onderbouwde sensor wordt gevonden. Handmatig gekoppelde entiteiten behouden voorrang.
+- Ontbreekt een watersensor voor het dagverbruik, dan probeert Energiehuis het dagtotaal uit Home Assistant Recorder te berekenen op basis van een beginstand vóór middernacht. De daghoeveelheid wordt in liters weergegeven; meterstanden in m³.
+- Overzicht, gas-/waterdetail en Meer tonen nu consistente bronvermeldingen.
+- De bestaande nulmeting kan ook de herkende cumulatieve watermeter gebruiken zonder originele meterstanden te wijzigen.
+
+**Opmerking:** de waterentiteitsnamen zijn nog niet uit jouw Home Assistant-installatie bevestigd. Als automatische herkenning geen eenduidige sensor vindt, vul `water`, `water_today` en/of `water_flow` met de werkelijke entiteitsnamen in. Zie [release notes v1.7.1](RELEASE_NOTES_v1.7.1.md).
+
+## Nieuw in v1.7.0 — Smart Energy Intelligence
 
 - **Energiecoach:** advies over goedkope volledige stroomuren en actuele zonneopwek.
 - **Slim laden 2.0:** direct versus goedkoop laden versus zonneladen, met volledige uren, 1×40 A-limiet, huisverbruik, laadvermogen en rekenrendement. Zonneladen vereist een expliciete PV-uurprognose; de kaart stuurt niet.

@@ -22,4 +22,4 @@ jobs:
       - name: Check JavaScript syntax
         run: node --check energiehuis-card.js
       - name: Run functionality tests
-        run: node --test tests/v17.test.cjs
+        run: node --test tests/*.test.cjs
