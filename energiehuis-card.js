@@ -1,9 +1,8 @@
-/* Energiehuis v1.4.0 — Uitgebreid HomeWizard-achtig energieoverzicht.
+/* Energiehuis v1.4.1 — Kostenvergelijking hotfix.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Nieuw: gas & water op Home, interne Batterij/Kosten/Meer-pagina's en
- * rijkere financiële businesscase. Cupra-planner blijft een veilige simulatie.
+ * Fix: Vattenfall-voordeel wordt direct uit de getoonde maandkosten berekend.
  */
-const EH_VERSION = '1.4.0';
+const EH_VERSION = '1.4.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -959,7 +958,11 @@ class EnergiehuisCard extends HTMLElement {
   const current=ehCurrentPrice(h,c.prijs);
   const zpDay=ehRead(h,c.cost_zonneplan_day),zpMonth=ehRead(h,c.cost_zonneplan_month),zpYear=ehRead(h,c.cost_zonneplan_year);
   const vf1=ehRead(h,c.cost_vattenfall_1_month),vf3=ehRead(h,c.cost_vattenfall_3_month);
-  const smart=ehRead(h,c.saving_smart_month),adv1=ehRead(h,c.advantage_vattenfall_1_month),adv3=ehRead(h,c.advantage_vattenfall_3_month);
+  const smart=ehRead(h,c.saving_smart_month);
+  const adv1=(vf1!==null&&zpMonth!==null)?vf1-zpMonth:null;
+  const adv3=(vf3!==null&&zpMonth!==null)?vf3-zpMonth:null;
+  const advLabel=(v,years)=>v===null?`Verschil vs ${years} jaar`:(v>=0?`Voordeel vs ${years} jaar`:`Nadeel vs ${years} jaar`);
+  const advClass=v=>v===null?'':(v>=0?'positive':'negative');
   const tile=(label,value,icon,tone='blue',sub='')=>`<div class="subcard"><div class="sub-icon ${tone}">${ehIcon(icon)}</div><small>${ehEsc(label)}</small><strong>${value}</strong>${sub?`<span>${ehEsc(sub)}</span>`:''}</div>`;
   return `<main class="subpage">
    <div class="subpage-head"><div><div class="eyebrow">Kosten & besparing</div><h2>Energiekosten</h2><p>Zonneplan, slimme timing en vaste Vattenfall-referenties naast elkaar.</p></div><div class="price-badge"><small>Nu</small><strong>${current===null?'—':ehMoney(current)}</strong><span>€/kWh</span></div></div>
@@ -971,12 +974,12 @@ class EnergiehuisCard extends HTMLElement {
    <section class="subsection"><div class="section-title">${ehIcon('euro')} Vergelijking deze maand</div><div class="subrows">
     <div><span>Zonneplan</span><strong>${zpMonth===null?'—':ehEuro2(zpMonth)}</strong></div>
     <div><span>Vattenfall 1 jaar</span><strong>${vf1===null?'—':ehEuro2(vf1)}</strong></div>
-    <div><span>Voordeel vs 1 jaar</span><strong class="positive">${adv1===null?'—':ehEuro2(adv1)}</strong></div>
+    <div><span>${advLabel(adv1,1)}</span><strong class="${advClass(adv1)}">${adv1===null?'—':ehEuro2(adv1)}</strong></div>
     <div><span>Vattenfall 3 jaar</span><strong>${vf3===null?'—':ehEuro2(vf3)}</strong></div>
-    <div><span>Voordeel vs 3 jaar</span><strong class="positive">${adv3===null?'—':ehEuro2(adv3)}</strong></div>
+    <div><span>${advLabel(adv3,3)}</span><strong class="${advClass(adv3)}">${adv3===null?'—':ehEuro2(adv3)}</strong></div>
     <div><span>Zonneplan dit jaar</span><strong>${zpYear===null?'—':ehEuro2(zpYear)}</strong></div>
    </div></section>
-   <div class="cupra-safety">${ehIcon('info')} <span><strong>Geen dubbeltelling.</strong> Zonneplan-contractvoordeel, slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
+   <div class="cupra-safety">${ehIcon('info')} <span><strong>Maandvergelijking direct berekend.</strong> Verschil = Vattenfall maandkosten − Zonneplan maandkosten. Slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
   </main>`;
  }
  _moreHtml(h,c){
@@ -1047,7 +1050,7 @@ class EnergiehuisCard extends HTMLElement {
 .metric-copy{min-width:0}.metric-label{font-size:12px;line-height:1.3;color:#d2e0ec}.metric-value{font-size:24px;line-height:1.18;font-weight:800;letter-spacing:-.6px;margin-top:8px;overflow-wrap:anywhere}.metric-sub{font-size:11px;line-height:1.35;color:#aac3d4;margin-top:5px}
 .mint{color:var(--mint)}.gold{color:var(--gold)}.blue{color:var(--blue)}.peach{color:#ffae83}.white{color:#f6f9ff}
 .metric-euro .metric-value{font-size:23px}.metric-gas .metric-symbol{color:#ff9b6b}.metric-water .metric-symbol{color:#67c8ff}
-.subpage{padding:22px 20px 88px;min-height:620px}.subpage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:3px 0 19px;padding:16px 4px}.subpage-head h2{margin:2px 0 7px;font-size:32px;letter-spacing:-.8px}.subpage-head p{margin:0;color:#a9c3d5;font-size:13px;line-height:1.5;max-width:670px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#61dcb0;font-weight:800;font-size:10px}.subgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.subgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.subcard,.subsection,.utility-card{border:1px solid #83adc42f;background:linear-gradient(145deg,#173047,#0b2132);border-radius:18px;box-shadow:0 6px 18px #0003}.subcard{padding:15px;min-height:132px;display:flex;flex-direction:column;align-items:flex-start}.subcard small{color:#a8c2d3;margin-top:10px}.subcard strong{font-size:24px;margin-top:5px;letter-spacing:-.4px}.subcard span{font-size:10px;color:#87a8bb;margin-top:5px}.sub-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:#14364b}.sub-icon .icon{width:24px;height:24px}.sub-icon.mint{color:var(--mint);background:#28d99a18}.sub-icon.blue{color:var(--blue);background:#4ca6ff18}.sub-icon.gold{color:var(--gold);background:#ffc93a18}.sub-icon.peach{color:#ff9e76;background:#ff9e7618}.subsection{padding:17px;margin-top:12px}.subrows{display:grid;margin-top:7px}.subrows>div{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid #9db9cb20;font-size:13px}.subrows>div:last-child{border-bottom:0}.subrows span{color:#aac2d2}.subrows strong{font-size:14px;text-align:right}.positive{color:var(--mint)!important}.soc-ring{flex:none;width:112px;height:112px;border-radius:50%;border:9px solid #2ccf9860;box-shadow:inset 0 0 0 1px #74e0bd40;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0c2232}.soc-ring strong{font-size:25px}.soc-ring span{font-size:10px;color:#9fc0d0;margin-top:4px}.price-badge{min-width:130px;border:1px solid #5ba1c847;background:#0d2638;border-radius:16px;padding:12px 15px;text-align:right}.price-badge small,.price-badge span{display:block;color:#9ab8cb;font-size:10px}.price-badge strong{display:block;font-size:22px;margin:3px 0}.utility-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.utility-card{padding:17px}.utility-head{display:flex;align-items:center;gap:13px}.utility-head small{display:block;color:#9ebccc}.utility-head strong{display:block;font-size:24px;margin-top:3px}
+.subpage{padding:22px 20px 88px;min-height:620px}.subpage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:3px 0 19px;padding:16px 4px}.subpage-head h2{margin:2px 0 7px;font-size:32px;letter-spacing:-.8px}.subpage-head p{margin:0;color:#a9c3d5;font-size:13px;line-height:1.5;max-width:670px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#61dcb0;font-weight:800;font-size:10px}.subgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.subgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.subcard,.subsection,.utility-card{border:1px solid #83adc42f;background:linear-gradient(145deg,#173047,#0b2132);border-radius:18px;box-shadow:0 6px 18px #0003}.subcard{padding:15px;min-height:132px;display:flex;flex-direction:column;align-items:flex-start}.subcard small{color:#a8c2d3;margin-top:10px}.subcard strong{font-size:24px;margin-top:5px;letter-spacing:-.4px}.subcard span{font-size:10px;color:#87a8bb;margin-top:5px}.sub-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:#14364b}.sub-icon .icon{width:24px;height:24px}.sub-icon.mint{color:var(--mint);background:#28d99a18}.sub-icon.blue{color:var(--blue);background:#4ca6ff18}.sub-icon.gold{color:var(--gold);background:#ffc93a18}.sub-icon.peach{color:#ff9e76;background:#ff9e7618}.subsection{padding:17px;margin-top:12px}.subrows{display:grid;margin-top:7px}.subrows>div{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid #9db9cb20;font-size:13px}.subrows>div:last-child{border-bottom:0}.subrows span{color:#aac2d2}.subrows strong{font-size:14px;text-align:right}.positive{color:var(--mint)!important}.negative{color:#ff9e76!important}.soc-ring{flex:none;width:112px;height:112px;border-radius:50%;border:9px solid #2ccf9860;box-shadow:inset 0 0 0 1px #74e0bd40;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0c2232}.soc-ring strong{font-size:25px}.soc-ring span{font-size:10px;color:#9fc0d0;margin-top:4px}.price-badge{min-width:130px;border:1px solid #5ba1c847;background:#0d2638;border-radius:16px;padding:12px 15px;text-align:right}.price-badge small,.price-badge span{display:block;color:#9ab8cb;font-size:10px}.price-badge strong{display:block;font-size:22px;margin:3px 0}.utility-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.utility-card{padding:17px}.utility-head{display:flex;align-items:center;gap:13px}.utility-head small{display:block;color:#9ebccc}.utility-head strong{display:block;font-size:24px;margin-top:3px}
 .chart-panel{margin-top:14px;padding:17px 17px 12px;background:linear-gradient(150deg,#12273bea,#0b1f31);border:1px solid #9dbbd02b;border-radius:20px}
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.chart-title{font-size:17px;font-weight:750;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}.chart-title .icon{width:16px;height:16px;color:#9bb4cc}.now-power{font-size:15px;font-weight:800;color:var(--gold);white-space:nowrap}
 .chart-note{font-size:11px;color:#9dbbd1;margin-top:4px}.history{display:block;width:100%;height:auto;margin:9px auto 0;overflow:visible}.gridline{stroke:#b1cddd20;stroke-width:1}.xlab,.ylab{fill:#a4bfd2;font-size:13px}
@@ -1151,5 +1154,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.4',description:'Uitgebreid energieoverzicht met Cupra, batterij, kosten, gas en water.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.4.1',description:'Uitgebreid energieoverzicht met gecorrigeerde maandvergelijking voor Vattenfall.'});
 }
