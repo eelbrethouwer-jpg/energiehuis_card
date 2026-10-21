@@ -1,0 +1,25 @@
+name: Energiehuis v1.7.0 regressiecontrole
+
+on:
+  pull_request:
+    paths:
+      - 'energiehuis-card.js'
+      - 'tests/**'
+      - '.github/workflows/v17-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: node --check energiehuis-card.js
+      - name: Run functionality tests
+        run: node --test tests/v17.test.cjs
