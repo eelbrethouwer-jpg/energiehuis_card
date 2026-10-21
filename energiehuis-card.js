@@ -791,7 +791,7 @@ class EnergiehuisCard extends HTMLElement {
    if(details){this._cupraDetails=!this._cupraDetails;this._schedule();return;}
    const mode=e.target.closest('[data-eh-mode]');
    if(mode){
-     if(['slim','direct','pause'].includes(mode.dataset.ehMode)){
+     if(['slim','direct','sun','pause'].includes(mode.dataset.ehMode)){
        this._chargeMode=mode.dataset.ehMode;this._schedule();
      }
      return;
@@ -1251,7 +1251,13 @@ class EnergiehuisCard extends HTMLElement {
   const tariff=ehPricesForDay(h,c,new Date());
   const forecast=ehHourlyFromPrices(tariff.quarters,tariff.hourly.length?tariff.hourly:ehForecast(h,c.prijs));
   const prices=forecast.filter(x=>x.t&&Number.isFinite(Date.parse(x.t))).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
-  const planned=ehPlanningHours(prices,new Date(),this._departure,need,power,this._chargeMode);
+  const planned=eh17Plan(prices,new Date(),this._departure,need,power,this._chargeMode,{
+     fuseAmp:eh17N(c.fuse_amp)??40,chargerAmp:eh17N(c.charger_amp)??32,
+     reserveAmp:eh17N(c.reserve_amp)??2,houseW:ehW(h,c.huis),
+     efficiency:eh17N(c.ev_charge_efficiency)??.9,
+     solar:eh17Solar(h,c.pv_forecast),
+     exportCompensation:eh17N(c.export_compensation_eur_kwh)
+   });
   const safeImg=ehValidHero(c.cupra_image)?c.cupra_image:'';
   const connectionText=connected===null||connected===undefined?'Niet gekoppeld':String(connected);
   const chargeLabel=ev===null?'Alfen niet beschikbaar':charging?'Auto laadt via Alfen':'Geen laadsessie actief';
@@ -1314,7 +1320,7 @@ class EnergiehuisCard extends HTMLElement {
       <p class="subtle">${hasCapacity?`Behoefte berekend uit ${ehFmt(soc,0)}% SOC, ${ehFmt(capacity,1)} kWh bruikbare accucapaciteit en doel ${target}%. ${this._simNeed!==null?'Handmatige laadbehoefte gaat voor.':''}`:(soc===null?'De Cupra-SOC is nog niet gekoppeld. Vul daarom je laadbehoefte zelf in.':`Voor een automatische behoefteberekening bij ${target}% is cupra_usable_kwh nodig. Vul voorlopig zelf de laadbehoefte in.`)} Deze waarden zijn uitsluitend een simulatie.</p>
     </section>
     <section class="cupra-card"><div class="section-title">${ehIcon('bolt')} Planningsmodus</div><div class="mode-grid">
-      ${[['slim','leaf','Slim','Goedkoopste uren'],['direct','bolt','Direct','Eerstvolgende uren'],['sun','sun','Zon','Later koppelen'],['pause','dots','Pauze','Geen uren plannen']].map(([id,icon,title,desc])=>`<button class="mode ${this._chargeMode===id?'active':''}" data-eh-mode="${id}" type="button" ${id==='sun'?'disabled title="Vereist een betrouwbare zonneprognose"':''}>${ehIcon(icon)}<strong>${title}</strong><span>${desc}</span></button>`).join('')}
+      ${[['slim','leaf','Slim','Goedkoopste uren'],['direct','bolt','Direct','Eerstvolgende uren'],['sun','sun','Zon','PV-prognose nodig'],['pause','dots','Pauze','Geen uren plannen']].map(([id,icon,title,desc])=>`<button class="mode ${this._chargeMode===id?'active':''}" data-eh-mode="${id}" type="button" ${id==='sun'&&!eh17Solar(h,c.pv_forecast).length?'disabled title="Koppel een betrouwbare zonneprognose"':''}>${ehIcon(icon)}<strong>${title}</strong><span>${desc}</span></button>`).join('')}
     </div></section>
     <section class="cupra-card"><div class="section-title">${ehIcon('euro')} Verwachte laadplanning</div><p class="subtle">Tarieven komen uit je Zonneplan-forecast. Geschatte kosten zijn exclusief laadverlies, vaste kosten en eventuele tariefverschillen. Geen laadopdrachten worden verzonden.</p>${priceCompare}${forecastBars}${plannedMarkup}</section>
     <div class="cupra-safety">${ehIcon('shield')} <span><strong>Veilige simulatie.</strong> Deze knoppen regelen de Alfen niet. Werkelijke laadsnelheid kan variëren door de 1×40A-aansluiting, huisverbruik, laadpaalinstellingen en Active Load Balancing. Er worden geen laadcommando’s verstuurd.</span></div>
@@ -1715,14 +1721,19 @@ function eh17SessionsHtml(card,h,c){
 function eh17BatteryFromStats(data,c,h,now){
  const from=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7),to=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const bins=ehWindows({from,to,step:"day"}),bucket=ehCountersByWindow(data,[c.import,c.export],bins,"day",h);
- return bins.map(b=>({t:b.t,import:bucket[c.import]?.totals?.get(b.key),export:bucket[c.export]?.totals?.get(b.key)})).filter(x=>Number.isFinite(x.import)&&Number.isFinite(x.export));
+ const convert=(value,id)=>{
+  if(!Number.isFinite(value))return null;
+  const unit=String(h?.states?.[id]?.attributes?.unit_of_measurement||"kWh").trim().toLowerCase();
+  return unit==="wh"?value/1000:unit==="kwh"?value:null;
+ };
+ return bins.map(b=>({t:b.t,import:convert(bucket[c.import]?.totals?.get(b.key),c.import),export:convert(bucket[c.export]?.totals?.get(b.key),c.export)})).filter(x=>Number.isFinite(x.import)&&Number.isFinite(x.export));
 }
 
 function eh17BatteryHtml(card,h,c){
  if(!card._eh17BatteryLoading&&(!card._eh17Battery||Date.now()-card._eh17Battery.at>30*60000))card._eh17LoadBattery();
  const data=card._eh17Battery,cap=card._eh17Capacity||10;
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08;
- const days=data?.rows||[],usable=days.map(d=>Math.min(cap,d.export,d.import/Math.max(.01,eff))),mean=usable.length?usable.reduce((s,v)=>s+v,0)/usable.length:null;
+ const days=data?.rows||[],usable=days.map(d=>Math.min(cap,d.export,d.import/Math.max(.01,eff))),mean=usable.length>=2?usable.reduce((s,v)=>s+v,0)/usable.length:null;
  const kwhMonth=mean===null?null:mean*eff*30.44;
  const savings=mean===null?null:mean*(eff*buy-sell)*30.44;
  return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("battery")} Virtuele batterij 2.0 · capaciteitsvergelijking</div><div class="eh17-choices">${[5,10,15].map(n=>`<button type="button" data-eh17-cap="${n}" class="${n===cap?"active":""}">${n} kWh</button>`).join("")}</div><div class="eh17-grid"><div><small>Ideaal herbruikbare zonne-energie/maand</small><strong>${kwhMonth===null?"—":ehFmt(kwhMonth,1)+" kWh"}</strong></div><div><small>Indicatief financieel potentieel/maand</small><strong>${ehEuro2(savings)}</strong></div><div><small>Volledige gemeten dagen</small><strong>${days.length} / 7</strong></div></div><p class="subtle">${data?.error?ehEsc(data.error)+" ":""}Bovengrens voor dagelijkse opslag uit gemeten export en latere import; geen daadwerkelijke batterijprestatie, terugverdientijd of uursimulatie. Aannames: ${ehFmt(eff*100,0)}% rondrendement, ${ehEuro2(buy)}/kWh vermeden inkoop en ${ehEuro2(sell)}/kWh gemiste teruglevering. Voor financiële nauwkeurigheid zijn historische uurprijzen en laadstrategie nodig. ${days.length<2?"Onvoldoende betrouwbare historie voor een maandindicatie.":""}</p></section>`;
@@ -1735,13 +1746,17 @@ function eh17ResetDefs(c){
 function eh17ResetState(h,c){
  const id=c.reset_store,raw=h?.states?.[id]?.state;
  if(!id||!id.startsWith("input_text.")||raw===undefined)return {error:"Maak eerst de Home Assistant-helper input_text.energiehuis_reset_baselines aan (zie installatiehandleiding).",b:{}};
- if(raw===""||raw==="unknown"||raw==="unavailable")return {b:{},error:raw==="unavailable"?"Reset-helper tijdelijk niet beschikbaar.":null};
+ if(raw==="unknown"||raw==="unavailable")return {b:{},error:"Reset-helper niet beschikbaar."};
+ if(raw==="")return {b:{},error:null};
  try{const parsed=JSON.parse(raw);if(parsed?.v!==1||!parsed.b||typeof parsed.b!=="object"||Array.isArray(parsed.b))throw Error("formaat");return {b:parsed.b,error:null};}
  catch(_){return {error:"De opslag-helper bevat geen geldig Energiehuis-nulmetingformaat. Er wordt niets overschreven.",b:{}};}
 }
 
 function eh17ResetHtml(card,h,c){
- const initial=eh17ResetState(h,c),store=card._eh17PendingReset??initial;
+ const initial=eh17ResetState(h,c);
+ const currentRaw=h?.states?.[c.reset_store]?.state;
+ if(card._eh17PendingReset&&(card._eh17PendingReset.raw===currentRaw||Date.now()-card._eh17PendingReset.at>15000))card._eh17PendingReset=null;
+ const store=card._eh17PendingReset??initial;
  const entries=eh17ResetDefs(c).filter(([, ,id])=>id).map(([key,label,id])=>{
   const st=h?.states?.[id],n=eh17N(st?.state),unit=String(st?.attributes?.unit_of_measurement||"").trim();
   const baseline=store.b?.[key],valid=Array.isArray(baseline)&&baseline.length>=3&&baseline[2]===eh17Hash(id)&&Number.isFinite(eh17N(baseline[0]));
@@ -1822,7 +1837,7 @@ function eh17Enhance(){
   this._eh17ResetSaving=true;this._schedule();
   try{
     await h.callService("input_text","set_value",{entity_id:c.reset_store,value});
-    this._eh17PendingReset={b:baselines,error:null};
+    this._eh17PendingReset={b:baselines,error:null,at:Date.now(),raw:value};
     this._eh17ResetMsg="Nieuwe nulmeting opgeslagen in Home Assistant voor "+keys.length+" meter(s).";
     this._eh17ResetKeys=new Set();
     this._eh17Confirm=null;
