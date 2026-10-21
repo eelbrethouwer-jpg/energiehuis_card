@@ -1064,6 +1064,11 @@ class EnergiehuisCard extends HTMLElement {
   const adv3Year=(vf3Year!==null&&zpYear!==null)?vf3Year-zpYear:null;
   const advLabel=(v,years)=>v===null?`Verschil vs ${years} jaar`:(v>=0?`Voordeel vs ${years} jaar`:`Nadeel vs ${years} jaar`);
   const advClass=v=>v===null?'':(v>=0?'positive':'negative');
+  const costResult=this._costCompareResult?.period===this._costComparePeriod?this._costCompareResult:null;
+  const costPoints=costResult?.points||[];
+  const costSelected=costPoints.length?costPoints.reduce((a,b)=>this._costCompareSelectedTime===null||this._costCompareSelectedTime===undefined?(b.t>a.t?b:a):(Math.abs(b.t-this._costCompareSelectedTime)<Math.abs(a.t-this._costCompareSelectedTime)?b:a),costPoints[0]):null;
+  const costDate=costSelected?(this._costComparePeriod==='month'?new Date(costSelected.t).toLocaleDateString('nl-NL',{day:'numeric',month:'long'}):new Date(costSelected.t).toLocaleDateString('nl-NL',{month:'long',year:'numeric'})):'—';
+  const costGraph=costResult?.error?`<p class="plan-warning">${ehEsc(costResult.error)}</p>`:!costResult?'<div class="energy-loading">Kostenhistorie ophalen…</div>':ehCostCompareChart(costResult,costSelected?.t??Date.now());
   const tile=(label,value,icon,tone='blue',sub='')=>`<div class="subcard"><div class="sub-icon ${tone}">${ehIcon(icon)}</div><small>${ehEsc(label)}</small><strong>${value}</strong>${sub?`<span>${ehEsc(sub)}</span>`:''}</div>`;
   return `<main class="subpage">
    <div class="subpage-head"><div><div class="eyebrow">Kosten & besparing</div><h2>Energiekosten</h2><p>Zonneplan, slimme timing en vaste Vattenfall-referenties naast elkaar.</p></div><div class="price-badge"><small>Nu</small><strong>${current===null?'—':ehMoney(current)}</strong><span>€/kWh</span></div></div>
@@ -1086,6 +1091,14 @@ class EnergiehuisCard extends HTMLElement {
     <div><span>Vattenfall 3 jaar dit jaar</span><strong>${vf3Year===null?'—':ehEuro2(vf3Year)}</strong></div>
     <div><span>${advLabel(adv3Year,3)}</span><strong class="${advClass(adv3Year)}">${adv3Year===null?'—':ehEuro2(adv3Year)}</strong></div>
    </div></section>
+   <section class="subsection cost-trend"><div class="section-title">${ehIcon('chart')} Cumulatief verschil</div>
+    <div class="cost-periods"><button type="button" data-eh-cost-period="month" class="${this._costComparePeriod==='month'?'chosen':''}">Deze maand</button><button type="button" data-eh-cost-period="year" class="${this._costComparePeriod==='year'?'chosen':''}">Dit jaar</button></div>
+    <p class="subtle">Start op €0 aan het begin van de gekozen periode. Boven nul = voordeel voor Zonneplan; onder nul = nadeel.</p>
+    ${costGraph}
+    <div class="cost-compare-readout" aria-live="polite"><span>${ehEsc(costDate)}</span><strong class="${costSelected?advClass(costSelected.v1):''}">vs 1 jaar: ${costSelected?ehEuro2(costSelected.v1):'—'}</strong><strong class="${costSelected?advClass(costSelected.v3):''}">vs 3 jaar: ${costSelected?ehEuro2(costSelected.v3):'—'}</strong></div>
+    <div class="energy-legend"><span><i style="background:#4ee3a6"></i>Vattenfall 1 jaar</span><span><i style="background:#69b8ff"></i>Vattenfall 3 jaar</span></div>
+    <p class="subtle">Tik of sleep over de grafiek voor het cumulatieve verschil op een datum. Het laatste punt wordt afgestemd op de actuele bedragen in de tabel.</p>
+   </section>
    <div class="cupra-safety">${ehIcon('info')} <span><strong>Perioden apart berekend.</strong> Maandverschillen gebruiken alleen maandkosten; jaarverschillen alleen jaarkosten. Slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
   </main>`;
  }
