@@ -793,6 +793,7 @@ class EnergiehuisCard extends HTMLElement {
  _cupraHtml(h,c){
   const soc=ehRead(h,c.cupra);
   const range=ehRead(h,c.cupra_range);
+  const mileage=ehRead(h,c.cupra_mileage);
   const connected=c.cupra_connection?h.states?.[c.cupra_connection]?.state:null;
   const ev=ehW(h,c.laden),amps=ehRead(h,c.stroom),charging=ev!==null&&ev>80;
   const target=this._targetSoc;
