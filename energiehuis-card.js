@@ -474,7 +474,7 @@ class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -488,6 +488,8 @@ class EnergiehuisCard extends HTMLElement {
      }
      return;
    }
+   const details=e.target.closest('[data-eh-cupra-details]');
+   if(details){this._cupraDetails=!this._cupraDetails;this._schedule();return;}
    const mode=e.target.closest('[data-eh-mode]');
    if(mode){
      if(['slim','direct','pause'].includes(mode.dataset.ehMode)){
