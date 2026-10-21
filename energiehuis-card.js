@@ -1,8 +1,8 @@
-/* Energiehuis v1.4.2 — Kostenvergelijking per maand en jaar.
+/* Energiehuis v1.5.0 — Cumulatieve kostenvergelijking.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Nieuw: maand- en jaarvergelijkingen zijn visueel en rekenkundig gescheiden.
+ * Nieuw: interactieve cumulatieve verschilgrafiek voor maand en jaar.
  */
-const EH_VERSION = '1.4.2';
+const EH_VERSION = '1.5.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -130,6 +130,7 @@ function ehIcon(name,cls='') {
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',
   leaf:'<path d="M20 4c-10 0-16 4-16 12 0 3 2 5 5 5 8 0 12-7 11-17Z"/><path d="M5 20c4-7 8-10 13-12"/>',
   shield:'<path d="m12 2 9 4v6c0 6-4 9-9 10-5-1-9-4-9-10V6z"/><path d="m8 12 3 3 5-6"/>',
+  chart:'<path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/><path d="M3 21h18"/>',
   chevron:'<path d="m9 18 6-6-6-6"/>'
  }[name]||'';
  return `<svg class="icon ${cls}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -444,6 +445,56 @@ function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  const cursor=chosen?`<line x1="${tx.toFixed(1)}" x2="${tx.toFixed(1)}" y1="${T}" y2="${H-B}" stroke="#f5faff" stroke-dasharray="4 4" opacity=".8"/>`:'';
  return `<svg class="metric-history" data-eh-metric-plot="1" data-eh-left="${L}" data-eh-right="${W-R}" data-eh-width="${W}" role="img" aria-label="${ehEsc(type==='grid'?'Afname en teruglevering':'Energiehistorie')}, tik of klik voor waarden per tijdstip" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><text x="6" y="12" fill="#a6c4d6" font-size="12">${isRaw?'kW':'kWh'}</text>${axis}<line x1="${L}" x2="${W-R}" y1="${yp(0).toFixed(1)}" y2="${yp(0).toFixed(1)}" stroke="#c2dcef66"/>${lines}${cursor}${ticks}<rect x="${L}" y="${T}" width="${CW}" height="${CH}" fill="transparent" style="cursor:crosshair"/></svg>`;
 }
+function ehCostComparePoints(stats,ids,bins,step,h,live,now){
+ const mapped=ehCountersByWindow(stats,ids,bins,step,h);
+ const val=(id,b)=>id?mapped[id]?.totals.get(b.key):undefined;
+ let z=0,v1=0,v3=0,historyCount=0;
+ const points=[];
+ if(bins.length)points.push({t:bins[0].t,v1:0,v3:0});
+ for(const b of bins){
+   const dz=val(ids[0],b),d1=val(ids[1],b),d3=val(ids[2],b);
+   if([dz,d1,d3].every(Number.isFinite)){
+     z+=dz;v1+=d1;v3+=d3;historyCount++;
+     points.push({t:b.end,v1:v1-z,v3:v3-z});
+   }
+ }
+ if(live&&[live.z,live.v1,live.v3].every(Number.isFinite)){
+   const endpoint={t:now.getTime(),v1:live.v1-live.z,v3:live.v3-live.z};
+   if(points.length&&Math.abs(points[points.length-1].t-endpoint.t)<60000)points[points.length-1]=endpoint;
+   else points.push(endpoint);
+ }
+ return {points,historyCount};
+}
+function ehCostCompareChart(result,selectedAt){
+ const points=result?.points||[];
+ if(points.length<2||!result?.historyCount)return '<div class="no-chart">Nog onvoldoende langetermijnstatistieken voor een betrouwbare cumulatieve grafiek.</div>';
+ const W=690,H=260,L=58,R=14,T=18,B=42,CW=W-L-R,CH=H-T-B;
+ const nums=points.flatMap(p=>[p.v1,p.v3]).filter(Number.isFinite);
+ if(!nums.length)return '<div class="no-chart">Geen cumulatieve kostenverschillen beschikbaar.</div>';
+ let min=Math.min(0,...nums),max=Math.max(0,...nums);
+ const pad=Math.max((max-min)*.14,.5);min-=pad;max+=pad;
+ const from=result.from.getTime(),to=result.to.getTime();
+ const xp=t=>L+(Math.max(from,Math.min(t,to))-from)/Math.max(1,to-from)*CW;
+ const yp=v=>T+(max-v)/(max-min)*CH;
+ const axis=Array.from({length:5},(_,i)=>max-(max-min)*i/4).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-8)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">€ '+ehEsc(ehFmt(v,1))+'</text>').join('');
+ const ticks=Array.from({length:5},(_,i)=>{
+   const t=from+(to-from)*i/4,d=new Date(t);
+   const label=result.period==='month'?d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'}):d.toLocaleDateString('nl-NL',{month:'short'});
+   const x=xp(t);return '<text x="'+x.toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===4?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(label)+'</text>';
+ }).join('');
+ const series=[['v1','#4ee3a6'],['v3','#69b8ff']];
+ const lines=series.map(([key,color])=>{
+   const valid=points.filter(p=>Number.isFinite(p[key]));
+   if(valid.length<2)return '';
+   const d=valid.map((p,i)=>(i?'L':'M')+xp(p.t).toFixed(1)+','+yp(p[key]).toFixed(1)).join(' ');
+   return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+ }).join('');
+ const chosen=points.reduce((a,b)=>Math.abs(b.t-selectedAt)<Math.abs(a.t-selectedAt)?b:a,points[0]);
+ const cx=xp(chosen.t);
+ const dots=series.map(([key,color])=>Number.isFinite(chosen[key])?'<circle cx="'+cx.toFixed(1)+'" cy="'+yp(chosen[key]).toFixed(1)+'" r="5" fill="'+color+'" stroke="#071522" stroke-width="2"/>':'').join('');
+ return '<svg class="cost-compare-chart" data-eh-cost-plot="1" data-eh-left="'+L+'" data-eh-right="'+(W-R)+'" data-eh-width="'+W+'" role="img" aria-label="Cumulatief kostenverschil ten opzichte van Vattenfall" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'+axis+'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(0).toFixed(1)+'" y2="'+yp(0).toFixed(1)+'" stroke="#f0f8ff99" stroke-width="1.8"/><text x="'+(L+4)+'" y="'+(yp(0)-6).toFixed(1)+'" fill="#d5e8f4" font-size="10">€0</text>'+lines+'<line x1="'+cx.toFixed(1)+'" x2="'+cx.toFixed(1)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="#f5faff" stroke-dasharray="4 4" opacity=".75"/>'+dots+ticks+'<rect x="'+L+'" y="'+T+'" width="'+CW+'" height="'+CH+'" fill="transparent" style="cursor:crosshair"/></svg>';
+}
+
 function ehPricesForDay(h,c,now){
  const sources=[c.kwartier_forecast,c.prijs].filter(Boolean);
  let forecasts=sources.map(id=>ehForecast(h,id).filter(p=>p.t&&Number.isFinite(Date.parse(p.t))).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t)));
@@ -494,7 +545,7 @@ class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -503,9 +554,16 @@ class EnergiehuisCard extends HTMLElement {
      if(['overview','cupra','battery','costs','more'].includes(next)){
        this._view=next;this._detail=null;
        this._schedule();
+       if(next==='costs')this._loadCostCompare();
        requestAnimationFrame(()=>{if(this.isConnected)this.scrollIntoView({behavior:'smooth',block:'start'});});
        // De pagina blijft binnen dezelfde Lovelace kaart: geen route of backend wijziging.
      }
+     return;
+   }
+   const costPeriod=e.target.closest('[data-eh-cost-period]');
+   if(costPeriod){
+     const p=costPeriod.dataset.ehCostPeriod;
+     if(['month','year'].includes(p)){this._costComparePeriod=p;this._costCompareSelectedTime=null;this._costCompareResult=null;this._schedule();this._loadCostCompare();}
      return;
    }
    const details=e.target.closest('[data-eh-cupra-details]');
@@ -572,6 +630,8 @@ class EnergiehuisCard extends HTMLElement {
      }
    });
   this.shadowRoot.addEventListener('pointerdown',e=>{
+    const cost=e.target.closest('[data-eh-cost-plot]');
+    if(cost){this._costCompareDragging=true;this._selectCostCompareFromPointer(cost,e);return;}
     const metric=e.target.closest('[data-eh-metric-plot]');
     if(metric){this._metricDragging=true;this._selectMetricFromPointer(metric,e);return;}
     const svg=e.target.closest('[data-eh-history-chart]');
@@ -581,13 +641,15 @@ class EnergiehuisCard extends HTMLElement {
     this._selectFromPointer(svg,e);
   });
   this.shadowRoot.addEventListener('pointermove',e=>{
+    const cost=e.target.closest('[data-eh-cost-plot]');
+    if(cost && (this._costCompareDragging||e.pointerType==='mouse')){this._selectCostCompareFromPointer(cost,e);return;}
     const metric=e.target.closest('[data-eh-metric-plot]');
     if(metric && (this._metricDragging||e.pointerType==='mouse')){this._selectMetricFromPointer(metric,e);return;}
     const svg=e.target.closest('[data-eh-history-chart]');
     if(svg && (this._dragging || e.pointerType==='mouse'))this._selectFromPointer(svg,e);
   });
-  this.shadowRoot.addEventListener('pointerup',()=>{this._dragging=false;this._metricDragging=false});
-  this.shadowRoot.addEventListener('pointercancel',()=>{this._dragging=false;this._metricDragging=false});
+  this.shadowRoot.addEventListener('pointerup',()=>{this._dragging=false;this._metricDragging=false;this._costCompareDragging=false});
+  this.shadowRoot.addEventListener('pointercancel',()=>{this._dragging=false;this._metricDragging=false;this._costCompareDragging=false});
  }
  _selectFromPointer(svg,e){
   const hist=this._history;
@@ -683,6 +745,41 @@ class EnergiehuisCard extends HTMLElement {
   const nearest=values.reduce((a,b)=>Math.abs(b.t-target)<Math.abs(a.t-target)?b:a,values[0]);
   if(nearest&&this._metricSelectedTime!==nearest.t){this._metricSelectedTime=nearest.t;this._schedule();}
  }
+ _selectCostCompareFromPointer(svg,event){
+  const result=this._costCompareResult;
+  if(!result?.points?.length)return;
+  const r=svg.getBoundingClientRect(),left=Number(svg.dataset.ehLeft),right=Number(svg.dataset.ehRight),w=Number(svg.dataset.ehWidth);
+  if(!r.width)return;
+  const fx=Math.max(0,Math.min(1,((event.clientX-r.left)/r.width*w-left)/(right-left)));
+  const target=result.from.getTime()+fx*(result.to.getTime()-result.from.getTime());
+  const nearest=result.points.reduce((a,b)=>Math.abs(b.t-target)<Math.abs(a.t-target)?b:a,result.points[0]);
+  if(nearest&&this._costCompareSelectedTime!==nearest.t){this._costCompareSelectedTime=nearest.t;this._schedule();}
+ }
+ async _loadCostCompare(){
+  const h=this._hass,c=this.config,p=this._costComparePeriod;
+  if(this._view!=='costs'||!h?.callWS||!c)return;
+  const now=new Date();
+  const from=p==='month'?new Date(now.getFullYear(),now.getMonth(),1):new Date(now.getFullYear(),0,1);
+  const step=p==='month'?'day':'month';
+  const ids=p==='month'?[c.cost_zonneplan_month,c.cost_vattenfall_1_month,c.cost_vattenfall_3_month]:[c.cost_zonneplan_year,c.cost_vattenfall_1_year,c.cost_vattenfall_3_year];
+  if(ids.some(id=>!id)){this._costCompareResult={period:p,from,to:now,points:[],historyCount:0,error:'Niet alle kostensensoren zijn gekoppeld.',fetched:Date.now()};this._schedule();return;}
+  const key=p+'|'+ehDayKey(from)+'|'+ids.join('|');
+  if(this._costCompareKey===key&&Date.now()-this._costCompareAt<5*60*1000&&this._costCompareResult){this._schedule();return;}
+  if(this._costCompareLoading)return;
+  this._costCompareLoading=true;this._costCompareResult=null;this._schedule();
+  try{
+   const bins=ehWindows({from,to:now,step});
+   const before=p==='month'?new Date(from.getFullYear(),from.getMonth(),from.getDate()-1):new Date(from.getFullYear()-1,11,1);
+   const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:now.toISOString(),statistic_ids:[...new Set(ids)],period:step,types:['change','sum']});
+   const live={z:ehRead(h,ids[0]),v1:ehRead(h,ids[1]),v3:ehRead(h,ids[2])};
+   const built=ehCostComparePoints(stats,ids,bins,step,h,live,now);
+   this._costCompareResult={period:p,from,to:now,points:built.points,historyCount:built.historyCount,error:null,fetched:Date.now()};
+   this._costCompareKey=key;this._costCompareAt=Date.now();
+  }catch(_){
+   this._costCompareResult={period:p,from,to:now,points:[],historyCount:0,error:'Langetermijnstatistieken voor de kostensensoren zijn niet beschikbaar.',fetched:Date.now()};
+   this._costCompareKey=key;this._costCompareAt=Date.now();
+  }finally{this._costCompareLoading=false;this._schedule();}
+ }
  async _loadMetricData(){
   const type=this._detail,p=this._metricPeriod,c=this.config,h=this._hass;
   if(!['grid','sun','home','car'].includes(type)||!h?.callWS||!c)return;
@@ -773,14 +870,14 @@ class EnergiehuisCard extends HTMLElement {
  }
  setConfig(config){
   if(!config || typeof config!=='object')throw new Error('Ongeldige Energiehuis-configuratie');
-  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._schedule();this._loadMetricData();
+  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._schedule();this._loadMetricData();this._loadCostCompare();
  }
- set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();}
+ set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();}
  getCardSize(){return 9}
  static getStubConfig(){return {type:'custom:energiehuis-card'}}
  connectedCallback(){
-  this._loadHistory();this._loadMetricData();
-  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>this._loadHistory(),5*60*1000);
+  this._loadHistory();this._loadMetricData();this._loadCostCompare();
+  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();},5*60*1000);
  }
  disconnectedCallback(){if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}}
  _schedule(){
@@ -968,6 +1065,11 @@ class EnergiehuisCard extends HTMLElement {
   const adv3Year=(vf3Year!==null&&zpYear!==null)?vf3Year-zpYear:null;
   const advLabel=(v,years)=>v===null?`Verschil vs ${years} jaar`:(v>=0?`Voordeel vs ${years} jaar`:`Nadeel vs ${years} jaar`);
   const advClass=v=>v===null?'':(v>=0?'positive':'negative');
+  const costResult=this._costCompareResult?.period===this._costComparePeriod?this._costCompareResult:null;
+  const costPoints=costResult?.points||[];
+  const costSelected=costPoints.length?costPoints.reduce((a,b)=>this._costCompareSelectedTime===null||this._costCompareSelectedTime===undefined?(b.t>a.t?b:a):(Math.abs(b.t-this._costCompareSelectedTime)<Math.abs(a.t-this._costCompareSelectedTime)?b:a),costPoints[0]):null;
+  const costDate=costSelected?(this._costComparePeriod==='month'?new Date(costSelected.t).toLocaleDateString('nl-NL',{day:'numeric',month:'long'}):new Date(costSelected.t).toLocaleDateString('nl-NL',{month:'long',year:'numeric'})):'—';
+  const costGraph=costResult?.error?`<p class="plan-warning">${ehEsc(costResult.error)}</p>`:!costResult?'<div class="energy-loading">Kostenhistorie ophalen…</div>':ehCostCompareChart(costResult,costSelected?.t??Date.now());
   const tile=(label,value,icon,tone='blue',sub='')=>`<div class="subcard"><div class="sub-icon ${tone}">${ehIcon(icon)}</div><small>${ehEsc(label)}</small><strong>${value}</strong>${sub?`<span>${ehEsc(sub)}</span>`:''}</div>`;
   return `<main class="subpage">
    <div class="subpage-head"><div><div class="eyebrow">Kosten & besparing</div><h2>Energiekosten</h2><p>Zonneplan, slimme timing en vaste Vattenfall-referenties naast elkaar.</p></div><div class="price-badge"><small>Nu</small><strong>${current===null?'—':ehMoney(current)}</strong><span>€/kWh</span></div></div>
@@ -990,6 +1092,14 @@ class EnergiehuisCard extends HTMLElement {
     <div><span>Vattenfall 3 jaar dit jaar</span><strong>${vf3Year===null?'—':ehEuro2(vf3Year)}</strong></div>
     <div><span>${advLabel(adv3Year,3)}</span><strong class="${advClass(adv3Year)}">${adv3Year===null?'—':ehEuro2(adv3Year)}</strong></div>
    </div></section>
+   <section class="subsection cost-trend"><div class="section-title">${ehIcon('chart')} Cumulatief verschil</div>
+    <div class="cost-periods"><button type="button" data-eh-cost-period="month" class="${this._costComparePeriod==='month'?'chosen':''}">Deze maand</button><button type="button" data-eh-cost-period="year" class="${this._costComparePeriod==='year'?'chosen':''}">Dit jaar</button></div>
+    <p class="subtle">Start op €0 aan het begin van de gekozen periode. Boven nul = voordeel voor Zonneplan; onder nul = nadeel.</p>
+    ${costGraph}
+    <div class="cost-compare-readout" aria-live="polite"><span>${ehEsc(costDate)}</span><strong class="${costSelected?advClass(costSelected.v1):''}">vs 1 jaar: ${costSelected?ehEuro2(costSelected.v1):'—'}</strong><strong class="${costSelected?advClass(costSelected.v3):''}">vs 3 jaar: ${costSelected?ehEuro2(costSelected.v3):'—'}</strong></div>
+    <div class="energy-legend"><span><i style="background:#4ee3a6"></i>Vattenfall 1 jaar</span><span><i style="background:#69b8ff"></i>Vattenfall 3 jaar</span></div>
+    <p class="subtle">Tik of sleep over de grafiek voor het cumulatieve verschil op een datum. Het laatste punt wordt afgestemd op de actuele bedragen in de tabel.</p>
+   </section>
    <div class="cupra-safety">${ehIcon('info')} <span><strong>Perioden apart berekend.</strong> Maandverschillen gebruiken alleen maandkosten; jaarverschillen alleen jaarkosten. Slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
   </main>`;
  }
@@ -1061,7 +1171,7 @@ class EnergiehuisCard extends HTMLElement {
 .metric-copy{min-width:0}.metric-label{font-size:12px;line-height:1.3;color:#d2e0ec}.metric-value{font-size:24px;line-height:1.18;font-weight:800;letter-spacing:-.6px;margin-top:8px;overflow-wrap:anywhere}.metric-sub{font-size:11px;line-height:1.35;color:#aac3d4;margin-top:5px}
 .mint{color:var(--mint)}.gold{color:var(--gold)}.blue{color:var(--blue)}.peach{color:#ffae83}.white{color:#f6f9ff}
 .metric-euro .metric-value{font-size:23px}.metric-gas .metric-symbol{color:#ff9b6b}.metric-water .metric-symbol{color:#67c8ff}
-.subpage{padding:22px 20px 88px;min-height:620px}.subpage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:3px 0 19px;padding:16px 4px}.subpage-head h2{margin:2px 0 7px;font-size:32px;letter-spacing:-.8px}.subpage-head p{margin:0;color:#a9c3d5;font-size:13px;line-height:1.5;max-width:670px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#61dcb0;font-weight:800;font-size:10px}.subgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.subgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.subcard,.subsection,.utility-card{border:1px solid #83adc42f;background:linear-gradient(145deg,#173047,#0b2132);border-radius:18px;box-shadow:0 6px 18px #0003}.subcard{padding:15px;min-height:132px;display:flex;flex-direction:column;align-items:flex-start}.subcard small{color:#a8c2d3;margin-top:10px}.subcard strong{font-size:24px;margin-top:5px;letter-spacing:-.4px}.subcard span{font-size:10px;color:#87a8bb;margin-top:5px}.sub-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:#14364b}.sub-icon .icon{width:24px;height:24px}.sub-icon.mint{color:var(--mint);background:#28d99a18}.sub-icon.blue{color:var(--blue);background:#4ca6ff18}.sub-icon.gold{color:var(--gold);background:#ffc93a18}.sub-icon.peach{color:#ff9e76;background:#ff9e7618}.subsection{padding:17px;margin-top:12px}.subrows{display:grid;margin-top:7px}.subrows>div{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid #9db9cb20;font-size:13px}.subrows>div:last-child{border-bottom:0}.subrows span{color:#aac2d2}.subrows strong{font-size:14px;text-align:right}.positive{color:var(--mint)!important}.negative{color:#ff9e76!important}.soc-ring{flex:none;width:112px;height:112px;border-radius:50%;border:9px solid #2ccf9860;box-shadow:inset 0 0 0 1px #74e0bd40;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0c2232}.soc-ring strong{font-size:25px}.soc-ring span{font-size:10px;color:#9fc0d0;margin-top:4px}.price-badge{min-width:130px;border:1px solid #5ba1c847;background:#0d2638;border-radius:16px;padding:12px 15px;text-align:right}.price-badge small,.price-badge span{display:block;color:#9ab8cb;font-size:10px}.price-badge strong{display:block;font-size:22px;margin:3px 0}.utility-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.utility-card{padding:17px}.utility-head{display:flex;align-items:center;gap:13px}.utility-head small{display:block;color:#9ebccc}.utility-head strong{display:block;font-size:24px;margin-top:3px}
+.subpage{padding:22px 20px 88px;min-height:620px}.subpage-head{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:3px 0 19px;padding:16px 4px}.subpage-head h2{margin:2px 0 7px;font-size:32px;letter-spacing:-.8px}.subpage-head p{margin:0;color:#a9c3d5;font-size:13px;line-height:1.5;max-width:670px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#61dcb0;font-weight:800;font-size:10px}.subgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.subgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.subcard,.subsection,.utility-card{border:1px solid #83adc42f;background:linear-gradient(145deg,#173047,#0b2132);border-radius:18px;box-shadow:0 6px 18px #0003}.subcard{padding:15px;min-height:132px;display:flex;flex-direction:column;align-items:flex-start}.subcard small{color:#a8c2d3;margin-top:10px}.subcard strong{font-size:24px;margin-top:5px;letter-spacing:-.4px}.subcard span{font-size:10px;color:#87a8bb;margin-top:5px}.sub-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:#14364b}.sub-icon .icon{width:24px;height:24px}.sub-icon.mint{color:var(--mint);background:#28d99a18}.sub-icon.blue{color:var(--blue);background:#4ca6ff18}.sub-icon.gold{color:var(--gold);background:#ffc93a18}.sub-icon.peach{color:#ff9e76;background:#ff9e7618}.subsection{padding:17px;margin-top:12px}.subrows{display:grid;margin-top:7px}.subrows>div{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid #9db9cb20;font-size:13px}.subrows>div:last-child{border-bottom:0}.subrows span{color:#aac2d2}.subrows strong{font-size:14px;text-align:right}.positive{color:var(--mint)!important}.negative{color:#ff9e76!important}.cost-trend{overflow:hidden}.cost-periods{display:flex;gap:7px;margin:11px 0 8px}.cost-periods button{appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:7px 12px;font:inherit;font-size:11px;font-weight:750;cursor:pointer}.cost-periods button.chosen{background:#153c50;border-color:#55d7b66b;color:#eafaff}.cost-compare-chart{display:block;width:100%;height:auto;margin:10px 0 4px;touch-action:pan-y;user-select:none;-webkit-user-select:none}.cost-compare-readout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:center;margin-top:7px;padding:10px 11px;border:1px solid #7aa5bc2e;background:#081c2a;border-radius:12px;font-size:11px}.cost-compare-readout span{color:#99b8ca}.cost-compare-readout strong{text-align:right;font-size:12px}.soc-ring{flex:none;width:112px;height:112px;border-radius:50%;border:9px solid #2ccf9860;box-shadow:inset 0 0 0 1px #74e0bd40;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0c2232}.soc-ring strong{font-size:25px}.soc-ring span{font-size:10px;color:#9fc0d0;margin-top:4px}.price-badge{min-width:130px;border:1px solid #5ba1c847;background:#0d2638;border-radius:16px;padding:12px 15px;text-align:right}.price-badge small,.price-badge span{display:block;color:#9ab8cb;font-size:10px}.price-badge strong{display:block;font-size:22px;margin:3px 0}.utility-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.utility-card{padding:17px}.utility-head{display:flex;align-items:center;gap:13px}.utility-head small{display:block;color:#9ebccc}.utility-head strong{display:block;font-size:24px;margin-top:3px}
 .chart-panel{margin-top:14px;padding:17px 17px 12px;background:linear-gradient(150deg,#12273bea,#0b1f31);border:1px solid #9dbbd02b;border-radius:20px}
 .chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.chart-title{font-size:17px;font-weight:750;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}.chart-title .icon{width:16px;height:16px;color:#9bb4cc}.now-power{font-size:15px;font-weight:800;color:var(--gold);white-space:nowrap}
 .chart-note{font-size:11px;color:#9dbbd1;margin-top:4px}.history{display:block;width:100%;height:auto;margin:9px auto 0;overflow:visible}.gridline{stroke:#b1cddd20;stroke-width:1}.xlab,.ylab{fill:#a4bfd2;font-size:13px}
@@ -1137,7 +1247,7 @@ class EnergiehuisCard extends HTMLElement {
 .energy-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#b8d1df;margin:12px 0}
 .energy-legend>span{display:flex;align-items:center;gap:6px}.energy-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
 @media(max-width:760px){.energy-periods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.energy-period{font-size:10px;padding:8px 4px}.energy-totals strong{font-size:17px}.energy-detail{padding:12px 9px}}
-@media(max-width:720px){.subpage{padding:13px 10px 82px}.subpage-head{padding:10px 2px;align-items:center}.subpage-head h2{font-size:27px}.subpage-head p{font-size:11px}.subgrid,.subgrid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subcard{min-height:118px;padding:13px}.subcard strong{font-size:20px}.soc-ring{width:88px;height:88px;border-width:7px}.soc-ring strong{font-size:20px}.price-badge{min-width:110px;padding:10px}.utility-grid{grid-template-columns:1fr}.utility-head strong{font-size:21px}}
+@media(max-width:720px){.subpage{padding:13px 10px 82px}.subpage-head{padding:10px 2px;align-items:center}.subpage-head h2{font-size:27px}.subpage-head p{font-size:11px}.subgrid,.subgrid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subcard{min-height:118px;padding:13px}.subcard strong{font-size:20px}.soc-ring{width:88px;height:88px;border-width:7px}.soc-ring strong{font-size:20px}.price-badge{min-width:110px;padding:10px}.utility-grid{grid-template-columns:1fr}.utility-head strong{font-size:21px}.cost-compare-readout{grid-template-columns:1fr 1fr}.cost-compare-readout span{grid-column:1/-1}.cost-compare-readout strong{text-align:left}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
  ${this._view==='cupra'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
@@ -1165,5 +1275,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.4.2',description:'Kostenvergelijking apart per maand en jaar, naast Cupra, batterij, gas en water.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.5.0',description:'Interactieve cumulatieve kostenvergelijking per maand en jaar, naast Cupra, batterij, gas en water.'});
 }
