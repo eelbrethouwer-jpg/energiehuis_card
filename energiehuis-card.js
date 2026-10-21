@@ -1762,7 +1762,7 @@ function eh17ResetHtml(card,h,c){
   const baseline=store.b?.[key],valid=Array.isArray(baseline)&&baseline.length>=3&&baseline[2]===eh17Hash(id)&&Number.isFinite(eh17N(baseline[0]));
   const delta=valid&&n!==null?n-baseline[0]:null;
   const t=valid?new Date(baseline[1]*1000).toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"}):"Nog niet ingesteld";
-  return `<label class="eh17-reset-row"><input type="checkbox" data-eh17-select="${key}" ${card._eh17ResetKeys?.has(key)?"checked":""} ${n===null?"disabled":""}/><span><strong>${ehEsc(label)}</strong><small>${ehEsc(id)} · ${ehEsc(t)}</small></span><span><strong>${delta===null?"—":ehFmt(delta,2)+" "+ehEsc(unit)}</strong><small>Stand: ${n===null?"Onbekend":ehFmt(n,2)+" "+ehEsc(unit)}</small></span></label>`;
+  return `<label class="eh17-reset-row"><input type="checkbox" data-eh17-select="${key}" ${card._eh17ResetKeys?.has(key)?"checked":""} ${n===null?"disabled":""}/><span><strong>${ehEsc(label)}</strong><small>${ehEsc(id)} · ${ehEsc(t)}</small></span><span><strong>${delta===null?"—":delta<0?"Teller lager dan nulmeting":ehFmt(delta,2)+" "+ehEsc(unit)}</strong><small>Stand: ${n===null?"Onbekend":ehFmt(n,2)+" "+ehEsc(unit)}</small></span></label>`;
  }).join("");
  const chosen=(card._eh17Confirm||[]).map(key=>eh17ResetDefs(c).find(d=>d[0]===key)?.[1]).filter(Boolean);
  const confirm=chosen.length?`<div class="eh17-confirm" role="alertdialog" aria-modal="true" aria-label="Bevestig nieuwe nulmeting"><strong>Bevestig nieuwe nulmeting</strong><p>Wil je voor <b>${ehEsc(chosen.join(", "))}</b> de huidige meterstanden als nieuw beginpunt bewaren? Bestaande nulmetingen voor deze selectie worden vervangen. De originele meterstanden en historische gegevens blijven behouden.</p><div class="eh17-confirm-actions"><button type="button" data-eh17-cancel="1">Annuleren</button><button type="button" class="danger" data-eh17-confirm="1">Ja, nulmeting vastleggen</button></div></div>`:"";
@@ -1870,3 +1870,22 @@ function eh17Enhance(){
 }
 
 eh17Enhance();
+
+function eh17ContractPanel(h,c) {
+ const store=eh17ResetState(h,c);
+ if(store.error)return "";
+ const readings=eh17ResetDefs(c).map(([key,label,id])=>{
+  const baseline=store.b?.[key],n=eh17N(h?.states?.[id]?.state);
+  if(!id||!Array.isArray(baseline)||baseline[2]!==eh17Hash(id)||n===null)return null;
+  const difference=n-eh17N(baseline[0]),unit=String(h?.states?.[id]?.attributes?.unit_of_measurement||"");
+  if(!Number.isFinite(difference))return null;
+  const since=new Date(baseline[1]*1000).toLocaleDateString("nl-NL",{day:"numeric",month:"short"});
+  return `<div><span>${ehEsc(label)} <small>vanaf ${ehEsc(since)}</small></span><strong>${difference<0?"Teller gewijzigd":ehFmt(difference,2)+" "+ehEsc(unit)}</strong></div>`;
+ }).filter(Boolean);
+ if(!readings.length)return "";
+ return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("clock")} Sinds de ingestelde nulmetingen</div><div class="eh17-health">${readings.join("")}</div><p class="subtle">Elke sensor heeft zijn eigen startdatum; de oorspronkelijke teller blijft ongewijzigd. Dit zijn ruwe meetverschillen, geen automatische nieuwe contractfactuur. Stel nieuwe nulmetingen in onder Meer → Meterbeheer.</p></section>`;
+}
+{
+ const old=EnergiehuisCard.prototype._costsHtml;
+ EnergiehuisCard.prototype._costsHtml=function(h,c){return old.call(this,h,c).replace("</main>",eh17ContractPanel(h,c)+"</main>");};
+}
