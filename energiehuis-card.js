@@ -1122,7 +1122,7 @@ class EnergiehuisCard extends HTMLElement {
    const ms=ehNumericHistory(history,c.cupra_mileage,h);const byDay=new Map();
    for(let i=1;i<ms.length;i++){const d=ms[i].v-ms[i-1].v;if(!Number.isFinite(d)||d<=0||d>400)continue;const date=new Date(ms[i].t),t=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();byDay.set(t,(byDay.get(t)||0)+d);}
    daily=[...byDay.entries()].map(([t,km])=>({t,km})).sort((a,b)=>a.t-b.t);
-   if(daily.length){statsWarning='Kilometertotalen zijn voorlopig uit beschikbare detailhistorie berekend.';dailyCoverageFrom=lim.from.getTime();}
+   if(daily.length){statsWarning='Kilometertotalen zijn voorlopig uit beschikbare detailhistorie berekend.';dailyCoverageFrom=ms[0]?.t??lim.to.getTime();}
   }
   const capacity=ehNum(c.cupra_usable_kwh)||59;
   const seg=history?ehCupraSegments(history,c,h,lim.from,now,capacity):{segments:[],anchors:0,homeChargeExcluded:0,externalChargeSuspected:0,noiseExcluded:0,coverageFrom:null,coverageTo:null};
