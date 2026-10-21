@@ -4,7 +4,44 @@
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis v1.6.1 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis v1.7.0 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+
+## Nieuw in v1.7.0 — Smart Energy Intelligence (RC)
+
+- **Energiecoach:** advies over goedkope volledige stroomuren en actuele zonneopwek.
+- **Slim laden 2.0:** direct versus goedkoop laden versus zonneladen, met volledige uren, 1×40 A-limiet, huisverbruik, laadvermogen en rekenrendement. Zonneladen vereist een expliciete PV-uurprognose; de kaart stuurt niet.
+- **Financiële maandprognose:** stroomkosten en optionele gas-maandkosten met instelbaar budget van €200 en duidelijk onderscheid tussen volledige en gedeeltelijke totalen.
+- **Cupra laadgeschiedenis:** herkenning uit de laatste 14 dagen Alfen-energiehistorie en Zonneplan-tariefhistorie, inclusief aanduiding bij ontbrekende prijsmetingen.
+- **Virtuele batterij 2.0:** indicatieve capaciteitsvergelijking 5/10/15 kWh uit zeven volledige historische dagen import/export.
+- **Systeemcontrole:** actualiteit en gezondheid van de zes belangrijkste databronnen.
+- **Meterbeheer & Reset:** onder **Meer → Geavanceerd**, individuele P1-/Alfen-/gas-/watermeters selecteren en een nulmeting instellen na een tweede bevestiging. Geen fysieke tellerreset.
+
+### Eenmalige installatie voor Meterbeheer
+
+Installeer het optionele [nulmeting-package](packages/energiehuis_v17_reset.yaml) in Home Assistant op `/config/packages/energiehuis_v17_reset.yaml` (mits packages in `configuration.yaml` zijn geactiveerd). Controleer de configuratie en herstart. De benodigde helper is `input_text.energiehuis_reset_baselines`. De helper bewaart baselines over Home Assistant-herstarts; HACS installeert het YAML-package niet automatisch.
+
+Kies in de verborgen meterbeheeromgeving de gewenste meters en klik op **Nieuwe nulmeting voor selectie**. Bevestig in de aparte waarschuwingsdialoog. De historische sensoren en fysieke meters blijven onaangetast. De verschilwaarden worden op dit moment zichtbaar in Meterbeheer, en de nieuwe beginstand is ook beschikbaar in de aanvullende contractperiode-uitlezing. Oude maand- en jaarkosten worden niet overschreven.
+
+Optionele instellingen om aan de bestaande kaartconfiguratie toe te voegen:
+
+```yaml
+reset_store: input_text.energiehuis_reset_baselines
+gas_cost_month: ""
+monthly_budget_eur: 200
+pv_forecast: ""
+pv_total_energy: ""
+billing_total_cost: ""
+export_compensation_eur_kwh: null
+battery_buy_eur_kwh: 0.25
+battery_sell_eur_kwh: 0.08
+battery_roundtrip_efficiency: 0.88
+fuse_amp: 40
+charger_amp: 32
+reserve_amp: 2
+ev_charge_efficiency: 0.90
+```
+
+De waarden voor batterijtarieven, laadverliezen en huislasten zijn expliciete rekenaannames. De financiële simulaties zijn geen rekening of werkelijk geboekte besparing. Zie [Release notes v1.7.0](RELEASE_NOTES_v1.7.0.md) voor technische beperkingen en verificatie.
 
 ## Nieuw in v1.6.1 — Cupra & Slim laden
 
@@ -183,4 +220,4 @@ De batterij-businesscase en het contractvoordeel worden bewust gescheiden.
 
 ## Ontwikkelrichting
 
-Na Cupra Insights volgen verdere modularisering, instellingen vanuit Energiehuis zelf, uitgebreidere water/gas-grafieken en verdere verfijning van de persoonlijke energie- en mobiliteitsanalyse.
+Na Energiehuis v1.7.0 volgen verdere modularisering, instellingen vanuit Energiehuis zelf, uitgebreidere water/gas-grafieken en verdere verfijning van de persoonlijke energie- en mobiliteitsanalyse.
