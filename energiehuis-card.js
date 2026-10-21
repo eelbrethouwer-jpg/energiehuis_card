@@ -744,6 +744,16 @@ class EnergiehuisCard extends HTMLElement {
   const nearest=values.reduce((a,b)=>Math.abs(b.t-target)<Math.abs(a.t-target)?b:a,values[0]);
   if(nearest&&this._metricSelectedTime!==nearest.t){this._metricSelectedTime=nearest.t;this._schedule();}
  }
+ _selectCostCompareFromPointer(svg,event){
+  const result=this._costCompareResult;
+  if(!result?.points?.length)return;
+  const r=svg.getBoundingClientRect(),left=Number(svg.dataset.ehLeft),right=Number(svg.dataset.ehRight),w=Number(svg.dataset.ehWidth);
+  if(!r.width)return;
+  const fx=Math.max(0,Math.min(1,((event.clientX-r.left)/r.width*w-left)/(right-left)));
+  const target=result.from.getTime()+fx*(result.to.getTime()-result.from.getTime());
+  const nearest=result.points.reduce((a,b)=>Math.abs(b.t-target)<Math.abs(a.t-target)?b:a,result.points[0]);
+  if(nearest&&this._costCompareSelectedTime!==nearest.t){this._costCompareSelectedTime=nearest.t;this._schedule();}
+ }
  async _loadMetricData(){
   const type=this._detail,p=this._metricPeriod,c=this.config,h=this._hass;
   if(!['grid','sun','home','car'].includes(type)||!h?.callWS||!c)return;
