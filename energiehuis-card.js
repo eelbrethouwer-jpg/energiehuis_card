@@ -754,6 +754,31 @@ class EnergiehuisCard extends HTMLElement {
   const nearest=result.points.reduce((a,b)=>Math.abs(b.t-target)<Math.abs(a.t-target)?b:a,result.points[0]);
   if(nearest&&this._costCompareSelectedTime!==nearest.t){this._costCompareSelectedTime=nearest.t;this._schedule();}
  }
+ async _loadCostCompare(){
+  const h=this._hass,c=this.config,p=this._costComparePeriod;
+  if(this._view!=='costs'||!h?.callWS||!c)return;
+  const now=new Date();
+  const from=p==='month'?new Date(now.getFullYear(),now.getMonth(),1):new Date(now.getFullYear(),0,1);
+  const step=p==='month'?'day':'month';
+  const ids=p==='month'?[c.cost_zonneplan_month,c.cost_vattenfall_1_month,c.cost_vattenfall_3_month]:[c.cost_zonneplan_year,c.cost_vattenfall_1_year,c.cost_vattenfall_3_year];
+  if(ids.some(id=>!id)){this._costCompareResult={period:p,from,to:now,points:[],historyCount:0,error:'Niet alle kostensensoren zijn gekoppeld.',fetched:Date.now()};this._schedule();return;}
+  const key=p+'|'+ehDayKey(from)+'|'+ids.join('|');
+  if(this._costCompareKey===key&&Date.now()-this._costCompareAt<5*60*1000&&this._costCompareResult){this._schedule();return;}
+  if(this._costCompareLoading)return;
+  this._costCompareLoading=true;this._costCompareResult=null;this._schedule();
+  try{
+   const bins=ehWindows({from,to:now,step});
+   const before=p==='month'?new Date(from.getFullYear(),from.getMonth(),from.getDate()-1):new Date(from.getFullYear()-1,11,1);
+   const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:now.toISOString(),statistic_ids:[...new Set(ids)],period:step,types:['change','sum']});
+   const live={z:ehRead(h,ids[0]),v1:ehRead(h,ids[1]),v3:ehRead(h,ids[2])};
+   const built=ehCostComparePoints(stats,ids,bins,step,h,live,now);
+   this._costCompareResult={period:p,from,to:now,points:built.points,historyCount:built.historyCount,error:null,fetched:Date.now()};
+   this._costCompareKey=key;this._costCompareAt=Date.now();
+  }catch(_){
+   this._costCompareResult={period:p,from,to:now,points:[],historyCount:0,error:'Langetermijnstatistieken voor de kostensensoren zijn niet beschikbaar.',fetched:Date.now()};
+   this._costCompareKey=key;this._costCompareAt=Date.now();
+  }finally{this._costCompareLoading=false;this._schedule();}
+ }
  async _loadMetricData(){
   const type=this._detail,p=this._metricPeriod,c=this.config,h=this._hass;
   if(!['grid','sun','home','car'].includes(type)||!h?.callWS||!c)return;
