@@ -9,7 +9,7 @@ Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energ
 ## Nieuw in v1.6.0
 
 - Nieuwe **Cupra Insights**-sectie op de Cupra-pagina.
-- Kilometers: vandaag, 7 dagen, 30 dagen en dit jaar.
+- Kilometers: vandaag, deze week, deze maand en dit jaar.
 - Kilometerhistorie per dag; bij jaarweergave per maand.
 - Praktijkactieradius uit werkelijk gereden kilometers en SOC-verlies.
 - Geschat verbruik in kWh/100 km op basis van 59 kWh bruikbare accucapaciteit.
@@ -20,7 +20,7 @@ Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energ
 - Samenhang tussen buitentemperatuur / setpointverschil en geschat verbruik.
 - Alfen wordt gebruikt om thuislaadmomenten uit rijsegmenten te filteren.
 - Een SOC-stijging zonder overeenkomstige Alfen-laadenergie wordt gemarkeerd als vermoedelijk extern laden.
-- Empirische thuislaadefficiëntie uit gekoppelde Cupra-SOC- en Alfen-energie-intervallen.
+- Empirische thuislaadefficiëntie uit gekoppelde Cupra-SOC- en Alfen-energie-intervallen, verankerd op SOC-updates zodat stilstaand laden niet afhankelijk is van kilometerupdates.
 - Datakwaliteitslabel **Beperkt / Opbouwend / Sterk**.
 - De analyse gaat uit van de bewust gekozen Cupra/VW Group Connect-verversing van circa **15 minuten**.
 
