@@ -40,6 +40,12 @@ Alle vijf knoppen zijn nu intern bruikbaar:
 - Kosten
 - Meer
 
+### Cupra voertuigdashboard
+- Compacte voertuigstatus bovenaan het Cupra-tabblad.
+- Accupercentage, actieradius, laadstatus en resterende laadtijd in één oogopslag.
+- Uitklapbare **Uitgebreide voertuigdetails** met ruimte voor kilometerstand, vergrendeling, portieren, laadkabel, laadvermogen, geladen energie, laadsnelheid, laadscenario, laadschema, portalfeed en verbinding.
+- Ontbrekende Cupra-data wordt niet verzonnen; velden blijven leeg totdat de bijbehorende entiteit is gekoppeld.
+
 ## Veiligheid
 Deze release blijft **alleen-lezen voor laadsturing**. De Cupra-planner simuleert laadmomenten, maar verstuurt geen commando's naar de Alfen. De bestaande Home Assistant EMS en Active Load Balancing blijven leidend.
 
