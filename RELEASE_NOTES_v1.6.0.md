@@ -43,6 +43,8 @@ Hierdoor vervuilen de uitzonderlijke externe laadbeurten de hoofdstatistiek niet
 Wanneer Cupra-SOC en de cumulatieve Alfen-laadenergie voldoende netjes op elkaar aansluiten, berekent Energiehuis daarnaast een **empirische thuislaadefficiëntie**: geschatte accutoename gedeeld door gemeten energie aan de laadpaal. Deze waarde verschijnt pas nadat meerdere bruikbare laadintervallen beschikbaar zijn.
 
 ## Temperatuuranalyse
+Cupra Insights bevat een **praktijkrange-trendgrafiek per temperatuurklasse**. De klasse waarin de actuele buitentemperatuur valt, wordt gemarkeerd zodra daar voldoende eigen ritdata voor beschikbaar is.
+
 Geldige rijsegmenten worden verdeeld over:
 - < 0°C
 - 0–5°C
