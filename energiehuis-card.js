@@ -1959,7 +1959,7 @@ function eh171Read(card,h,c){
   const total=eh171M3(meter?.state,meter?.attributes?.unit_of_measurement);
   const manual=eh171M3(day?.state,day?.attributes?.unit_of_measurement);
   const validManual=manual!==null&&manual>=0&&manual<=100?manual:null;
-  const historical=card?._eh171Daily?.key===card?._eh171DailyKey?card._eh171Daily.values?.[type]:null;
+  const historical=card?._eh171Daily && card._eh171Daily.key===card._eh171DailyKey ? card._eh171Daily.values?.[type] : null;
   const value=validManual!==null?validManual:historical?.value??null;
   const flowValue=eh171Flow(flow?.state,flow?.attributes?.unit_of_measurement);
   const meterText=total===null?"—":ehFmt(total,isGas?2:3)+" m³",today=value===null?"—":ehFmt(isGas?value:value*1000,isGas?2:0)+(isGas?" m³":" L");
