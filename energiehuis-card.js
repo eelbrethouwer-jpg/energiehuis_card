@@ -49,6 +49,19 @@ const EH_DEFAULTS = {
   hero_image: '',                 // optioneel: veilige afbeelding-URL
   cupra_range: '',                // optioneel: Cupra actieradius in km
   cupra_connection: '',           // optioneel: Cupra verbindingsstatus
+  cupra_charge_status: '',        // optioneel: laadstatus uit Cupra
+  cupra_charge_power: '',         // optioneel: laadvermogen uit Cupra
+  cupra_remaining_charge_time: '',// optioneel: resterende laadtijd
+  cupra_mileage: '',              // optioneel: kilometerstand
+  cupra_locked: '',               // optioneel: vergrendelstatus
+  cupra_cable: '',                // optioneel: laadkabel aangesloten
+  cupra_charging: '',             // optioneel: aan het laden
+  cupra_charged_energy: '',       // optioneel: geladen energie
+  cupra_charge_scenario: '',      // optioneel: laadscenario
+  cupra_charge_schedule: '',      // optioneel: laadschema
+  cupra_charge_speed: '',         // optioneel: laadsnelheid
+  cupra_portalfeed: '',           // optioneel: status portalfeed
+  cupra_doors: '',                // optioneel: deuren/portierenstatus
   cupra_image: '',                // optioneel: /local/ of https:// afbeelding
   sim_laadvermogen_kw: 3.7,       // alleen rekenvoorbeeld, bestuurt Alfen niet
   sim_laadbehoefte_kwh: 30,       // handmatig aanpasbare planningsaanname
