@@ -1,8 +1,8 @@
-/* Energiehuis v1.4.1 — Kostenvergelijking hotfix.
+/* Energiehuis v1.4.2 — Kostenvergelijking per maand en jaar.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Fix: Vattenfall-voordeel wordt direct uit de getoonde maandkosten berekend.
+ * Nieuw: maand- en jaarvergelijkingen zijn visueel en rekenkundig gescheiden.
  */
-const EH_VERSION = '1.4.1';
+const EH_VERSION = '1.4.2';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -41,6 +41,8 @@ const EH_DEFAULTS = {
   cost_zonneplan_year: 'sensor.kosten_zonneplan_stroom_jaar',
   cost_vattenfall_1_month: 'sensor.kosten_vattenfall_1_jaar_stroom_maand',
   cost_vattenfall_3_month: 'sensor.kosten_vattenfall_3_jaar_stroom_maand',
+  cost_vattenfall_1_year: 'sensor.kosten_vattenfall_1_jaar_stroom_jaar',
+  cost_vattenfall_3_year: 'sensor.kosten_vattenfall_3_jaar_stroom_jaar',
   saving_smart_month: 'sensor.besparing_slim_stroomgebruik_maand',
   advantage_vattenfall_1_month: 'sensor.voordeel_zonneplan_vs_vattenfall_1_jaar_maand',
   advantage_vattenfall_3_month: 'sensor.voordeel_zonneplan_vs_vattenfall_3_jaar_maand',
@@ -958,9 +960,12 @@ class EnergiehuisCard extends HTMLElement {
   const current=ehCurrentPrice(h,c.prijs);
   const zpDay=ehRead(h,c.cost_zonneplan_day),zpMonth=ehRead(h,c.cost_zonneplan_month),zpYear=ehRead(h,c.cost_zonneplan_year);
   const vf1=ehRead(h,c.cost_vattenfall_1_month),vf3=ehRead(h,c.cost_vattenfall_3_month);
+  const vf1Year=ehRead(h,c.cost_vattenfall_1_year),vf3Year=ehRead(h,c.cost_vattenfall_3_year);
   const smart=ehRead(h,c.saving_smart_month);
   const adv1=(vf1!==null&&zpMonth!==null)?vf1-zpMonth:null;
   const adv3=(vf3!==null&&zpMonth!==null)?vf3-zpMonth:null;
+  const adv1Year=(vf1Year!==null&&zpYear!==null)?vf1Year-zpYear:null;
+  const adv3Year=(vf3Year!==null&&zpYear!==null)?vf3Year-zpYear:null;
   const advLabel=(v,years)=>v===null?`Verschil vs ${years} jaar`:(v>=0?`Voordeel vs ${years} jaar`:`Nadeel vs ${years} jaar`);
   const advClass=v=>v===null?'':(v>=0?'positive':'negative');
   const tile=(label,value,icon,tone='blue',sub='')=>`<div class="subcard"><div class="sub-icon ${tone}">${ehIcon(icon)}</div><small>${ehEsc(label)}</small><strong>${value}</strong>${sub?`<span>${ehEsc(sub)}</span>`:''}</div>`;
@@ -972,14 +977,20 @@ class EnergiehuisCard extends HTMLElement {
     ${tile('Slimme timing',smart===null?'—':ehEuro2(smart),'clock','gold','bespaard deze maand')}
    </div>
    <section class="subsection"><div class="section-title">${ehIcon('euro')} Vergelijking deze maand</div><div class="subrows">
-    <div><span>Zonneplan</span><strong>${zpMonth===null?'—':ehEuro2(zpMonth)}</strong></div>
-    <div><span>Vattenfall 1 jaar</span><strong>${vf1===null?'—':ehEuro2(vf1)}</strong></div>
+    <div><span>Zonneplan deze maand</span><strong>${zpMonth===null?'—':ehEuro2(zpMonth)}</strong></div>
+    <div><span>Vattenfall 1 jaar deze maand</span><strong>${vf1===null?'—':ehEuro2(vf1)}</strong></div>
     <div><span>${advLabel(adv1,1)}</span><strong class="${advClass(adv1)}">${adv1===null?'—':ehEuro2(adv1)}</strong></div>
-    <div><span>Vattenfall 3 jaar</span><strong>${vf3===null?'—':ehEuro2(vf3)}</strong></div>
+    <div><span>Vattenfall 3 jaar deze maand</span><strong>${vf3===null?'—':ehEuro2(vf3)}</strong></div>
     <div><span>${advLabel(adv3,3)}</span><strong class="${advClass(adv3)}">${adv3===null?'—':ehEuro2(adv3)}</strong></div>
-    <div><span>Zonneplan dit jaar</span><strong>${zpYear===null?'—':ehEuro2(zpYear)}</strong></div>
    </div></section>
-   <div class="cupra-safety">${ehIcon('info')} <span><strong>Maandvergelijking direct berekend.</strong> Verschil = Vattenfall maandkosten − Zonneplan maandkosten. Slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
+   <section class="subsection"><div class="section-title">${ehIcon('calendar')} Vergelijking dit jaar</div><div class="subrows">
+    <div><span>Zonneplan dit jaar</span><strong>${zpYear===null?'—':ehEuro2(zpYear)}</strong></div>
+    <div><span>Vattenfall 1 jaar dit jaar</span><strong>${vf1Year===null?'—':ehEuro2(vf1Year)}</strong></div>
+    <div><span>${advLabel(adv1Year,1)}</span><strong class="${advClass(adv1Year)}">${adv1Year===null?'—':ehEuro2(adv1Year)}</strong></div>
+    <div><span>Vattenfall 3 jaar dit jaar</span><strong>${vf3Year===null?'—':ehEuro2(vf3Year)}</strong></div>
+    <div><span>${advLabel(adv3Year,3)}</span><strong class="${advClass(adv3Year)}">${adv3Year===null?'—':ehEuro2(adv3Year)}</strong></div>
+   </div></section>
+   <div class="cupra-safety">${ehIcon('info')} <span><strong>Perioden apart berekend.</strong> Maandverschillen gebruiken alleen maandkosten; jaarverschillen alleen jaarkosten. Slimme timing en batterijbesparing blijven afzonderlijke financiële categorieën.</span></div>
   </main>`;
  }
  _moreHtml(h,c){
@@ -1154,5 +1165,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.4.1',description:'Uitgebreid energieoverzicht met gecorrigeerde maandvergelijking voor Vattenfall.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.4.2',description:'Kostenvergelijking apart per maand en jaar, naast Cupra, batterij, gas en water.'});
 }
