@@ -1,8 +1,8 @@
-/* Energiehuis v1.5.0 — Cumulatieve kostenvergelijking.
+/* Energiehuis v1.6.0 — Cupra Insights.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Nieuw: interactieve cumulatieve verschilgrafiek voor maand en jaar.
+ * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.5.0';
+const EH_VERSION = '1.6.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -48,27 +48,29 @@ const EH_DEFAULTS = {
   advantage_vattenfall_3_month: 'sensor.voordeel_zonneplan_vs_vattenfall_3_jaar_maand',
   weather: '',                    // optioneel: weather.-entiteit
   hero_image: '',                 // optioneel: veilige afbeelding-URL
-  cupra_range: '',                // optioneel: Cupra actieradius in km
+  cupra_range: 'sensor.garage_cupra_born_actieradius',
   cupra_connection: '',           // optioneel: Cupra verbindingsstatus
   cupra_charge_status: '',        // optioneel: laadstatus uit Cupra
   cupra_charge_power: '',         // optioneel: laadvermogen uit Cupra
   cupra_remaining_charge_time: '',// optioneel: resterende laadtijd
-  cupra_mileage: '',              // optioneel: kilometerstand
+  cupra_mileage: 'sensor.garage_cupra_born_kilometerstand',
   cupra_locked: '',               // optioneel: vergrendelstatus
   cupra_cable: '',                // optioneel: laadkabel aangesloten
   cupra_charging: '',             // optioneel: aan het laden
-  cupra_charged_energy: '',       // optioneel: geladen energie
+  cupra_charged_energy: 'sensor.garage_cupra_born_geladen_energie',
   cupra_charge_scenario: '',      // optioneel: laadscenario
   cupra_charge_schedule: '',      // optioneel: laadschema
   cupra_charge_speed: '',         // optioneel: laadsnelheid
   cupra_portalfeed: '',           // optioneel: status portalfeed
   cupra_doors: '',                // optioneel: deuren/portierenstatus
-  cupra_outside_temp: '',         // optioneel: buitentemperatuur
-  cupra_target_temp: '',          // optioneel: doeltemperatuur
-  cupra_climate_usage: '',        // optioneel: klimaatverbruik
-  cupra_charge_target: '',        // optioneel: laaddoel
-  cupra_onboard_usage: '',        // optioneel: verbruik boordnet
+  cupra_outside_temp: 'sensor.garage_cupra_born_buitentemperatuur',
+  cupra_target_temp: 'sensor.garage_cupra_born_doeltemperatuur',
+  cupra_climate_usage: 'sensor.garage_cupra_born_klimaatverbruik',
+  cupra_charge_target: 'sensor.garage_cupra_born_laaddoel',
+  cupra_onboard_usage: 'sensor.garage_cupra_born_verbruik_boordnet',
   cupra_image: '',                // optioneel: /local/ of https:// afbeelding
+  cupra_usable_kwh: 59,           // bruikbare accucapaciteit Cupra Born
+  cupra_refresh_minutes: 15,      // bewust gekozen VW Group Connect interval
   sim_laadvermogen_kw: 3.7,       // alleen rekenvoorbeeld, bestuurt Alfen niet
   sim_laadbehoefte_kwh: 30,       // handmatig aanpasbare planningsaanname
   cupra_path: '', batterij_path: '', kosten_path: '', meer_path: ''
