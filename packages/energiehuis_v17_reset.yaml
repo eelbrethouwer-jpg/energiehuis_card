@@ -1,0 +1,8 @@
+# Energiehuis v1.7.0 — optionele nulmeting-opslag (read-only voor fysieke meters)
+# Kopieer naar /config/packages/energiehuis_v17_reset.yaml als packages zijn ingeschakeld.
+# Geen 'initial' toevoegen: Home Assistant herstelt dan de laatste waarde na een herstart.
+input_text:
+  energiehuis_reset_baselines:
+    name: Energiehuis nulmetingen
+    max: 255
+    mode: text
