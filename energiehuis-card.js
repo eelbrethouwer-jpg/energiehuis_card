@@ -1,8 +1,8 @@
-/* Energiehuis v1.6.1 — Cupra & Slim laden apart.
+/* Energiehuis v1.7.0 — Smart Energy Intelligence.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
  * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.6.1';
+const EH_VERSION = '1.7.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -71,6 +71,21 @@ const EH_DEFAULTS = {
   cupra_image: '',                // optioneel: /local/ of https:// afbeelding
   cupra_usable_kwh: 59,           // bruikbare accucapaciteit Cupra Born
   cupra_refresh_minutes: 15,      // bewust gekozen VW Group Connect interval
+  reset_store: 'input_text.energiehuis_reset_baselines',
+  pv_total_energy: '',
+  billing_total_cost: '',
+  gas_cost_month: '',
+  pv_forecast: '',
+  export_compensation_eur_kwh: null,
+  monthly_budget_eur: 200,
+  budget_other_month_eur: 0,
+  battery_roundtrip_efficiency: 0.88,
+  battery_buy_eur_kwh: 0.25,
+  battery_sell_eur_kwh: 0.08,
+  fuse_amp: 40,
+  charger_amp: 32,
+  reserve_amp: 2,
+  ev_charge_efficiency: 0.90,
   sim_laadvermogen_kw: 3.7,       // alleen rekenvoorbeeld, bestuurt Alfen niet
   sim_laadbehoefte_kwh: 30,       // handmatig aanpasbare planningsaanname
   cupra_path: '', batterij_path: '', kosten_path: '', meer_path: ''
@@ -1557,5 +1572,286 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.6.1',description:'Gescheiden Cupra Insights- en slim-ladenpagina; laadstatus, scenario en prijsplanning direct bereikbaar.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.7.0',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
+
+/* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
+function eh17N(v){if(v===null||v===undefined||v==="")return null;const n=typeof v==="number"?v:Number(String(v).replace(",","."));return Number.isFinite(n)?n:null;}
+
+function eh17Hash(s){let h=0;for(const c of String(s||""))h=(h*31+c.charCodeAt(0))%65521;return h;}
+
+function eh17Solar(h,id){
+ const a=h?.states?.[id]?.attributes||{},raw=a.forecast??a.hourly??a.data??[];
+ if(!Array.isArray(raw))return [];
+ return raw.map(o=>{const t=Date.parse(o?.start??o?.start_date??o?.datetime??o?.time??"");const n=eh17N(o?.pv_kw??o?.power_kw??o?.estimated_power_kw??o?.estimate_kw);return {t,pv:n};}).filter(o=>Number.isFinite(o.t)&&o.pv!==null&&o.pv>=0&&o.pv<=30);
+}
+
+function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
+ const end=Date.parse(departure),start=now.getTime(),need=eh17N(needKwh),requested=eh17N(requestedKw);
+ const empty=(error)=>({error,selected:[],totalKwh:0,remaining:Math.max(0,need||0),cost:null,mode});
+ if(!Number.isFinite(end)||end<=start)return empty("Kies een toekomstige vertrektijd.");
+ if(need===null||need<=0||need>100||requested===null||requested<=0)return empty("Controleer de gewenste laadbehoefte en het vermogen.");
+ if(mode==="pause")return {...empty(null),remaining:need,cost:0};
+ const fuse=eh17N(opts.fuseAmp)??40,charger=eh17N(opts.chargerAmp)??32;
+ const reserve=eh17N(opts.reserveAmp)??2,house=eh17N(opts.houseW);
+ const efficiency=Math.min(1,Math.max(.5,eh17N(opts.efficiency)??.9));
+ if(fuse<=0||charger<6||reserve<0||reserve>=fuse)return empty("Controleer de ingestelde veiligheidsgrenzen.");
+ const maxAmp=Math.min(charger,fuse-reserve-Math.max(0,house??2000)/230);
+ const allowedKw=Math.min(requested,Math.max(0,maxAmp)*230/1000);
+ if(allowedKw<1.38)return empty("Minder dan 6 A beschikbaar bij de gebruikte huisbelasting.");
+ const solar=new Map((opts.solar||[]).map(v=>[v.t,v.pv]));
+ const hourly=new Map();
+ for(const v of prices||[]){const t=Date.parse(v?.t),p=eh17N(v?.p);if(Number.isFinite(t)&&t%3600000===0&&p!==null&&p>=-1&&p<=5)hourly.set(t,p);}
+ const slots=[];
+ for(let t=Math.ceil(start/3600000)*3600000;t+3600000<=end&&slots.length<72;t+=3600000){
+   if(!hourly.has(t))continue;
+   const pv=solar.get(t);
+   const surplus=Number.isFinite(pv)?Math.max(0,pv-Math.max(0,house??2000)/1000):null;
+   const wallKw=mode==="sun"?(surplus===null?0:Math.min(allowedKw,surplus)):allowedKw;
+   if(wallKw<1.38)continue;
+   slots.push({t,slotStart:t,slotEnd:t+3600000,price:hourly.get(t),capacity:wallKw*efficiency,wallKw,surplus});
+ }
+ if(!slots.length)return empty(mode==="sun"?"Geen volledige uren met voldoende voorspeld zonne-overschot. Koppel eerst een betrouwbare PV-prognose.":"Geen volledige uren met geldige tarieven vóór vertrek.");
+ slots.sort((a,b)=>mode==="direct"?a.t-b.t:mode==="sun"?(b.surplus-a.surplus||a.t-b.t):(a.price-b.price||a.t-b.t));
+ let remaining=need,cost=0;const selected=[];
+ for(const slot of slots){
+   if(remaining<=.00001)break;
+   const kWh=Math.min(remaining,slot.capacity),wallKwh=kWh/efficiency;
+   const sell=eh17N(opts.exportCompensation);
+   const itemCost=mode==="sun"?(sell===null?null:wallKwh*sell):wallKwh*slot.price;
+   selected.push({...slot,kWh,wallKwh,cost:itemCost});
+   if(itemCost===null)cost=null;else if(cost!==null)cost+=itemCost;
+   remaining-=kWh;
+ }
+ selected.sort((a,b)=>a.t-b.t);
+ return {error:null,selected,totalKwh:need-remaining,remaining:Math.max(0,remaining),cost,allowedKw,houseKnown:house!==null,efficiency,mode};
+}
+
+function eh17Health(h,c,now=Date.now()){
+ const defs=[["P1",c.net,5,"power"],["GoodWe",c.zonnepanelen,35,"power"],["Alfen",c.laden,35,"power"],["Cupra",c.cupra,50,"number"],["Zonneplan",c.prijs,95,"number"],["Virtuele batterij",c.battery_soc||c.batterij,140,"number"]];
+ return defs.map(([name,id,mins,kind])=>{
+   const st=id?h?.states?.[id]:null,raw=String(st?.state??""),n=eh17N(raw),unit=String(st?.attributes?.unit_of_measurement||"").toLowerCase();
+   const updated=Date.parse(st?.last_updated??st?.last_changed??"");
+   let status=!id||!st?"Ontbreekt":n===null?"Geen getal":kind==="power"&&!["w","kw"].includes(unit)?"Eenheid controleren":Number.isFinite(updated)&&now-updated>mins*60000?"Mogelijk verouderd":"Actueel";
+   if(name==="GoodWe"&&status==="Mogelijk verouderd")status="Controleer daglicht";
+   return {name,id,status,updated};
+ });
+}
+
+function eh17Coach(h,c){
+ const now=new Date(),t=ehPricesForDay(h,c,now),prices=ehHourlyFromPrices(t.quarters,t.hourly.length?t.hourly:ehForecast(h,c.prijs));
+ const upcoming=prices.filter(p=>{const ms=Date.parse(p.t);return Number.isFinite(ms)&&ms>=Math.ceil(now.getTime()/3600000)*3600000&&ms<now.getTime()+36*3600000;}).sort((a,b)=>a.p-b.p);
+ const first=upcoming[0],current=ehCurrentPrice(h,c.prijs),pv=ehW(h,c.zonnepanelen);
+ const advice=[];
+ if(first)advice.push(`<div><strong>Goedkoop volgend volledig uur</strong><p>${ehEsc(new Date(first.t).toLocaleString("nl-NL",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))} · ${ehEsc(ehEuro2(first.p))}/kWh.${current===null?"":` Verschil met nu: ${ehEsc(ehEuro2(current-first.p))}/kWh.`}</p></div>`);
+ if(!first)advice.push("<div><strong>Laadadvies ontbreekt</strong><p>De Zonneplan-forecast bevat nog geen volledige toekomstige uren.</p></div>");
+ if(pv!==null&&pv>800)advice.push(`<div><strong>Zonnepanelen leveren</strong><p>Actueel ${ehEsc(ehPower(pv))}. Dit is geen voorspelling van het beschikbare overschot.</p></div>`);
+ advice.push("<div><strong>Volgende stap</strong><p>Vergelijk Direct, Slim en Zon in het tabblad Slim laden. De voorstellen blijven simulaties.</p></div>");
+ return `<section class="eh17-panel"><div class="eh17-title">${ehIcon("leaf")} Slimme energiecoach <span class="eh17-tag">Advies · geen sturing</span></div><div class="eh17-grid">${advice.join("")}</div></section>`;
+}
+
+function eh17Charge(h,c,card){
+ const now=new Date(),soc=ehRead(h,c.cupra),capacity=eh17N(c.cupra_usable_kwh)||59;
+ const need=card._simNeed??(soc!==null?Math.max(0,(card._targetSoc-soc)/100*capacity):eh17N(c.sim_laadbehoefte_kwh)||30);
+ const kw=card._simPower??eh17N(c.sim_laadvermogen_kw)??3.7;
+ const tr=ehPricesForDay(h,c,now),prices=ehHourlyFromPrices(tr.quarters,tr.hourly.length?tr.hourly:ehForecast(h,c.prijs));
+ const house=ehW(h,c.huis),opts={fuseAmp:eh17N(c.fuse_amp)??40,chargerAmp:eh17N(c.charger_amp)??32,reserveAmp:eh17N(c.reserve_amp)??2,houseW:house,efficiency:eh17N(c.ev_charge_efficiency)??.9,solar:eh17Solar(h,c.pv_forecast),exportCompensation:eh17N(c.export_compensation_eur_kwh)};
+ const sims=["direct","slim","sun"].map(m=>[m,eh17Plan(prices,now,card._departure,need,kw,m,opts)]);
+ const slim=sims[1][1],direct=sims[0][1];
+ const diff=slim.cost!==null&&direct.cost!==null&&slim.remaining<=.05&&direct.remaining<=.05?direct.cost-slim.cost:null;
+ const markup=sims.map(([mode,p])=>`<div class="eh17-option"><small>${mode==="direct"?"Direct":mode==="slim"?"Goedkoopste volledige uren":"Zonneladen"}</small><strong>${p.cost===null?"—":ehEuro2(p.cost)}</strong><span>${p.error?ehEsc(p.error):`${ehFmt(p.totalKwh,1)} van ${ehFmt(need,1)} kWh · ${p.selected.length} volledige uren`}</span>${p.remaining>.05?`<em>Nog ${ehFmt(p.remaining,1)} kWh te laden</em>`:""}</div>`).join("");
+ const source=house===null?"Huisbelasting aangenomen: 2.000 W (geen actuele meting).":`Huisbelasting aangenomen constant: ${ehFmt(house/1000,2)} kW (huidige meting).`;
+ return `<section class="cupra-card eh17-panel"><div class="eh17-title">${ehIcon("chart")} Slim laden 2.0 · scenariovergelijking</div><p class="subtle">Voorzien van eenfase-grenzen en volledige toekomstige uren. Het rekenmodel houdt rekening met ${ehFmt(opts.fuseAmp,0)}A hoofdaansluiting, maximaal ${ehFmt(opts.chargerAmp,0)}A voor de lader, ${ehFmt(opts.reserveAmp,0)}A reserve en ${ehFmt(opts.efficiency*100,0)}% aangenomen efficiëntie.</p><div class="eh17-options">${markup}</div>${diff===null?"":`<p class="eh17-good">Indicatief voordeel goedkoop laden t.o.v. direct: ${ehEuro2(diff)}</p>`}<p class="subtle">${ehEsc(source)} Het model gebruikt geen voorspelling van toekomstig huishoudverbruik. Zon vereist een expliciete PV-uurprognose en ingestelde terugleververgoeding; anders blijven kosten onbekend.</p><div class="cupra-safety">${ehIcon("shield")} Alle adviezen zijn uitsluitend simulaties. De Alfen en Active Load Balancing bepalen de werkelijk toegestane laadstroom.</div></section>`;
+}
+
+function eh17Budget(h,c){
+ const now=new Date(),electric=ehRead(h,c.cost_zonneplan_month);
+ const gas=c.gas_cost_month?ehRead(h,c.gas_cost_month):null;
+ const fixed=eh17N(c.budget_other_month_eur)??0;
+ const days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+ const elapsed=now.getDate()-1+(now.getHours()+now.getMinutes()/60)/24;
+ const extrapolate=n=>n!==null&&elapsed>=1?n*days/elapsed:null;
+ const electProj=extrapolate(electric),gasProj=extrapolate(gas),all=electProj!==null&&gasProj!==null?electProj+gasProj+fixed:null;
+ const target=eh17N(c.monthly_budget_eur)??200;
+ const percentage=all!==null?Math.max(0,Math.min(100,all/target*100)):electProj!==null?Math.max(0,Math.min(100,electProj/target*100)):0;
+ return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("euro")} Maandprognose en budget</div><div class="eh17-grid"><div><small>Stroom · lineair voorspeld</small><strong>${ehEuro2(electProj)}</strong></div><div><small>Gas · lineair voorspeld</small><strong>${ehEuro2(gasProj)}</strong></div><div><small>Totaal incl. ingestelde overige kosten</small><strong>${ehEuro2(all)}</strong></div></div><div class="eh17-track"><div style="width:${percentage}%"></div></div><p class="subtle">Doel: onder ${ehEuro2(target)} per maand. ${all===null?"Het totaaldoel is niet toetsbaar totdat ook een echte gas-maandkostensensor is gekoppeld.":all<=target?"De huidige lineaire raming blijft onder het doel.":"De huidige lineaire raming ligt boven het doel."} Dit is een eenvoudige maandprojectie, geen seizoensvoorspelling. Vaste kosten tellen alleen mee als ze geconfigureerd zijn.</p></section>`;
+}
+
+function eh17PriceAt(series,t,unit){
+ let p=null;
+ for(const v of series){if(v.t>t)break;if(t-v.t<=90*60000)p=v;}
+ if(!p)return null;const n=eh17N(p.v);if(n===null)return null;
+ return unit.includes("cent")||unit.includes("ct/")?n/100:Math.abs(n)>10?n/10000000:n;
+}
+
+function eh17SessionsFromHistory(data,c,h){
+ const energy=ehNumericHistory(data,c.laad_energie,h),tariff=ehNumericHistory(data,c.prijs,h);
+ const priceUnit=String(h?.states?.[c.prijs]?.attributes?.unit_of_measurement||"").toLowerCase();
+ const sessions=[];let cur=null;
+ for(let i=1;i<energy.length;i++){
+   const kwh=ehToKwh(energy[i].v-energy[i-1].v,h?.states?.[c.laad_energie]?.attributes?.unit_of_measurement);
+   // Voor cumulatieve kWh: alleen positieve, plausibele verschillen; negatieve tellerresets negeren.
+   if(kwh===null||kwh<.08||kwh>15||energy[i].t-energy[i-1].t>3*3600000)continue;
+   if(!cur||energy[i].t-cur.end>50*60000){cur={start:energy[i-1].t,end:energy[i].t,kwh:0,cost:0,missing:0,firstPrice:null};sessions.push(cur);}
+   const p=eh17PriceAt(tariff,energy[i].t,priceUnit);
+   cur.end=energy[i].t;cur.kwh+=kwh;
+   if(p===null)cur.missing+=kwh;else{cur.cost+=kwh*p;if(cur.firstPrice===null)cur.firstPrice=p;}
+ }
+ return sessions.filter(s=>s.kwh>=.5).slice(-25).reverse();
+}
+
+function eh17SessionsHtml(card,h,c){
+ const result=card._eh17Sessions;
+ if(!card._eh17SessionsLoading&&(!result||Date.now()-result.at>15*60000))card._eh17LoadSessions();
+ if(!result)return `<section class="cupra-card eh17-panel"><div class="eh17-title">${ehIcon("clock")} Laadgeschiedenis · laatste 14 dagen</div><p class="subtle">Laadgeschiedenis ophalen uit Home Assistant Recorder…</p></section>`;
+ if(result.error)return `<section class="cupra-card eh17-panel"><div class="eh17-title">Laadgeschiedenis</div><p class="subtle">${ehEsc(result.error)}</p></section>`;
+ const rows=result.sessions.map(s=>{
+  const complete=s.missing<.01,delta=s.firstPrice!==null&&complete?s.kwh*s.firstPrice-s.cost:null;
+  return `<div class="eh17-session"><span>${ehEsc(new Date(s.start).toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"}))}<small>${ehEsc(ehClock(s.start))}–${ehEsc(ehClock(s.end))}</small></span><span><strong>${ehFmt(s.kwh,2)} kWh</strong><small>Wallboxmeter</small></span><span><strong>${complete?ehEuro2(s.cost):"Onvolledig"}</strong><small>${delta===null?"":`Indicatief vs starttarief: ${ehEuro2(delta)}`}</small></span></div>`;
+ }).join("");
+ return `<section class="cupra-card eh17-panel"><div class="eh17-title">${ehIcon("clock")} Laadgeschiedenis · laatste 14 dagen <span class="eh17-tag">Historische metingen</span></div>${rows||'<p class="subtle">Geen herkende sessies in de beschikbare detailhistorie.</p>'}<p class="subtle">Schatting op basis van verschillen in Alfen-kWh-teller en historische Zonneplan-prijzen, zonder vaste kosten of laadverliescorrectie. Het eventuele voordeel tegenover het starttarief is hypothetisch, geen bewezen besparing. Onderbroken metingen kunnen sessies splitsen.</p></section>`;
+}
+
+function eh17BatteryFromStats(data,c,h,now){
+ const from=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7),to=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ const bins=ehWindows({from,to,step:"day"}),bucket=ehCountersByWindow(data,[c.import,c.export],bins,"day",h);
+ return bins.map(b=>({t:b.t,import:bucket[c.import]?.totals?.get(b.key),export:bucket[c.export]?.totals?.get(b.key)})).filter(x=>Number.isFinite(x.import)&&Number.isFinite(x.export));
+}
+
+function eh17BatteryHtml(card,h,c){
+ if(!card._eh17BatteryLoading&&(!card._eh17Battery||Date.now()-card._eh17Battery.at>30*60000))card._eh17LoadBattery();
+ const data=card._eh17Battery,cap=card._eh17Capacity||10;
+ const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08;
+ const days=data?.rows||[],usable=days.map(d=>Math.min(cap,d.export,d.import/Math.max(.01,eff))),mean=usable.length?usable.reduce((s,v)=>s+v,0)/usable.length:null;
+ const kwhMonth=mean===null?null:mean*eff*30.44;
+ const savings=mean===null?null:mean*(eff*buy-sell)*30.44;
+ return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("battery")} Virtuele batterij 2.0 · capaciteitsvergelijking</div><div class="eh17-choices">${[5,10,15].map(n=>`<button type="button" data-eh17-cap="${n}" class="${n===cap?"active":""}">${n} kWh</button>`).join("")}</div><div class="eh17-grid"><div><small>Ideaal herbruikbare zonne-energie/maand</small><strong>${kwhMonth===null?"—":ehFmt(kwhMonth,1)+" kWh"}</strong></div><div><small>Indicatief financieel potentieel/maand</small><strong>${ehEuro2(savings)}</strong></div><div><small>Volledige gemeten dagen</small><strong>${days.length} / 7</strong></div></div><p class="subtle">${data?.error?ehEsc(data.error)+" ":""}Bovengrens voor dagelijkse opslag uit gemeten export en latere import; geen daadwerkelijke batterijprestatie, terugverdientijd of uursimulatie. Aannames: ${ehFmt(eff*100,0)}% rondrendement, ${ehEuro2(buy)}/kWh vermeden inkoop en ${ehEuro2(sell)}/kWh gemiste teruglevering. Voor financiële nauwkeurigheid zijn historische uurprijzen en laadstrategie nodig. ${days.length<2?"Onvoldoende betrouwbare historie voor een maandindicatie.":""}</p></section>`;
+}
+
+function eh17ResetDefs(c){
+ return [["in","P1 afname",c.import],["out","P1 teruglevering",c.export],["ev","Alfen geladen energie",c.laad_energie],["gas","Gasmeter",c.gas],["water","Watermeter",c.water],["pv","Totale PV-opwek",c.pv_total_energy],["bill","Cumulatieve contractkosten",c.billing_total_cost]];
+}
+
+function eh17ResetState(h,c){
+ const id=c.reset_store,raw=h?.states?.[id]?.state;
+ if(!id||!id.startsWith("input_text.")||raw===undefined)return {error:"Maak eerst de Home Assistant-helper input_text.energiehuis_reset_baselines aan (zie installatiehandleiding).",b:{}};
+ if(raw===""||raw==="unknown"||raw==="unavailable")return {b:{},error:raw==="unavailable"?"Reset-helper tijdelijk niet beschikbaar.":null};
+ try{const parsed=JSON.parse(raw);if(parsed?.v!==1||!parsed.b||typeof parsed.b!=="object"||Array.isArray(parsed.b))throw Error("formaat");return {b:parsed.b,error:null};}
+ catch(_){return {error:"De opslag-helper bevat geen geldig Energiehuis-nulmetingformaat. Er wordt niets overschreven.",b:{}};}
+}
+
+function eh17ResetHtml(card,h,c){
+ const initial=eh17ResetState(h,c),store=card._eh17PendingReset??initial;
+ const entries=eh17ResetDefs(c).filter(([, ,id])=>id).map(([key,label,id])=>{
+  const st=h?.states?.[id],n=eh17N(st?.state),unit=String(st?.attributes?.unit_of_measurement||"").trim();
+  const baseline=store.b?.[key],valid=Array.isArray(baseline)&&baseline.length>=3&&baseline[2]===eh17Hash(id)&&Number.isFinite(eh17N(baseline[0]));
+  const delta=valid&&n!==null?n-baseline[0]:null;
+  const t=valid?new Date(baseline[1]*1000).toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"}):"Nog niet ingesteld";
+  return `<label class="eh17-reset-row"><input type="checkbox" data-eh17-select="${key}" ${card._eh17ResetKeys?.has(key)?"checked":""} ${n===null?"disabled":""}/><span><strong>${ehEsc(label)}</strong><small>${ehEsc(id)} · ${ehEsc(t)}</small></span><span><strong>${delta===null?"—":ehFmt(delta,2)+" "+ehEsc(unit)}</strong><small>Stand: ${n===null?"Onbekend":ehFmt(n,2)+" "+ehEsc(unit)}</small></span></label>`;
+ }).join("");
+ const chosen=(card._eh17Confirm||[]).map(key=>eh17ResetDefs(c).find(d=>d[0]===key)?.[1]).filter(Boolean);
+ const confirm=chosen.length?`<div class="eh17-confirm" role="alertdialog" aria-modal="true" aria-label="Bevestig nieuwe nulmeting"><strong>Bevestig nieuwe nulmeting</strong><p>Wil je voor <b>${ehEsc(chosen.join(", "))}</b> de huidige meterstanden als nieuw beginpunt bewaren? Bestaande nulmetingen voor deze selectie worden vervangen. De originele meterstanden en historische gegevens blijven behouden.</p><div class="eh17-confirm-actions"><button type="button" data-eh17-cancel="1">Annuleren</button><button type="button" class="danger" data-eh17-confirm="1">Ja, nulmeting vastleggen</button></div></div>`:"";
+ const status=card._eh17ResetMsg?`<p class="eh17-status" role="status">${ehEsc(card._eh17ResetMsg)}</p>`:"";
+ return `<section class="subsection eh17-panel"><button class="eh17-collapse" type="button" data-eh17-toggle-reset="1">${ehIcon("shield")} Geavanceerd · Meterbeheer &amp; Reset ${card._eh17ResetOpen?"▴":"▾"}</button>${card._eh17ResetOpen?`<p class="subtle">Bij een nieuw contract leg je per meter een nieuwe beginstand vast. Alleen de relatieve stand <em>sinds nulmeting</em> wordt hier opnieuw vanaf nul berekend. Er gaan geen resetcommando's naar P1, GoodWe, Alfen, gas- of watermeters.</p>${initial.error?`<p class="plan-warning">${ehEsc(initial.error)}</p>`:""}<div class="eh17-reset-items">${entries}</div><button type="button" class="eh17-primary" data-eh17-preview="1" ${initial.error||card._eh17ResetSaving?"disabled":""}>Nieuwe nulmeting voor selectie…</button>${confirm}${status}<p class="subtle">De nulmetingen staan centraal in Home Assistant, niet alleen op je telefoon. Kosten per maand, vergelijkingsgrafieken en fysieke totalen worden hierdoor niet gereset. Gebruik daarvoor een aparte, gecontroleerde contractperiode.</p>`:""}</section>`;
+}
+
+function eh17MoreHtml(card,h,c){
+ const quality=eh17Health(h,c),bad=quality.filter(q=>!["Actueel","Controleer daglicht"].includes(q.status));
+ return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("shield")} Systeemcontrole <span class="eh17-tag">${bad.length?"Aandachtspunten: "+bad.length:"Bronnen lijken actueel"}</span></div><div class="eh17-health">${quality.map(q=>`<div><span>${ehEsc(q.name)}<small>${ehEsc(q.id||"Niet ingesteld")}</small></span><strong class="${q.status==="Actueel"?"eh17-good":""}">${ehEsc(q.status)}</strong></div>`).join("")}</div><p class="subtle">Status op basis van beschikbaarheid, eenheid en laatste HA-update. Dit bewijst geen volledige nauwkeurigheid van de meting. Zonnepanelen kunnen 's nachts stilstaan.</p></section>${eh17ResetHtml(card,h,c)}`;
+}
+
+function eh17Css(){
+ return `.eh17-panel{margin-top:14px}.eh17-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:800;margin-bottom:13px;flex-wrap:wrap}.eh17-title .icon{width:19px;height:19px;color:#59dcbc}.eh17-tag{font-size:10px;color:#b7edda;border:1px solid #60cfa244;border-radius:20px;padding:4px 8px;font-weight:550}.eh17-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}.eh17-grid>div,.eh17-option{padding:12px;border-radius:12px;background:#0a2435;border:1px solid #98cde02b;display:flex;flex-direction:column;gap:5px}.eh17-grid p{margin:4px 0;color:#c6d9e6;line-height:1.5;font-size:12px}.eh17-grid strong{font-size:18px;color:#e9f9ff}.eh17-grid small,.eh17-option small{color:#a8cbdb;font-size:11px}.eh17-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.eh17-option strong{color:#4ae4b3;font-size:21px}.eh17-option span,.eh17-option em{font-size:11px;font-style:normal;color:#c3d7e6;line-height:1.5}.eh17-option em{color:#ffcc78}.eh17-good{color:#56e8b6!important}.eh17-track{height:9px;border-radius:20px;background:#264258;margin-top:15px;overflow:hidden}.eh17-track>div{height:100%;background:#4bd7b3;border-radius:20px}.eh17-session{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:10px;border-top:1px solid #9db9ca2f;padding:12px 0;font-size:12px}.eh17-session>span{display:flex;flex-direction:column;gap:6px}.eh17-session small{font-size:10px;color:#9fbccc}.eh17-choices{display:flex;gap:7px;margin-bottom:14px}.eh17-choices button,.eh17-primary,.eh17-confirm-actions button{font:inherit;color:#d5eaf5;background:#102c40;border:1px solid #6aadc34a;border-radius:9px;padding:10px 13px;cursor:pointer}.eh17-choices button.active,.eh17-primary{background:#15503f;color:#e9fff7;border-color:#53dfad}.eh17-health>div{display:flex;justify-content:space-between;gap:9px;padding:10px 0;border-bottom:1px solid #abc3d422;font-size:12px}.eh17-health span{display:flex;flex-direction:column;gap:4px}.eh17-health small{font-size:10px;color:#a7c0d3;overflow-wrap:anywhere}.eh17-health strong{white-space:nowrap}.eh17-collapse{background:transparent;color:#e8f7ff;border:none;font:inherit;font-size:15px;font-weight:750;cursor:pointer;padding:3px;display:flex;gap:9px;align-items:center}.eh17-reset-items{display:grid;gap:8px;margin:15px 0}.eh17-reset-row{display:flex;align-items:center;gap:10px;border:1px solid #aac3d431;border-radius:10px;background:#0a2636;padding:11px;font-size:12px;cursor:pointer}.eh17-reset-row>span{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}.eh17-reset-row>span:last-child{text-align:right}.eh17-reset-row small{font-size:10px;color:#a8bfcb;overflow-wrap:anywhere}.eh17-reset-row input{accent-color:#34d5a0;width:18px;height:18px}.eh17-confirm{margin-top:12px;padding:17px;border:1px solid #f0b86788;border-radius:13px;background:#3d2b1e;color:#ffe7c3;font-size:13px;line-height:1.55}.eh17-confirm-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.eh17-confirm-actions .danger{background:#9b422e;color:white;border-color:#eb966e}.eh17-primary:disabled{opacity:.5;cursor:not-allowed}.eh17-status{color:#9fe7ce;font-size:12px}.eh17-panel .cupra-safety{margin-top:12px}@media(max-width:550px){.eh17-options{grid-template-columns:1fr}.eh17-session{grid-template-columns:1fr 1fr}.eh17-session>span:last-child{grid-column:1/-1}.eh17-health strong{font-size:11px}.eh17-reset-row{align-items:flex-start}.eh17-reset-row>span:last-child{flex:0 0 34%}}`;
+}
+
+function eh17Enhance(){
+ const P=EnergiehuisCard.prototype;
+ const oldCupra=P._cupraHtml,oldBattery=P._batteryHtml,oldCosts=P._costsHtml,oldMore=P._moreHtml,oldRender=P._render,oldConnected=P.connectedCallback;
+ P._cupraHtml=function(h,c){
+  const base=oldCupra.call(this,h,c);
+  return base.replace("</main>",(this._view==="charge"?eh17Charge(h,c,this):eh17SessionsHtml(this,h,c))+"</main>");
+ };
+ P._batteryHtml=function(h,c){return oldBattery.call(this,h,c).replace("</main>",eh17BatteryHtml(this,h,c)+"</main>");};
+ P._costsHtml=function(h,c){return oldCosts.call(this,h,c).replace("</main>",eh17Budget(h,c)+"</main>");};
+ P._moreHtml=function(h,c){return oldMore.call(this,h,c).replace("</main>",eh17MoreHtml(this,h,c)+"</main>");};
+ P._render=function(){
+  oldRender.call(this);
+  if(!this.shadowRoot||!this.config||!this._hass)return;
+  const style=this.shadowRoot.querySelector("style");
+  if(style)style.textContent+="\n"+eh17Css();
+  if(this._view==="overview"){
+    const chart=this.shadowRoot.querySelector(".body .chart-panel");
+    if(chart)chart.insertAdjacentHTML("beforebegin",eh17Coach(this._hass,this.config));
+  }
+ };
+ P._eh17LoadSessions=async function(){
+  const h=this._hass,c=this.config;
+  if(this._eh17SessionsLoading||!this.isConnected||!h?.callWS||!c||!c.laad_energie)return;
+  this._eh17SessionsLoading=true;
+  const now=new Date(),from=new Date(now.getTime()-14*86400000),ids=[c.laad_energie,c.prijs].filter(Boolean);
+  try{
+    const data=await h.callWS({type:"history/history_during_period",start_time:from.toISOString(),end_time:now.toISOString(),entity_ids:[...new Set(ids)],minimal_response:false,no_attributes:false,significant_changes_only:false});
+    this._eh17Sessions={at:Date.now(),sessions:eh17SessionsFromHistory(data,c,h)};
+  }catch(_){this._eh17Sessions={at:Date.now(),error:"Recorder-detailhistorie voor de afgelopen 14 dagen is niet beschikbaar."};}
+  finally{this._eh17SessionsLoading=false;this._schedule();}
+ };
+ P._eh17LoadBattery=async function(){
+  const h=this._hass,c=this.config;
+  if(this._eh17BatteryLoading||!this.isConnected||!h?.callWS||!c?.import||!c?.export)return;
+  this._eh17BatteryLoading=true;
+  const now=new Date(),from=new Date(now.getFullYear(),now.getMonth(),now.getDate()-8);
+  try{
+    const data=await h.callWS({type:"recorder/statistics_during_period",start_time:from.toISOString(),end_time:now.toISOString(),statistic_ids:[c.import,c.export],period:"day",types:["change","sum"]});
+    this._eh17Battery={at:Date.now(),rows:eh17BatteryFromStats(data,c,h,now)};
+  }catch(_){this._eh17Battery={at:Date.now(),rows:[],error:"Recorder-statistieken voor afname en teruglevering zijn niet beschikbaar."};}
+  finally{this._eh17BatteryLoading=false;this._schedule();}
+ };
+ P._eh17ResetNow=async function(){
+  const h=this._hass,c=this.config,keys=this._eh17Confirm||[];
+  if(this._eh17ResetSaving||!keys.length||!h?.callService)return;
+  const state=eh17ResetState(h,c);
+  if(state.error){this._eh17ResetMsg=state.error;this._eh17Confirm=null;this._schedule();return;}
+  const baselines={...state.b};const stamp=Math.floor(Date.now()/1000);
+  for(const key of keys){
+    const def=eh17ResetDefs(c).find(d=>d[0]===key),id=def?.[2],n=eh17N(h.states?.[id]?.state);
+    if(n===null){this._eh17ResetMsg="Meter niet meer beschikbaar: "+(def?.[1]||key);this._eh17Confirm=null;this._schedule();return;}
+    baselines[key]=[n,stamp,eh17Hash(id)];
+  }
+  const value=JSON.stringify({v:1,b:baselines});
+  if(value.length>255){this._eh17ResetMsg="Te veel nulmetingen voor de opslag-helper (maximaal 255 tekens).";this._eh17Confirm=null;this._schedule();return;}
+  this._eh17ResetSaving=true;this._schedule();
+  try{
+    await h.callService("input_text","set_value",{entity_id:c.reset_store,value});
+    this._eh17PendingReset={b:baselines,error:null};
+    this._eh17ResetMsg="Nieuwe nulmeting opgeslagen in Home Assistant voor "+keys.length+" meter(s).";
+    this._eh17ResetKeys=new Set();
+    this._eh17Confirm=null;
+  }catch(err){this._eh17ResetMsg="Opslaan is mislukt. De bestaande nulmeting is niet bevestigd: "+String(err?.message||"onbekende fout");this._eh17Confirm=null;}
+  finally{this._eh17ResetSaving=false;this._schedule();}
+ };
+ P.connectedCallback=function(){
+   oldConnected.call(this);
+   if(this._eh17EventsReady)return;
+   this._eh17EventsReady=true;this._eh17Capacity=10;this._eh17ResetKeys=new Set();this._eh17ResetOpen=false;
+   this.shadowRoot.addEventListener("change",e=>{
+     const key=e.target?.dataset?.eh17Select;
+     if(key){if(e.target.checked)this._eh17ResetKeys.add(key);else this._eh17ResetKeys.delete(key);this._eh17Confirm=null;return;}
+   });
+   this.shadowRoot.addEventListener("click",e=>{
+     const btn=e.target.closest("[data-eh17-cap], [data-eh17-toggle-reset], [data-eh17-preview], [data-eh17-cancel], [data-eh17-confirm]");
+     if(!btn)return;
+     if(btn.hasAttribute("data-eh17-cap")){this._eh17Capacity=Number(btn.dataset.eh17Cap);this._schedule();return;}
+     if(btn.hasAttribute("data-eh17-toggle-reset")){this._eh17ResetOpen=!this._eh17ResetOpen;this._eh17Confirm=null;this._schedule();return;}
+     if(btn.hasAttribute("data-eh17-preview")){
+       const st=eh17ResetState(this._hass,this.config);
+       if(st.error){this._eh17ResetMsg=st.error;this._schedule();return;}
+       if(!this._eh17ResetKeys.size){this._eh17ResetMsg="Selecteer eerst één of meer meters.";this._schedule();return;}
+       this._eh17Confirm=[...this._eh17ResetKeys];this._eh17ResetMsg="";this._schedule();return;
+     }
+     if(btn.hasAttribute("data-eh17-cancel")){this._eh17Confirm=null;this._schedule();return;}
+     if(btn.hasAttribute("data-eh17-confirm"))this._eh17ResetNow();
+   });
+ };
+}
+
+eh17Enhance();
