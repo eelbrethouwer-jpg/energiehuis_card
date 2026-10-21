@@ -543,13 +543,13 @@ function ehHourlyFromPrices(quarter,hour){
  return [...result.values()].sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
 }
 
-const EH_CUPRA_PERIODS=[['today','Vandaag'],['7d','7 dagen'],['30d','30 dagen'],['year','Dit jaar']];
+const EH_CUPRA_PERIODS=[['today','Vandaag'],['week','Deze week'],['month','Deze maand'],['year','Dit jaar']];
 const ehCupraPeriodLimits=(p,now=new Date())=>{
- const day=(delta=0)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()+delta);
+ const day=()=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
  if(p==='today')return {from:day(),to:now,label:'Vandaag'};
- if(p==='7d')return {from:day(-6),to:now,label:'Laatste 7 dagen'};
- if(p==='year')return {from:new Date(now.getFullYear(),0,1),to:now,label:'Dit jaar'};
- return {from:day(-29),to:now,label:'Laatste 30 dagen'};
+ if(p==='week'){const d=day(),weekday=(d.getDay()+6)%7;return {from:new Date(d.getFullYear(),d.getMonth(),d.getDate()-weekday),to:now,label:'Deze week'};}
+ if(p==='month')return {from:new Date(now.getFullYear(),now.getMonth(),1),to:now,label:'Deze maand'};
+ return {from:new Date(now.getFullYear(),0,1),to:now,label:'Dit jaar'};
 };
 function ehHistoryEntity(data,id){
  if(!id)return [];
@@ -597,11 +597,12 @@ function ehCupraKmDaily(stats,id){
 }
 function ehCupraDistanceSummary(daily,now=new Date()){
  const startToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
- const start7=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime();
- const start30=new Date(now.getFullYear(),now.getMonth(),now.getDate()-29).getTime();
+ const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),weekday=(today.getDay()+6)%7;
+ const startWeek=new Date(today.getFullYear(),today.getMonth(),today.getDate()-weekday).getTime();
+ const startMonth=new Date(now.getFullYear(),now.getMonth(),1).getTime();
  const startYear=new Date(now.getFullYear(),0,1).getTime();
  const sumSince=from=>{const v=daily.filter(x=>x.t>=from&&x.t<=now.getTime()&&Number.isFinite(x.km)).map(x=>x.km);return v.length?v.reduce((a,b)=>a+b,0):null;};
- return {today:sumSince(startToday),d7:sumSince(start7),d30:sumSince(start30),year:sumSince(startYear)};
+ return {today:sumSince(startToday),week:sumSince(startWeek),month:sumSince(startMonth),year:sumSince(startYear)};
 }
 function ehCupraKmBuckets(daily,period,now=new Date()){
  const lim=ehCupraPeriodLimits(period,now);
@@ -714,7 +715,7 @@ class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;this._cupraInsightsPeriod='30d';this._cupraInsightsResult=null;this._cupraInsightsCache=new Map();this._cupraInsightsLoadingKey=null;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;this._cupraInsightsPeriod='month';this._cupraInsightsResult=null;this._cupraInsightsCache=new Map();this._cupraInsightsLoadingKey=null;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -1119,13 +1120,13 @@ class EnergiehuisCard extends HTMLElement {
  }
  _cupraInsightsHtml(h,c){
   const r=this._cupraInsightsResult?.period===this._cupraInsightsPeriod?this._cupraInsightsResult:null;
-  const periodLabel=EH_CUPRA_PERIODS.find(x=>x[0]===this._cupraInsightsPeriod)?.[1]||'30 dagen';
+  const periodLabel=EH_CUPRA_PERIODS.find(x=>x[0]===this._cupraInsightsPeriod)?.[1]||'Deze maand';
   const fmtKm=v=>Number.isFinite(v)?ehFmt(v,1)+' km':'—';
   const fmtPct=v=>Number.isFinite(v)?(v>0?'+':'')+ehFmt(v,1)+'%':'—';
   const corrLabel=v=>{if(!Number.isFinite(v))return 'Nog onvoldoende meetpunten';const a=Math.abs(v),s=a>=.65?'sterk':a>=.4?'matig':a>=.2?'licht':'zwak';return s+' · r '+ehFmt(v,2);};
   if(!r)return `<section class="cupra-card cupra-insights"><div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Analyse</span></div><div class="energy-loading">Cupra- en Alfen-historie analyseren…</div></section>`;
   const s=r.summary||{},m=r.metrics||{};
-  const selectedKm=this._cupraInsightsPeriod==='today'?s.today:this._cupraInsightsPeriod==='7d'?s.d7:this._cupraInsightsPeriod==='year'?s.year:s.d30;
+  const selectedKm=this._cupraInsightsPeriod==='today'?s.today:this._cupraInsightsPeriod==='week'?s.week:this._cupraInsightsPeriod==='year'?s.year:s.month;
   const now=new Date(),from=r.limits?.from||now;
   const day0=new Date(from.getFullYear(),from.getMonth(),from.getDate()),today0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const days=Math.max(1,Math.round((today0-day0)/86400000)+1),avgDay=Number.isFinite(selectedKm)?selectedKm/days:null;
@@ -1141,7 +1142,7 @@ class EnergiehuisCard extends HTMLElement {
    <div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Praktijkanalyse</span></div>
    <p class="subtle">Gebaseerd op jouw Cupra-data, 15-minutenupdates en Alfen-laadenergie. Segmenten met thuisladen of vermoedelijk extern laden worden uit de efficiëntieanalyse gefilterd.</p>
    <div class="insight-periods">${EH_CUPRA_PERIODS.map(([id,label])=>`<button type="button" data-eh-cupra-insight-period="${id}" class="${this._cupraInsightsPeriod===id?'chosen':''}">${label}</button>`).join('')}</div>
-   <div class="km-summary"><div><small>Vandaag</small><strong>${fmtKm(s.today)}</strong></div><div><small>7 dagen</small><strong>${fmtKm(s.d7)}</strong></div><div><small>30 dagen</small><strong>${fmtKm(s.d30)}</strong></div><div><small>Dit jaar</small><strong>${fmtKm(s.year)}</strong></div></div>
+   <div class="km-summary"><div><small>Vandaag</small><strong>${fmtKm(s.today)}</strong></div><div><small>Deze week</small><strong>${fmtKm(s.week)}</strong></div><div><small>Deze maand</small><strong>${fmtKm(s.month)}</strong></div><div><small>Dit jaar</small><strong>${fmtKm(s.year)}</strong></div></div>
    <div class="insight-headline"><div><small>${ehEsc(periodLabel)}</small><strong>${fmtKm(selectedKm)}</strong><span>${Number.isFinite(avgDay)?ehEsc(ehFmt(avgDay,1)+' km gemiddeld per kalenderdag'):'Gemiddelde nog niet beschikbaar'}</span></div><div class="quality-pill ${String(m.quality||'').toLowerCase()}"><small>Datakwaliteit</small><strong>${ehEsc(m.quality||'Beperkt')}</strong></div></div>
    ${ehCupraKmChart(r.kmBuckets,this._cupraInsightsPeriod)}
    <div class="insight-metrics"><div><small>Praktijkactieradius</small><strong>${Number.isFinite(m.range)?ehEsc(ehFmt(m.range,0)+' km'):'—'}</strong><span>Uit ${ehEsc(ehFmt(m.km||0,0))} km geldige segmenten</span></div><div><small>Geschat verbruik</small><strong>${Number.isFinite(m.kwh100)?ehEsc(ehFmt(m.kwh100,1)+' kWh/100 km'):'—'}</strong><span>SOC-verlies × ${ehEsc(ehFmt(r.capacity,0))} kWh</span></div><div><small>Cupra voorspelling</small><strong>${Number.isFinite(m.predicted)?ehEsc(ehFmt(m.predicted,0)+' km'):'—'}</strong><span>${Number.isFinite(m.rangeDelta)?'Praktijk '+ehEsc(fmtPct(m.rangeDelta)):'Nog geen vergelijking'}</span></div><div><small>Verwacht bij huidige temperatuur</small><strong>${Number.isFinite(expectedNow)?ehEsc(ehFmt(expectedNow,0)+' km'):'—'}</strong><span>${currentTempGroup?ehEsc(currentTempGroup.label+' · '+ehFmt(currentTempGroup.km,0)+' km historie'):'Nog onvoldoende data in deze temperatuurklasse'}</span></div><div><small>Laadefficiëntie thuis</small><strong>${Number.isFinite(m.chargeEfficiency)&&m.chargeSamples>=2?ehEsc(ehFmt(m.chargeEfficiency,1)+'%'):'—'}</strong><span>${m.chargeSamples?`${m.chargeSamples} Alfen/Cupra intervallen · ${ehEsc(ehFmt(m.wallKwh||0,1))} kWh muur`:'Nog onvoldoende gekoppelde laadintervallen'}</span></div><div><small>Geldige segmenten</small><strong>${m.valid?.length??0}</strong><span>${ehEsc(coverage)}</span></div></div>
