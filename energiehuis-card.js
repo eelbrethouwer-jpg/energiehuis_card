@@ -636,7 +636,7 @@ function ehCupraSegments(history,c,h,from,to,capacity){
    const homeCharged=Number.isFinite(alfenDelta)&&alfenDelta>.08;
    const socDrop=Number.isFinite(a.soc)&&Number.isFinite(b.soc)?a.soc-b.soc:null;
    const socGain=Number.isFinite(socDrop)?-socDrop:null;
-   const externalCharge=Number.isFinite(socGain)&&socGain>.5&&!homeCharged;
+   const externalCharge=Number.isFinite(socGain)&&socGain>=2&&!homeCharged;
    if(homeCharged)homeChargeExcluded++;if(externalCharge)externalChargeSuspected++;
    if(homeCharged&&Number.isFinite(socGain)&&socGain>.3&&km<1){
      const wall=alfenDelta,batteryGain=capacity*socGain/100,eff=wall>0?batteryGain/wall:null;
