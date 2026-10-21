@@ -1074,6 +1074,40 @@ class EnergiehuisCard extends HTMLElement {
     // Fouten blijven beperkt tot de historiegrafiek; live-sensoren blijven bruikbaar.
   } finally {this._historyLoading=false;this._schedule();}
  }
+ async _loadCupraInsights(){
+  const h=this._hass,c=this.config,p=this._cupraInsightsPeriod;
+  if(this._view!=='cupra'||!h?.callWS||!c)return;
+  const now=new Date(),lim=ehCupraPeriodLimits(p,now),yearStart=new Date(now.getFullYear(),0,1);
+  const ids=[c.cupra,c.cupra_mileage,c.cupra_range,c.cupra_outside_temp,c.cupra_target_temp,c.cupra_climate_usage,c.cupra_onboard_usage,c.laad_energie].filter(Boolean);
+  const key=p+'|'+ehDayKey(lim.from)+'|'+ids.join('|');
+  const ttl=Math.max(5,Number(c.cupra_refresh_minutes)||15)*60*1000;
+  const cached=this._cupraInsightsCache.get(key);
+  if(cached&&Date.now()-cached.fetched<ttl){this._cupraInsightsResult=cached;this._schedule();return;}
+  if(this._cupraInsightsLoadingKey===key)return;
+  this._cupraInsightsLoadingKey=key;this._cupraInsightsResult=null;this._schedule();
+  let daily=[],statsWarning='',historyWarning='',history=null;
+  try{
+   const before=new Date(yearStart.getFullYear()-1,11,31);
+   const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:now.toISOString(),statistic_ids:[c.cupra_mileage],period:'day',types:['change','min','max','mean']});
+   daily=ehCupraKmDaily(stats,c.cupra_mileage);
+  }catch(_){statsWarning='Kilometer-langetermijnstatistieken niet beschikbaar.';}
+  try{
+   history=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:now.toISOString(),entity_ids:[...new Set(ids)],minimal_response:true,no_attributes:false,significant_changes_only:false});
+  }catch(_){historyWarning='Detailhistorie voor de Cupra-analyse kon niet worden opgehaald.';}
+  if(!daily.length&&history){
+   const ms=ehNumericHistory(history,c.cupra_mileage,h);const byDay=new Map();
+   for(let i=1;i<ms.length;i++){const d=ms[i].v-ms[i-1].v;if(!Number.isFinite(d)||d<=0||d>400)continue;const date=new Date(ms[i].t),t=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();byDay.set(t,(byDay.get(t)||0)+d);}
+   daily=[...byDay.entries()].map(([t,km])=>({t,km})).sort((a,b)=>a.t-b.t);
+   if(daily.length)statsWarning='Kilometertotalen zijn voorlopig uit beschikbare detailhistorie berekend.';
+  }
+  const capacity=ehNum(c.cupra_usable_kwh)||59;
+  const seg=history?ehCupraSegments(history,c,h,lim.from,now,capacity):{segments:[],anchors:0,homeChargeExcluded:0,externalChargeSuspected:0,noiseExcluded:0,coverageFrom:null,coverageTo:null};
+  const temp=ehTempGroups(seg.segments,capacity),metrics=ehCupraInsightMetrics(seg,capacity);
+  const result={key,period:p,limits:lim,capacity,daily,summary:ehCupraDistanceSummary(daily,now),kmBuckets:ehCupraKmBuckets(daily,p,now),segments:seg.segments,anchors:seg.anchors,homeChargeExcluded:seg.homeChargeExcluded,externalChargeSuspected:seg.externalChargeSuspected,noiseExcluded:seg.noiseExcluded,coverageFrom:seg.coverageFrom,coverageTo:seg.coverageTo,tempGroups:temp.groups,tempBaseline:temp.baseline,metrics,statsWarning,historyWarning,fetched:Date.now()};
+  this._cupraInsightsCache.set(key,result);
+  if(this._cupraInsightsCache.size>8)this._cupraInsightsCache.delete(this._cupraInsightsCache.keys().next().value);
+  if(this._cupraInsightsLoadingKey===key){this._cupraInsightsResult=result;this._cupraInsightsLoadingKey=null;this._schedule();}
+ }
  _cupraHtml(h,c){
   const soc=ehRead(h,c.cupra);
   const rangeState=ehCupraByName(h,c.cupra_range,'Actieradius');
