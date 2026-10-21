@@ -19,10 +19,10 @@ De analyse gaat uit van de bewust gekozen VW Group Connect-verversing van circa 
 
 ## Kilometeranalyse
 - kilometers vandaag
-- kilometers laatste 7 dagen
-- kilometers laatste 30 dagen
+- kilometers deze week
+- kilometers deze maand
 - kilometers dit jaar
-- gemiddelde kilometers per kalenderdag
+- gemiddelde kilometers per kalenderdag binnen de gekozen periode
 - grafiek per dag; bij jaarweergave per maand
 
 ## Praktijkverbruik
@@ -63,7 +63,7 @@ Energiehuis berekent onder meer:
 - gemiddelde doeltemperatuur
 - gemiddeld verschil tussen doeltemperatuur en buitenlucht
 - statistische samenhang tussen buitentemperatuur en verbruik
-- statistische samenhang tussen setpointverschil en verbruik
+- statistische samenhang tussen de absolute afstand van doeltemperatuur tot buitentemperatuur en verbruik
 
 De doeltemperatuur is een setpoint, geen gemeten binnentemperatuur. De getoonde samenhang is daarom indicatief en wordt niet als bewezen oorzaak gepresenteerd.
 
