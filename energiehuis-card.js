@@ -1,8 +1,8 @@
-/* Energiehuis v1.6.0 — Cupra Insights.
+/* Energiehuis v1.6.1 — Cupra & Slim laden apart.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
  * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.6.0';
+const EH_VERSION = '1.6.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -750,7 +750,7 @@ class EnergiehuisCard extends HTMLElement {
     const page=e.target.closest('[data-eh-page]');
    if(page){
      const next=page.dataset.ehPage;
-     if(['overview','cupra','battery','costs','more'].includes(next)){
+     if(['overview','cupra','charge','battery','costs','more'].includes(next)){
        this._view=next;this._detail=null;
        this._schedule();
        if(next==='costs')this._loadCostCompare();
@@ -1279,14 +1279,16 @@ class EnergiehuisCard extends HTMLElement {
     </div>
     ${planned.remaining>0.1?`<p class="plan-warning">Niet genoeg ingeplande capaciteit vóór vertrek met de beschikbare prijzen en het gekozen laadvermogen.</p>`:''}
     <div class="scheduled-hours">${planned.selected.length?planned.selected.map(x=>`<div class="scheduled-hour"><span>${ehEsc(ehClock(x.slotStart))}–${ehEsc(ehClock(x.slotEnd))}</span><span>${ehEsc(ehFmt(x.kWh,1))} kWh</span><strong>${ehEsc(ehMoney(x.price))}/kWh</strong></div>`).join(''):'<p class="detail-muted">Geen uren geselecteerd in deze modus.</p>'}</div>`;
-  return `<main class="cupra-page">
-    <div class="cupra-head"><button class="back-button" type="button" data-eh-page="overview" aria-label="Terug naar overzicht">←</button><div><div class="cupra-kicker">ENERGIEHUIS · LAADPLANNER</div><h2>Slim laden Cupra Born</h2></div><span class="read-only compact">${ehIcon('shield')} Alleen simulatie</span></div>
+  return this._view==='cupra' ? `<main class="cupra-page">
+    <div class="cupra-head"><button class="back-button" type="button" data-eh-page="overview" aria-label="Terug naar overzicht">←</button><div><div class="cupra-kicker">ENERGIEHUIS · VOERTUIG &amp; INZICHTEN</div><h2>Cupra Born</h2></div><span class="read-only compact">${ehIcon('shield')} Alleen uitlezen</span></div>
     <section class="cupra-hero">
       ${safeImg?`<div class="cupra-photo" style="background-image:linear-gradient(180deg,#06162433,#071522),url('${ehEsc(safeImg)}')"></div>`:`<div class="cupra-car-icon">${ehIcon('car')}</div>`}
       <div class="cupra-car-copy"><div class="cupra-name">Cupra Born</div><div class="cupra-connection">${ehEsc(connectionText)}</div><div class="cupra-big">${soc===null?'—':ehEsc(ehFmt(soc,0)+'%')} <span>SOC</span></div><div class="cupra-small">${range===null?'Actieradius niet gekoppeld':ehEsc(ehFmt(range,0)+' km geschatte actieradius')}</div></div>
     </section>
     <section class="cupra-card vehicle-dashboard"><div class="section-title">${ehIcon('car')} Huidige voertuigstatus</div>${vehicleStatusCards}<button type="button" class="vehicle-details-toggle" data-eh-cupra-details="1">${this._cupraDetails?'Minder details':'Uitgebreide voertuigdetails'} <span>${this._cupraDetails?'↑':'→'}</span></button>${vehicleDetails}</section>
     ${this._cupraInsightsHtml(h,c)}
+  </main>` : `<main class="cupra-page charge-page">
+    <div class="cupra-head"><button class="back-button" type="button" data-eh-page="overview" aria-label="Terug naar overzicht">←</button><div><div class="cupra-kicker">ENERGIEHUIS · LAADOMGEVING</div><h2>Cupra &amp; Slim laden</h2></div><span class="read-only compact">${ehIcon('shield')} Alleen simulatie</span></div>
     <section class="cupra-card"><div class="section-label">Huidige laadstatus</div><div class="charge-row"><div><strong class="charge-power">${ehEsc(ehPower(ev))}</strong><p>${ehEsc(chargeLabel)}</p></div><div class="charge-amps"><span>Stroom L1</span><strong>${amps===null?'—':ehEsc(ehFmt(amps,1)+' A')}</strong></div></div><div class="charge-progress"><div style="width:${Math.min(100,Math.max(0,soc??0))}%"></div></div><p class="subtle">Actueel laadvermogen: Alfen · ${soc===null?'Cupra-accustand niet gekoppeld':'Accustand: Cupra-sensor'}</p></section>
     <section class="cupra-card"><div class="section-title">${ehIcon('clock')} Jouw laadscenario <span class="only-sim">Niet actief</span></div>
       <div class="planning-inputs">
@@ -1429,9 +1431,10 @@ class EnergiehuisCard extends HTMLElement {
   const selectedIndex=plotted?.samples?.length?ehClosestIndex(plotted.samples,this._selectedAt):0;
   const graph=this._historyError?`<div class="no-chart">Historische gegevens niet beschikbaar. Controleer de History-integratie en toegang tot deze entiteiten.</div>`:ehChart(plotted,ids,selectedIndex);
   const tab=(name,icon)=>{
-    const pages={Overzicht:'overview',Cupra:'cupra',Batterij:'battery',Kosten:'costs',Meer:'more'};
+    const pages={Overzicht:'overview',Cupra:'cupra','Cupra & Slim laden':'charge',Batterij:'battery',Kosten:'costs',Meer:'more'};
     const page=pages[name],current=this._view===page;
-    return `<button class="navitem ${current?'active':''}" data-eh-page="${page}" ${current?'aria-current="page"':''} type="button">${ehIcon(icon)}<span>${ehEsc(name)}</span></button>`;
+    const label=name==='Cupra & Slim laden'?'<span class="nav-label-full">Cupra &amp; Slim laden</span><span class="nav-label-short">Slim laden</span>':`<span>${ehEsc(name)}</span>`;
+     return `<button class="navitem ${current?'active':''}" data-eh-page="${page}" aria-label="${ehEsc(name)}" ${current?'aria-current="page"':''} type="button">${ehIcon(icon)}${label}</button>`;
   };
   const missing=[['P1',net],['GoodWe',pv],['Alfen',ev],['Zonneplan',price],['Huis',house]].filter(([,v])=>v===null).map(([name])=>name);
   this.shadowRoot.innerHTML=`<style>
@@ -1472,7 +1475,7 @@ class EnergiehuisCard extends HTMLElement {
 .foot{margin:12px 2px 0;font-size:10px;color:#809eaf;text-align:center;line-height:1.5}.notice{border-left:3px solid #ffd16e;background:#ffdc7211;color:#ffe0aa;border-radius:6px;padding:8px 10px;font-size:11px;margin-top:12px}
 .nav{position:sticky;bottom:0;border-radius:0 0 21px 21px;z-index:50;box-shadow:0 -10px 25px #020b15bb;display:flex;align-items:stretch;justify-content:space-around;background:#06131f;border-top:1px solid #9bd0d021;padding:10px 5px max(12px,env(safe-area-inset-bottom));gap:3px}
 .navitem{appearance:none;border:0;background:transparent;color:#91a9bb;display:flex;gap:5px;flex-direction:column;align-items:center;justify-content:center;padding:6px 4px;min-width:0;flex:1;font:inherit;font-size:11px;cursor:pointer;border-radius:12px}
-.navitem .icon{width:21px;height:21px}.navitem.active{color:var(--mint);background:#1adb9220;font-weight:750}.navitem:disabled{opacity:.48;cursor:not-allowed}.navitem:not(:disabled):focus-visible{outline:2px solid #76c1ef;outline-offset:1px}
+.navitem .icon{width:21px;height:21px}.nav-label-short{display:none}.nav-label-full{display:inline}.navitem.active{color:var(--mint);background:#1adb9220;font-weight:750}.navitem:disabled{opacity:.48;cursor:not-allowed}.navitem:not(:disabled):focus-visible{outline:2px solid #76c1ef;outline-offset:1px}
 
 /* Tweede scherm: Cupra Born. Bestaande overview styling blijft onaangetast. */
 .cupra-page{padding:20px 20px 16px;display:flex;flex-direction:column;gap:12px}
@@ -1504,7 +1507,7 @@ class EnergiehuisCard extends HTMLElement {
 .scheduled-hours{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}.scheduled-hour{background:#071d2d;border-radius:9px;border:1px solid #a2bfd52b;padding:8px;font-size:11px;display:grid;gap:5px;min-width:0}.scheduled-hour span{color:#c8dceb}.scheduled-hour strong{font-size:10px;color:#47e5ae}
 .plan-warning{color:#ffda91;font-size:11px;padding:10px;background:#ad7a1620;border-left:3px solid #edbd59;line-height:1.4;border-radius:6px}
 .cupra-safety{background:#12403833;border:1px solid #39b88f55;border-radius:13px;padding:12px;display:flex;gap:10px;align-items:start;color:#b5dacf;font-size:11px;line-height:1.5}.cupra-safety .icon{flex:none;width:19px;height:19px;color:#4fdaac}
-@media(max-width:760px){.hero{height:230px}.hero-inner{padding:21px 16px 0}.title{font-size:29px}.subtitle{font-size:11px}.body{padding:0 12px 12px;margin-top:-17px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.metric{padding:11px 9px;min-height:106px;gap:8px;border-radius:15px}.metric-symbol{width:31px;height:35px}.metric-symbol .icon{width:29px;height:29px}.metric-label{font-size:11px}.metric-value{font-size:19px;letter-spacing:-.5px;margin-top:7px}.metric-euro .metric-value{font-size:19px}.metric-sub{font-size:10px}.chart-panel{margin-top:10px;padding:14px 9px 12px;border-radius:17px}.chart-title{font-size:15px}.now-power{font-size:14px}.legend{font-size:11px;gap:12px}.navitem{font-size:10px}.navitem .icon{width:20px;height:20px}}
+@media(max-width:760px){.navitem{padding:6px 1px}.nav-label-full{display:none}.nav-label-short{display:inline}.hero{height:230px}.hero-inner{padding:21px 16px 0}.title{font-size:29px}.subtitle{font-size:11px}.body{padding:0 12px 12px;margin-top:-17px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.metric{padding:11px 9px;min-height:106px;gap:8px;border-radius:15px}.metric-symbol{width:31px;height:35px}.metric-symbol .icon{width:29px;height:29px}.metric-label{font-size:11px}.metric-value{font-size:19px;letter-spacing:-.5px;margin-top:7px}.metric-euro .metric-value{font-size:19px}.metric-sub{font-size:10px}.chart-panel{margin-top:10px;padding:14px 9px 12px;border-radius:17px}.chart-title{font-size:15px}.now-power{font-size:14px}.legend{font-size:11px;gap:12px}.navitem{font-size:10px}.navitem .icon{width:20px;height:20px}}
 @media(max-width:760px){.cupra-page{padding:16px 11px}.cupra-head{gap:8px}.cupra-head h2{font-size:18px}.cupra-head .compact{font-size:9px;padding:6px 6px}.cupra-hero{min-height:180px;padding:16px}.cupra-car-icon .icon{width:95px;height:95px}.cupra-card{padding:13px}.scheduled-hours{grid-template-columns:1fr 1fr}.plan-results strong{font-size:14px}.vehicle-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.vehicle-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:380px){.hero{height:210px}.title{font-size:27px}.subtitle{max-width:200px;line-height:1.35}.metric{gap:5px;padding:10px 7px}.metric-symbol{width:27px}.metric-symbol .icon{width:25px;height:25px}.metric-value,.metric-euro .metric-value{font-size:17px}.reading-item strong{font-size:11px}.reading-grid{gap:3px}.metric-chevron .icon{width:12px;height:12px}.read-only{font-size:10px;padding:8px 7px}.chart-title{font-size:14px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
@@ -1529,7 +1532,7 @@ class EnergiehuisCard extends HTMLElement {
 @media(max-width:720px){.subpage{padding:13px 10px 82px}.subpage-head{padding:10px 2px;align-items:center}.subpage-head h2{font-size:27px}.subpage-head p{font-size:11px}.subgrid,.subgrid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subcard{min-height:118px;padding:13px}.subcard strong{font-size:20px}.soc-ring{width:88px;height:88px;border-width:7px}.soc-ring strong{font-size:20px}.price-badge{min-width:110px;padding:10px}.utility-grid{grid-template-columns:1fr}.utility-head strong{font-size:21px}.cost-compare-readout{grid-template-columns:1fr 1fr}.cost-compare-readout span{grid-column:1/-1}.cost-compare-readout strong{text-align:left}.km-summary,.insight-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.insight-split{grid-template-columns:1fr}.temp-row{grid-template-columns:72px minmax(45px,1fr) 116px}.insight-headline strong{font-size:21px}.quality-pill{min-width:78px}.climate-grid{grid-template-columns:1fr 1fr}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
- ${this._view==='cupra'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
+ ${this._view==='cupra'||this._view==='charge'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
  <section class="hero" style="background-image:linear-gradient(180deg,#06152477,#07152415 58%,#071522 100%),url('${ehEsc(hero)}')">
   <div class="hero-inner"><div><h2 class="title">Energiehuis</h2><div class="subtitle">Slimmer energie. Een duurzamer thuis.</div></div>${weatherBadge}</div>
  </section>
@@ -1546,7 +1549,7 @@ class EnergiehuisCard extends HTMLElement {
  ${missing.length?`<div class="notice">Niet beschikbaar of onbekende eenheid: ${ehEsc(missing.join(', '))}. Controleer de bronentiteiten.</div>`:''}
  <p class="foot">v${EH_VERSION} · Alleen uitlezen · Geen laadcommando’s · Alfen loadbalancing blijft leidend</p></main>`}
  <nav class="nav" aria-label="Energiehuis navigatie">
-  ${tab('Overzicht','home')}${tab('Cupra','car')}${tab('Batterij','battery')}${tab('Kosten','euro')}${tab('Meer','dots')}
+  ${tab('Overzicht','home')}${tab('Cupra','car')}${tab('Cupra & Slim laden','bolt')}${tab('Batterij','battery')}${tab('Kosten','euro')}${tab('Meer','dots')}
  </nav>
 </article>`;
  }
@@ -1554,5 +1557,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.6.0',description:'Cupra Insights met kilometers, praktijkactieradius, temperatuur- en doeltemperatuuranalyse.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.6.1',description:'Gescheiden Cupra Insights- en slim-ladenpagina; laadstatus, scenario en prijsplanning direct bereikbaar.'});
 }
