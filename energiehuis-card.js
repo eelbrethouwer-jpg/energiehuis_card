@@ -1739,8 +1739,9 @@ function eh17BatteryHtml(card,h,c){
  return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("battery")} Virtuele batterij 2.0 · capaciteitsvergelijking</div><div class="eh17-choices">${[5,10,15].map(n=>`<button type="button" data-eh17-cap="${n}" class="${n===cap?"active":""}">${n} kWh</button>`).join("")}</div><div class="eh17-grid"><div><small>Ideaal herbruikbare zonne-energie/maand</small><strong>${kwhMonth===null?"—":ehFmt(kwhMonth,1)+" kWh"}</strong></div><div><small>Indicatief financieel potentieel/maand</small><strong>${ehEuro2(savings)}</strong></div><div><small>Volledige gemeten dagen</small><strong>${days.length} / 7</strong></div></div><p class="subtle">${data?.error?ehEsc(data.error)+" ":""}Bovengrens voor dagelijkse opslag uit gemeten export en latere import; geen daadwerkelijke batterijprestatie, terugverdientijd of uursimulatie. Aannames: ${ehFmt(eff*100,0)}% rondrendement, ${ehEuro2(buy)}/kWh vermeden inkoop en ${ehEuro2(sell)}/kWh gemiste teruglevering. Voor financiële nauwkeurigheid zijn historische uurprijzen en laadstrategie nodig. ${days.length<2?"Onvoldoende betrouwbare historie voor een maandindicatie.":""}</p></section>`;
 }
 
-function eh17ResetDefs(c){
- return [["in","P1 afname",c.import],["out","P1 teruglevering",c.export],["ev","Alfen geladen energie",c.laad_energie],["gas","Gasmeter",c.gas],["water","Watermeter",c.water],["pv","Totale PV-opwek",c.pv_total_energy],["bill","Cumulatieve contractkosten",c.billing_total_cost]];
+function eh17ResetDefs(c,h){
+ const source=h?eh171Sources(h,c):null;
+ return [["in","P1 afname",c.import],["out","P1 teruglevering",c.export],["ev","Alfen geladen energie",c.laad_energie],["gas","Gasmeter",source?.gas.total||c.gas],["water","Watermeter",source?.water.total||c.water],["pv","Totale PV-opwek",c.pv_total_energy],["bill","Cumulatieve contractkosten",c.billing_total_cost]];
 }
 
 function eh17ResetState(h,c){
@@ -1757,14 +1758,14 @@ function eh17ResetHtml(card,h,c){
  const currentRaw=h?.states?.[c.reset_store]?.state;
  if(card._eh17PendingReset&&(card._eh17PendingReset.raw===currentRaw||Date.now()-card._eh17PendingReset.at>15000))card._eh17PendingReset=null;
  const store=card._eh17PendingReset??initial;
- const entries=eh17ResetDefs(c).filter(([, ,id])=>id).map(([key,label,id])=>{
+ const entries=eh17ResetDefs(c,h).filter(([, ,id])=>id).map(([key,label,id])=>{
   const st=h?.states?.[id],n=eh17N(st?.state),unit=String(st?.attributes?.unit_of_measurement||"").trim();
   const baseline=store.b?.[key],valid=Array.isArray(baseline)&&baseline.length>=3&&baseline[2]===eh17Hash(id)&&Number.isFinite(eh17N(baseline[0]));
   const delta=valid&&n!==null?n-baseline[0]:null;
   const t=valid?new Date(baseline[1]*1000).toLocaleDateString("nl-NL",{day:"numeric",month:"short",year:"numeric"}):"Nog niet ingesteld";
   return `<label class="eh17-reset-row"><input type="checkbox" data-eh17-select="${key}" ${card._eh17ResetKeys?.has(key)?"checked":""} ${n===null?"disabled":""}/><span><strong>${ehEsc(label)}</strong><small>${ehEsc(id)} · ${ehEsc(t)}</small></span><span><strong>${delta===null?"—":delta<0?"Teller lager dan nulmeting":ehFmt(delta,2)+" "+ehEsc(unit)}</strong><small>Stand: ${n===null?"Onbekend":ehFmt(n,2)+" "+ehEsc(unit)}</small></span></label>`;
  }).join("");
- const chosen=(card._eh17Confirm||[]).map(key=>eh17ResetDefs(c).find(d=>d[0]===key)?.[1]).filter(Boolean);
+ const chosen=(card._eh17Confirm||[]).map(key=>eh17ResetDefs(c,h).find(d=>d[0]===key)?.[1]).filter(Boolean);
  const confirm=chosen.length?`<div class="eh17-confirm" role="alertdialog" aria-modal="true" aria-label="Bevestig nieuwe nulmeting"><strong>Bevestig nieuwe nulmeting</strong><p>Wil je voor <b>${ehEsc(chosen.join(", "))}</b> de huidige meterstanden als nieuw beginpunt bewaren? Bestaande nulmetingen voor deze selectie worden vervangen. De originele meterstanden en historische gegevens blijven behouden.</p><div class="eh17-confirm-actions"><button type="button" data-eh17-cancel="1">Annuleren</button><button type="button" class="danger" data-eh17-confirm="1">Ja, nulmeting vastleggen</button></div></div>`:"";
  const status=card._eh17ResetMsg?`<p class="eh17-status" role="status">${ehEsc(card._eh17ResetMsg)}</p>`:"";
  return `<section class="subsection eh17-panel"><button class="eh17-collapse" type="button" data-eh17-toggle-reset="1">${ehIcon("shield")} Geavanceerd · Meterbeheer &amp; Reset ${card._eh17ResetOpen?"▴":"▾"}</button>${card._eh17ResetOpen?`<p class="subtle">Bij een nieuw contract leg je per meter een nieuwe beginstand vast. Alleen de relatieve stand <em>sinds nulmeting</em> wordt hier opnieuw vanaf nul berekend. Er gaan geen resetcommando's naar P1, GoodWe, Alfen, gas- of watermeters.</p>${initial.error?`<p class="plan-warning">${ehEsc(initial.error)}</p>`:""}<div class="eh17-reset-items">${entries}</div><button type="button" class="eh17-primary" data-eh17-preview="1" ${initial.error||card._eh17ResetSaving?"disabled":""}>Nieuwe nulmeting voor selectie…</button>${confirm}${status}<p class="subtle">De nulmetingen staan centraal in Home Assistant, niet alleen op je telefoon. Kosten per maand, vergelijkingsgrafieken en fysieke totalen worden hierdoor niet gereset. Gebruik daarvoor een aparte, gecontroleerde contractperiode.</p>`:""}</section>`;
@@ -1828,7 +1829,7 @@ function eh17Enhance(){
   if(state.error){this._eh17ResetMsg=state.error;this._eh17Confirm=null;this._schedule();return;}
   const baselines={...state.b};const stamp=Math.floor(Date.now()/1000);
   for(const key of keys){
-    const def=eh17ResetDefs(c).find(d=>d[0]===key),id=def?.[2],n=eh17N(h.states?.[id]?.state);
+    const def=eh17ResetDefs(c,h).find(d=>d[0]===key),id=def?.[2],n=eh17N(h.states?.[id]?.state);
     if(n===null){this._eh17ResetMsg="Meter niet meer beschikbaar: "+(def?.[1]||key);this._eh17Confirm=null;this._schedule();return;}
     baselines[key]=[n,stamp,eh17Hash(id)];
   }
@@ -1874,7 +1875,7 @@ eh17Enhance();
 function eh17ContractPanel(h,c) {
  const store=eh17ResetState(h,c);
  if(store.error)return "";
- const readings=eh17ResetDefs(c).map(([key,label,id])=>{
+ const readings=eh17ResetDefs(c,h).map(([key,label,id])=>{
   const baseline=store.b?.[key],n=eh17N(h?.states?.[id]?.state);
   if(!id||!Array.isArray(baseline)||baseline[2]!==eh17Hash(id)||n===null)return null;
   const difference=n-eh17N(baseline[0]),unit=String(h?.states?.[id]?.attributes?.unit_of_measurement||"");
