@@ -639,10 +639,6 @@ function ehCupraSegments(history,c,h,from,to,capacity){
    const socGain=Number.isFinite(socDrop)?-socDrop:null;
    const externalCharge=Number.isFinite(socGain)&&socGain>=2&&!homeCharged;
    if(homeCharged)homeChargeExcluded++;if(externalCharge)externalChargeSuspected++;
-   if(homeCharged&&Number.isFinite(socGain)&&socGain>.3&&km<1){
-     const wall=alfenDelta,batteryGain=capacity*socGain/100,eff=wall>0?batteryGain/wall:null;
-     if(Number.isFinite(eff)&&eff>=.5&&eff<=1.08&&wall>=.15)chargeSegments.push({start:a.t,end:b.t,wall,batteryGain,eff,temp:Number.isFinite(b.temp)?b.temp:a.temp,target:Number.isFinite(b.target)?b.target:a.target});
-   }
    if(km<=.2)continue;
    const temp=Number.isFinite(a.temp)&&Number.isFinite(b.temp)?(a.temp+b.temp)/2:(Number.isFinite(b.temp)?b.temp:a.temp);
    const target=Number.isFinite(a.target)&&Number.isFinite(b.target)?(a.target+b.target)/2:(Number.isFinite(b.target)?b.target:a.target);
@@ -656,6 +652,25 @@ function ehCupraSegments(history,c,h,from,to,capacity){
    const predictedFull=Number.isFinite(a.range)&&Number.isFinite(a.soc)&&a.soc>5?a.range*100/a.soc:null;
    const rangeError=valid&&Number.isFinite(predictedFull)&&predictedFull>0?(practicalRange-predictedFull)/predictedFull*100:null;
    segments.push({start:a.t,end:b.t,km,socDrop,alfenDelta,homeCharged,externalCharge,valid,energy,kwh100,practicalRange,predictedFull,rangeError,temp,target,setpointGap:Number.isFinite(temp)&&Number.isFinite(target)?target-temp:null,setpointDemand:Number.isFinite(temp)&&Number.isFinite(target)?Math.abs(target-temp):null,climate,board});
+ }
+ // Laadefficiëntie wordt bewust op SOC-updates verankerd. Tijdens stilstaand laden
+ // verandert de kilometerstand vaak niet en levert die sensor dus geen bruikbare ankers.
+ const chargeAnchors=series.soc.filter(p=>p.t>=from.getTime()&&p.t<=to.getTime());
+ for(let i=1;i<chargeAnchors.length;i++){
+   const a=chargeAnchors[i-1],b=chargeAnchors[i],socGain=b.v-a.v;
+   if(!Number.isFinite(socGain)||socGain<=.3)continue;
+   const aAlfen=ehNearestPoint(series.alfen,a.t),bAlfen=ehNearestPoint(series.alfen,b.t);
+   if(!aAlfen||!bAlfen)continue;
+   const wallA=ehToKwh(aAlfen.v,aAlfen.unit),wallB=ehToKwh(bAlfen.v,bAlfen.unit);
+   const wall=Number.isFinite(wallA)&&Number.isFinite(wallB)?wallB-wallA:null;
+   if(!Number.isFinite(wall)||wall<.15)continue;
+   const aKm=ehNearestPoint(series.mileage,a.t),bKm=ehNearestPoint(series.mileage,b.t);
+   const moved=aKm&&bKm&&Number.isFinite(aKm.v)&&Number.isFinite(bKm.v)?Math.abs(bKm.v-aKm.v):0;
+   if(moved>=1)continue;
+   const batteryGain=capacity*socGain/100,eff=batteryGain/wall;
+   if(!Number.isFinite(eff)||eff<.5||eff>1.08)continue;
+   const tp=ehNearestPoint(series.temp,b.t),targetp=ehNearestPoint(series.target,b.t);
+   chargeSegments.push({start:a.t,end:b.t,wall,batteryGain,eff,temp:tp?.v??null,target:targetp?.v??null});
  }
  return {segments,chargeSegments,anchors:snapshots.length,homeChargeExcluded,externalChargeSuspected,noiseExcluded,coverageFrom:snapshots[0]?.t??null,coverageTo:snapshots.at(-1)?.t??null};
 }
@@ -1113,7 +1128,9 @@ class EnergiehuisCard extends HTMLElement {
   try{
    const before=new Date(yearStart.getFullYear()-1,11,31);
    const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:now.toISOString(),statistic_ids:[c.cupra_mileage],period:'day',types:['change','min','max','mean']});
-   daily=ehCupraKmDaily(stats,c.cupra_mileage);dailyCoverageFrom=yearStart.getTime();
+   daily=ehCupraKmDaily(stats,c.cupra_mileage);
+   const covered=daily.filter(x=>x.t>=yearStart.getTime()&&x.t<=now.getTime()&&Number.isFinite(x.km));
+   dailyCoverageFrom=covered.length?Math.max(yearStart.getTime(),covered[0].t):lim.from.getTime();
   }catch(_){statsWarning='Kilometer-langetermijnstatistieken niet beschikbaar.';dailyCoverageFrom=lim.from.getTime();}
   try{
    history=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:now.toISOString(),entity_ids:[...new Set(ids)],minimal_response:true,no_attributes:false,significant_changes_only:false});
