@@ -795,6 +795,17 @@ class EnergiehuisCard extends HTMLElement {
   const range=ehRead(h,c.cupra_range);
   const mileage=ehRead(h,c.cupra_mileage);
   const chargeStatus=c.cupra_charge_status?h.states?.[c.cupra_charge_status]?.state:null;
+  const chargePowerVehicle=c.cupra_charge_power?h.states?.[c.cupra_charge_power]?.state:null;
+  const remainingCharge=c.cupra_remaining_charge_time?h.states?.[c.cupra_remaining_charge_time]?.state:null;
+  const lockStatus=c.cupra_locked?h.states?.[c.cupra_locked]?.state:null;
+  const cableStatus=c.cupra_cable?h.states?.[c.cupra_cable]?.state:null;
+  const chargingStatus=c.cupra_charging?h.states?.[c.cupra_charging]?.state:null;
+  const chargedEnergy=c.cupra_charged_energy?h.states?.[c.cupra_charged_energy]?.state:null;
+  const chargeScenario=c.cupra_charge_scenario?h.states?.[c.cupra_charge_scenario]?.state:null;
+  const chargeSchedule=c.cupra_charge_schedule?h.states?.[c.cupra_charge_schedule]?.state:null;
+  const chargeSpeed=c.cupra_charge_speed?h.states?.[c.cupra_charge_speed]?.state:null;
+  const portalfeed=c.cupra_portalfeed?h.states?.[c.cupra_portalfeed]?.state:null;
+  const doors=c.cupra_doors?h.states?.[c.cupra_doors]?.state:null;
   const connected=c.cupra_connection?h.states?.[c.cupra_connection]?.state:null;
   const ev=ehW(h,c.laden),amps=ehRead(h,c.stroom),charging=ev!==null&&ev>80;
   const target=this._targetSoc;
