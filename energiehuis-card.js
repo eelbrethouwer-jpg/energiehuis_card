@@ -628,15 +628,21 @@ function ehCupraSegments(history,c,h,from,to,capacity){
    const ap=read('alfen');s.alfen=ap?ehToKwh(ap.v,ap.unit):null;
    return s;
  });
- const segments=[];let homeChargeExcluded=0,externalChargeSuspected=0,noiseExcluded=0;
+ const segments=[],chargeSegments=[];let homeChargeExcluded=0,externalChargeSuspected=0,noiseExcluded=0;
  for(let i=1;i<snapshots.length;i++){
    const a=snapshots[i-1],b=snapshots[i],km=b.mileage-a.mileage;
-   if(!Number.isFinite(km)||km<=.2||km>400)continue;
+   if(!Number.isFinite(km)||km<-.2||km>400)continue;
    const alfenDelta=Number.isFinite(a.alfen)&&Number.isFinite(b.alfen)?b.alfen-a.alfen:null;
    const homeCharged=Number.isFinite(alfenDelta)&&alfenDelta>.08;
    const socDrop=Number.isFinite(a.soc)&&Number.isFinite(b.soc)?a.soc-b.soc:null;
-   const externalCharge=Number.isFinite(socDrop)&&socDrop<-.5&&!homeCharged;
+   const socGain=Number.isFinite(socDrop)?-socDrop:null;
+   const externalCharge=Number.isFinite(socGain)&&socGain>.5&&!homeCharged;
    if(homeCharged)homeChargeExcluded++;if(externalCharge)externalChargeSuspected++;
+   if(homeCharged&&Number.isFinite(socGain)&&socGain>.3&&km<1){
+     const wall=alfenDelta,batteryGain=capacity*socGain/100,eff=wall>0?batteryGain/wall:null;
+     if(Number.isFinite(eff)&&eff>=.5&&eff<=1.08&&wall>=.15)chargeSegments.push({start:a.t,end:b.t,wall,batteryGain,eff,temp:Number.isFinite(b.temp)?b.temp:a.temp,target:Number.isFinite(b.target)?b.target:a.target});
+   }
+   if(km<=.2)continue;
    const temp=Number.isFinite(a.temp)&&Number.isFinite(b.temp)?(a.temp+b.temp)/2:(Number.isFinite(b.temp)?b.temp:a.temp);
    const target=Number.isFinite(a.target)&&Number.isFinite(b.target)?(a.target+b.target)/2:(Number.isFinite(b.target)?b.target:a.target);
    const climate=Number.isFinite(a.climate)&&Number.isFinite(b.climate)?(a.climate+b.climate)/2:(Number.isFinite(b.climate)?b.climate:a.climate);
@@ -650,7 +656,7 @@ function ehCupraSegments(history,c,h,from,to,capacity){
    const rangeError=valid&&Number.isFinite(predictedFull)&&predictedFull>0?(practicalRange-predictedFull)/predictedFull*100:null;
    segments.push({start:a.t,end:b.t,km,socDrop,alfenDelta,homeCharged,externalCharge,valid,energy,kwh100,practicalRange,predictedFull,rangeError,temp,target,setpointGap:Number.isFinite(temp)&&Number.isFinite(target)?target-temp:null,climate,board});
  }
- return {segments,anchors:snapshots.length,homeChargeExcluded,externalChargeSuspected,noiseExcluded,coverageFrom:snapshots[0]?.t??null,coverageTo:snapshots.at(-1)?.t??null};
+ return {segments,chargeSegments,anchors:snapshots.length,homeChargeExcluded,externalChargeSuspected,noiseExcluded,coverageFrom:snapshots[0]?.t??null,coverageTo:snapshots.at(-1)?.t??null};
 }
 function ehWeighted(items,key,weight='km'){
  const valid=items.filter(x=>Number.isFinite(x[key])&&Number.isFinite(x[weight])&&x[weight]>0);
@@ -683,8 +689,11 @@ function ehCupraInsightMetrics(result,capacity){
  const avgTemp=ehWeighted(valid,'temp'),avgTarget=ehWeighted(valid,'target'),avgGap=ehWeighted(valid,'setpointGap');
  const predicted=ehWeighted(valid,'predictedFull'),rangeDelta=Number.isFinite(range)&&Number.isFinite(predicted)&&predicted>0?(range-predicted)/predicted*100:null;
  const tempCorrelation=ehPearson(valid,'temp','kwh100'),gapCorrelation=ehPearson(valid,'setpointGap','kwh100');
+ const charge=(result?.chargeSegments||[]).filter(x=>Number.isFinite(x.wall)&&Number.isFinite(x.batteryGain));
+ const wallKwh=charge.reduce((a,b)=>a+b.wall,0),batteryGainKwh=charge.reduce((a,b)=>a+b.batteryGain,0);
+ const chargeEfficiency=wallKwh>0?batteryGainKwh/wallKwh*100:null;
  const quality=valid.length>=10&&km>=200?'Sterk':valid.length>=4&&km>=60?'Opbouwend':'Beperkt';
- return {valid,km,energy,kwh100,range,avgTemp,avgTarget,avgGap,predicted,rangeDelta,tempCorrelation,gapCorrelation,quality};
+ return {valid,km,energy,kwh100,range,avgTemp,avgTarget,avgGap,predicted,rangeDelta,tempCorrelation,gapCorrelation,chargeSamples:charge.length,wallKwh,batteryGainKwh,chargeEfficiency,quality};
 }
 function ehCupraKmChart(buckets,period){
  const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
