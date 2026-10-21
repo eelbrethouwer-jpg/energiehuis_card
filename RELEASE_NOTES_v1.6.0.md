@@ -35,10 +35,12 @@ Voor geldige rijsegmenten berekent Energiehuis:
 
 Deze waarden zijn afgeleid en worden als zodanig gelabeld.
 
-## Filteren met Alfen
-Een rijsegment wordt niet gebruikt voor de efficiëntieanalyse wanneer tussen twee Cupra-meetpunten thuis is geladen. Een stijgende SOC zonder overeenkomstige Alfen-laadenergie wordt gemarkeerd als vermoedelijk extern laden.
+## Filteren en leren met Alfen
+Een rijsegment wordt niet gebruikt voor de efficiëntieanalyse wanneer tussen twee Cupra-meetpunten thuis is geladen. Een duidelijke stijging van SOC zonder overeenkomstige Alfen-laadenergie wordt gemarkeerd als vermoedelijk extern laden.
 
 Hierdoor vervuilen de uitzonderlijke externe laadbeurten de hoofdstatistiek niet.
+
+Wanneer Cupra-SOC en de cumulatieve Alfen-laadenergie voldoende netjes op elkaar aansluiten, berekent Energiehuis daarnaast een **empirische thuislaadefficiëntie**: geschatte accutoename gedeeld door gemeten energie aan de laadpaal. Deze waarde verschijnt pas nadat meerdere bruikbare laadintervallen beschikbaar zijn.
 
 ## Temperatuuranalyse
 Geldige rijsegmenten worden verdeeld over:
@@ -50,6 +52,8 @@ Geldige rijsegmenten worden verdeeld over:
 - ≥ 20°C
 
 Per klasse toont Energiehuis onder andere praktijkrange, kWh/100 km, gereden kilometers en — zodra voldoende data bestaat — het verschil ten opzichte van 15–20°C.
+
+Als de huidige buitentemperatuur in een voldoende gevulde temperatuurklasse valt, toont Energiehuis ook een **verwachte praktijkrange bij de huidige temperatuur**. Dit is een verwachting uit de eigen historische ritdata, geen fabrieksopgave.
 
 ## Doeltemperatuur en klimaatvraag
 De ingestelde cabine-doeltemperatuur wordt meegenomen naast de buitentemperatuur.
@@ -82,3 +86,6 @@ Cupra Insights is volledig read-only. Er zijn geen wijzigingen aan:
 - Cupra slim laden
 - laadlimieten
 - virtuele batterijlogica
+
+## Historiedekking
+Kilometertotalen gebruiken waar mogelijk Home Assistant-langetermijnstatistieken. De fijnmazige rit-, temperatuur- en laadefficiëntieanalyse gebruikt de detailhistorie die Recorder daadwerkelijk beschikbaar heeft. Energiehuis toont daarom expliciet de periode waarop de analyse is gebaseerd en vult ontbrekende historie niet fictief aan.
