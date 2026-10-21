@@ -40,7 +40,7 @@ Een rijsegment wordt niet gebruikt voor de efficiëntieanalyse wanneer tussen tw
 
 Hierdoor vervuilen de uitzonderlijke externe laadbeurten de hoofdstatistiek niet.
 
-Wanneer Cupra-SOC en de cumulatieve Alfen-laadenergie voldoende netjes op elkaar aansluiten, berekent Energiehuis daarnaast een **empirische thuislaadefficiëntie**: geschatte accutoename gedeeld door gemeten energie aan de laadpaal. Deze waarde verschijnt pas nadat meerdere bruikbare laadintervallen beschikbaar zijn.
+Wanneer Cupra-SOC en de cumulatieve Alfen-laadenergie voldoende netjes op elkaar aansluiten, berekent Energiehuis daarnaast een **empirische thuislaadefficiëntie**: geschatte accutoename gedeeld door gemeten energie aan de laadpaal. De koppeling wordt op SOC-updates verankerd, zodat stilstaand laden niet afhankelijk is van kilometerupdates. Deze waarde verschijnt pas nadat meerdere bruikbare laadintervallen beschikbaar zijn.
 
 ## Temperatuuranalyse
 Cupra Insights bevat een **praktijkrange-trendgrafiek per temperatuurklasse**. De klasse waarin de actuele buitentemperatuur valt, wordt gemarkeerd zodra daar voldoende eigen ritdata voor beschikbaar is.
@@ -79,7 +79,7 @@ De pagina toont:
 - beschikbare periode detailhistorie
 - kwaliteitslabel Beperkt / Opbouwend / Sterk
 
-Ontbrekende historische data wordt niet aangevuld met fictieve waarden.
+Ontbrekende historische data wordt niet aangevuld met fictieve waarden. Als de beschikbare kilometerhistorie pas ná het begin van een gevraagde periode start, wordt dat totaal niet als een volledige periode gepresenteerd.
 
 ## Veiligheid
 Cupra Insights is volledig read-only. Er zijn geen wijzigingen aan:
