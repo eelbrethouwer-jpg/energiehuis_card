@@ -869,14 +869,14 @@ class EnergiehuisCard extends HTMLElement {
  }
  setConfig(config){
   if(!config || typeof config!=='object')throw new Error('Ongeldige Energiehuis-configuratie');
-  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._schedule();this._loadMetricData();
+  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._schedule();this._loadMetricData();this._loadCostCompare();
  }
- set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();}
+ set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();}
  getCardSize(){return 9}
  static getStubConfig(){return {type:'custom:energiehuis-card'}}
  connectedCallback(){
-  this._loadHistory();this._loadMetricData();
-  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>this._loadHistory(),5*60*1000);
+  this._loadHistory();this._loadMetricData();this._loadCostCompare();
+  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();},5*60*1000);
  }
  disconnectedCallback(){if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}}
  _schedule(){
