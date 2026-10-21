@@ -1,8 +1,8 @@
-/* Energiehuis v1.5.0 — Cumulatieve kostenvergelijking.
+/* Energiehuis v1.6.0 — Cupra Insights.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Nieuw: interactieve cumulatieve verschilgrafiek voor maand en jaar.
+ * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.5.0';
+const EH_VERSION = '1.6.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -48,27 +48,29 @@ const EH_DEFAULTS = {
   advantage_vattenfall_3_month: 'sensor.voordeel_zonneplan_vs_vattenfall_3_jaar_maand',
   weather: '',                    // optioneel: weather.-entiteit
   hero_image: '',                 // optioneel: veilige afbeelding-URL
-  cupra_range: '',                // optioneel: Cupra actieradius in km
+  cupra_range: 'sensor.garage_cupra_born_actieradius',
   cupra_connection: '',           // optioneel: Cupra verbindingsstatus
   cupra_charge_status: '',        // optioneel: laadstatus uit Cupra
   cupra_charge_power: '',         // optioneel: laadvermogen uit Cupra
   cupra_remaining_charge_time: '',// optioneel: resterende laadtijd
-  cupra_mileage: '',              // optioneel: kilometerstand
+  cupra_mileage: 'sensor.garage_cupra_born_kilometerstand',
   cupra_locked: '',               // optioneel: vergrendelstatus
   cupra_cable: '',                // optioneel: laadkabel aangesloten
   cupra_charging: '',             // optioneel: aan het laden
-  cupra_charged_energy: '',       // optioneel: geladen energie
+  cupra_charged_energy: 'sensor.garage_cupra_born_geladen_energie',
   cupra_charge_scenario: '',      // optioneel: laadscenario
   cupra_charge_schedule: '',      // optioneel: laadschema
   cupra_charge_speed: '',         // optioneel: laadsnelheid
   cupra_portalfeed: '',           // optioneel: status portalfeed
   cupra_doors: '',                // optioneel: deuren/portierenstatus
-  cupra_outside_temp: '',         // optioneel: buitentemperatuur
-  cupra_target_temp: '',          // optioneel: doeltemperatuur
-  cupra_climate_usage: '',        // optioneel: klimaatverbruik
-  cupra_charge_target: '',        // optioneel: laaddoel
-  cupra_onboard_usage: '',        // optioneel: verbruik boordnet
+  cupra_outside_temp: 'sensor.garage_cupra_born_buitentemperatuur',
+  cupra_target_temp: 'sensor.garage_cupra_born_doeltemperatuur',
+  cupra_climate_usage: 'sensor.garage_cupra_born_klimaatverbruik',
+  cupra_charge_target: 'sensor.garage_cupra_born_laaddoel',
+  cupra_onboard_usage: 'sensor.garage_cupra_born_verbruik_boordnet',
   cupra_image: '',                // optioneel: /local/ of https:// afbeelding
+  cupra_usable_kwh: 59,           // bruikbare accucapaciteit Cupra Born
+  cupra_refresh_minutes: 15,      // bewust gekozen VW Group Connect interval
   sim_laadvermogen_kw: 3.7,       // alleen rekenvoorbeeld, bestuurt Alfen niet
   sim_laadbehoefte_kwh: 30,       // handmatig aanpasbare planningsaanname
   cupra_path: '', batterij_path: '', kosten_path: '', meer_path: ''
@@ -541,11 +543,208 @@ function ehHourlyFromPrices(quarter,hour){
  return [...result.values()].sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
 }
 
+const EH_CUPRA_PERIODS=[['today','Vandaag'],['week','Deze week'],['month','Deze maand'],['year','Dit jaar']];
+const ehCupraPeriodLimits=(p,now=new Date())=>{
+ const day=()=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ if(p==='today')return {from:day(),to:now,label:'Vandaag'};
+ if(p==='week'){const d=day(),weekday=(d.getDay()+6)%7;return {from:new Date(d.getFullYear(),d.getMonth(),d.getDate()-weekday),to:now,label:'Deze week'};}
+ if(p==='month')return {from:new Date(now.getFullYear(),now.getMonth(),1),to:now,label:'Deze maand'};
+ return {from:new Date(now.getFullYear(),0,1),to:now,label:'Dit jaar'};
+};
+function ehHistoryEntity(data,id){
+ if(!id)return [];
+ if(Array.isArray(data)){
+  const exact=data.find(arr=>Array.isArray(arr)&&arr.some(x=>x?.entity_id===id));
+  return exact||[];
+ }
+ return Array.isArray(data?.[id])?data[id]:[];
+}
+function ehNumericHistory(data,id,h){
+ const unitNow=String(h?.states?.[id]?.attributes?.unit_of_measurement||'').trim();
+ return ehHistoryEntity(data,id).map(o=>{
+   const raw=o.s??o.state,v=ehNum(raw),ts=o.lu??o.lc??o.last_updated??o.last_changed;
+   const t=typeof ts==='number'?ts*1000:Date.parse(ts);
+   const unit=String(o.a?.unit_of_measurement||o.attributes?.unit_of_measurement||unitNow).trim();
+   return {t,v,unit};
+ }).filter(o=>o.v!==null&&Number.isFinite(o.t)).sort((a,b)=>a.t-b.t);
+}
+function ehNearestPoint(series,t,maxGap=30*60*1000){
+ if(!series?.length)return null;
+ let best=null,bestGap=Infinity;
+ for(const p of series){
+   const gap=Math.abs(p.t-t);
+   if(gap<bestGap){best=p;bestGap=gap;}
+   if(p.t>t&&gap>bestGap)break;
+ }
+ return bestGap<=maxGap?best:null;
+}
+function ehToKwh(value,unit){
+ if(!Number.isFinite(value))return null;
+ const u=String(unit||'').toLowerCase().replace(/\s/g,'');
+ if(u==='wh')return value/1000;
+ if(u==='mwh')return value*1000;
+ if(u==='kwh'||!u)return value;
+ return value;
+}
+function ehCupraKmDaily(stats,id){
+ const rows=Array.isArray(stats?.[id])?stats[id].slice().sort((a,b)=>ehStatTime(a.start)-ehStatTime(b.start)):[];
+ return rows.map(row=>{
+   const t=ehStatTime(row.start),change=ehNum(row.change),min=ehNum(row.min),max=ehNum(row.max);
+   let km=change!==null?change:(min!==null&&max!==null?max-min:null);
+   if(km!==null&&(!Number.isFinite(km)||km<-.01||km>1500))km=null;
+   return Number.isFinite(t)?{t,km:km===null?null:Math.max(0,km)}:null;
+ }).filter(Boolean);
+}
+function ehCupraDistanceSummary(daily,now=new Date(),coverageFrom=null){
+ const startToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+ const today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),weekday=(today.getDay()+6)%7;
+ const startWeek=new Date(today.getFullYear(),today.getMonth(),today.getDate()-weekday).getTime();
+ const startMonth=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+ const startYear=new Date(now.getFullYear(),0,1).getTime();
+ const sumSince=from=>{if(Number.isFinite(coverageFrom)&&coverageFrom>from+60000)return null;const v=daily.filter(x=>x.t>=from&&x.t<=now.getTime()&&Number.isFinite(x.km)).map(x=>x.km);return v.length?v.reduce((a,b)=>a+b,0):0;};
+ return {today:sumSince(startToday),week:sumSince(startWeek),month:sumSince(startMonth),year:sumSince(startYear)};
+}
+function ehCupraKmBuckets(daily,period,now=new Date()){
+ const lim=ehCupraPeriodLimits(period,now);
+ if(period==='year'){
+   const months=new Map();
+   for(const d of daily){
+    if(d.t<lim.from.getTime()||d.t>lim.to.getTime()||!Number.isFinite(d.km))continue;
+    const x=new Date(d.t),key=x.getFullYear()+'-'+x.getMonth();
+    const old=months.get(key)||{t:new Date(x.getFullYear(),x.getMonth(),1).getTime(),km:0,label:x.toLocaleDateString('nl-NL',{month:'short'})};
+    old.km+=d.km;months.set(key,old);
+   }
+   return [...months.values()].sort((a,b)=>a.t-b.t);
+ }
+ return daily.filter(d=>d.t>=lim.from.getTime()&&d.t<=lim.to.getTime()&&Number.isFinite(d.km)).map(d=>({...d,label:new Date(d.t).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}));
+}
+function ehCupraSegments(history,c,h,from,to,capacity){
+ const ids={soc:c.cupra,mileage:c.cupra_mileage,range:c.cupra_range,temp:c.cupra_outside_temp,target:c.cupra_target_temp,climate:c.cupra_climate_usage,board:c.cupra_onboard_usage,alfen:c.laad_energie};
+ const series=Object.fromEntries(Object.entries(ids).map(([k,id])=>[k,ehNumericHistory(history,id,h)]));
+ const anchors=series.mileage.filter(p=>p.t>=from.getTime()&&p.t<=to.getTime());
+ const snapshots=anchors.map(m=>{
+   const read=(key)=>key==='mileage'?m:ehNearestPoint(series[key],m.t);
+   const s={t:m.t,mileage:m.v};
+   for(const key of ['soc','range','temp','target','climate','board']){const p=read(key);s[key]=p?.v??null;}
+   const ap=read('alfen');s.alfen=ap?ehToKwh(ap.v,ap.unit):null;
+   return s;
+ });
+ const segments=[],chargeSegments=[];let homeChargeExcluded=0,externalChargeSuspected=0,noiseExcluded=0;
+ for(let i=1;i<snapshots.length;i++){
+   const a=snapshots[i-1],b=snapshots[i],km=b.mileage-a.mileage;
+   if(!Number.isFinite(km)||km<-.2||km>400)continue;
+   const alfenDelta=Number.isFinite(a.alfen)&&Number.isFinite(b.alfen)?b.alfen-a.alfen:null;
+   const homeCharged=Number.isFinite(alfenDelta)&&alfenDelta>.08;
+   const socDrop=Number.isFinite(a.soc)&&Number.isFinite(b.soc)?a.soc-b.soc:null;
+   const socGain=Number.isFinite(socDrop)?-socDrop:null;
+   const externalCharge=Number.isFinite(socGain)&&socGain>=2&&!homeCharged;
+   if(homeCharged)homeChargeExcluded++;if(externalCharge)externalChargeSuspected++;
+   if(km<=.2)continue;
+   const temp=Number.isFinite(a.temp)&&Number.isFinite(b.temp)?(a.temp+b.temp)/2:(Number.isFinite(b.temp)?b.temp:a.temp);
+   const target=Number.isFinite(a.target)&&Number.isFinite(b.target)?(a.target+b.target)/2:(Number.isFinite(b.target)?b.target:a.target);
+   const climate=Number.isFinite(a.climate)&&Number.isFinite(b.climate)?(a.climate+b.climate)/2:(Number.isFinite(b.climate)?b.climate:a.climate);
+   const board=Number.isFinite(a.board)&&Number.isFinite(b.board)?(a.board+b.board)/2:(Number.isFinite(b.board)?b.board:a.board);
+   let valid=!homeCharged&&!externalCharge&&Number.isFinite(socDrop)&&socDrop>=1&&socDrop<=40&&km>=3;
+   let energy=valid?capacity*socDrop/100:null;
+   let kwh100=valid?energy/km*100:null;
+   let practicalRange=valid?km/socDrop*100:null;
+   if(valid&&(!Number.isFinite(kwh100)||kwh100<7||kwh100>45||practicalRange<120||practicalRange>850)){valid=false;noiseExcluded++;energy=null;kwh100=null;practicalRange=null;}
+   const predictedFull=Number.isFinite(a.range)&&Number.isFinite(a.soc)&&a.soc>5?a.range*100/a.soc:null;
+   const rangeError=valid&&Number.isFinite(predictedFull)&&predictedFull>0?(practicalRange-predictedFull)/predictedFull*100:null;
+   segments.push({start:a.t,end:b.t,km,socDrop,alfenDelta,homeCharged,externalCharge,valid,energy,kwh100,practicalRange,predictedFull,rangeError,temp,target,setpointGap:Number.isFinite(temp)&&Number.isFinite(target)?target-temp:null,setpointDemand:Number.isFinite(temp)&&Number.isFinite(target)?Math.abs(target-temp):null,climate,board});
+ }
+ // Laadefficiëntie wordt bewust op SOC-updates verankerd. Tijdens stilstaand laden
+ // verandert de kilometerstand vaak niet en levert die sensor dus geen bruikbare ankers.
+ const chargeAnchors=series.soc.filter(p=>p.t>=from.getTime()&&p.t<=to.getTime());
+ for(let i=1;i<chargeAnchors.length;i++){
+   const a=chargeAnchors[i-1],b=chargeAnchors[i],socGain=b.v-a.v;
+   if(!Number.isFinite(socGain)||socGain<=.3)continue;
+   const aAlfen=ehNearestPoint(series.alfen,a.t),bAlfen=ehNearestPoint(series.alfen,b.t);
+   if(!aAlfen||!bAlfen)continue;
+   const wallA=ehToKwh(aAlfen.v,aAlfen.unit),wallB=ehToKwh(bAlfen.v,bAlfen.unit);
+   const wall=Number.isFinite(wallA)&&Number.isFinite(wallB)?wallB-wallA:null;
+   if(!Number.isFinite(wall)||wall<.15)continue;
+   const aKm=ehNearestPoint(series.mileage,a.t),bKm=ehNearestPoint(series.mileage,b.t);
+   const moved=aKm&&bKm&&Number.isFinite(aKm.v)&&Number.isFinite(bKm.v)?Math.abs(bKm.v-aKm.v):0;
+   if(moved>=1)continue;
+   const batteryGain=capacity*socGain/100,eff=batteryGain/wall;
+   if(!Number.isFinite(eff)||eff<.5||eff>1.08)continue;
+   const tp=ehNearestPoint(series.temp,b.t),targetp=ehNearestPoint(series.target,b.t);
+   chargeSegments.push({start:a.t,end:b.t,wall,batteryGain,eff,temp:tp?.v??null,target:targetp?.v??null});
+ }
+ return {segments,chargeSegments,anchors:snapshots.length,homeChargeExcluded,externalChargeSuspected,noiseExcluded,coverageFrom:snapshots[0]?.t??null,coverageTo:snapshots.at(-1)?.t??null};
+}
+function ehWeighted(items,key,weight='km'){
+ const valid=items.filter(x=>Number.isFinite(x[key])&&Number.isFinite(x[weight])&&x[weight]>0);
+ if(!valid.length)return null;
+ const w=valid.reduce((a,b)=>a+b[weight],0);return w?valid.reduce((a,b)=>a+b[key]*b[weight],0)/w:null;
+}
+function ehPearson(items,xKey,yKey){
+ const a=items.filter(x=>Number.isFinite(x[xKey])&&Number.isFinite(x[yKey]));
+ if(a.length<8)return null;
+ const mx=a.reduce((s,x)=>s+x[xKey],0)/a.length,my=a.reduce((s,x)=>s+x[yKey],0)/a.length;
+ const num=a.reduce((s,x)=>s+(x[xKey]-mx)*(x[yKey]-my),0),dx=Math.sqrt(a.reduce((s,x)=>s+(x[xKey]-mx)**2,0)),dy=Math.sqrt(a.reduce((s,x)=>s+(x[yKey]-my)**2,0));
+ return dx&&dy?num/(dx*dy):null;
+}
+function ehTempGroups(segments,capacity){
+ const defs=[[-Infinity,0,'< 0°C'],[0,5,'0–5°C'],[5,10,'5–10°C'],[10,15,'10–15°C'],[15,20,'15–20°C'],[20,Infinity,'≥ 20°C']];
+ const valid=segments.filter(s=>s.valid&&Number.isFinite(s.temp));
+ const groups=defs.map(([lo,hi,label])=>{
+  const rows=valid.filter(s=>s.temp>=lo&&s.temp<hi),km=rows.reduce((a,b)=>a+b.km,0),energy=rows.reduce((a,b)=>a+(b.energy||0),0);
+  const kwh100=km>0?energy/km*100:null,range=Number.isFinite(kwh100)&&kwh100>0?capacity*100/kwh100:null;
+  return {label,lo,hi,count:rows.length,km,kwh100,range};
+ });
+ const base=groups.find(g=>g.label==='15–20°C'&&g.km>=10&&Number.isFinite(g.range));
+ for(const g of groups)g.delta=base&&Number.isFinite(g.range)?(g.range-base.range)/base.range*100:null;
+ return {groups,baseline:base};
+}
+function ehCupraInsightMetrics(result,capacity){
+ const valid=(result?.segments||[]).filter(s=>s.valid);
+ const km=valid.reduce((a,b)=>a+b.km,0),energy=valid.reduce((a,b)=>a+(b.energy||0),0);
+ const kwh100=km>0?energy/km*100:null,range=Number.isFinite(kwh100)&&kwh100>0?capacity*100/kwh100:null;
+ const avgTemp=ehWeighted(valid,'temp'),avgTarget=ehWeighted(valid,'target'),avgGap=ehWeighted(valid,'setpointGap'),avgDemand=ehWeighted(valid,'setpointDemand');
+ const predicted=ehWeighted(valid,'predictedFull'),rangeDelta=Number.isFinite(range)&&Number.isFinite(predicted)&&predicted>0?(range-predicted)/predicted*100:null;
+ const tempCorrelation=ehPearson(valid,'temp','kwh100'),gapCorrelation=ehPearson(valid,'setpointDemand','kwh100');
+ const charge=(result?.chargeSegments||[]).filter(x=>Number.isFinite(x.wall)&&Number.isFinite(x.batteryGain));
+ const wallKwh=charge.reduce((a,b)=>a+b.wall,0),batteryGainKwh=charge.reduce((a,b)=>a+b.batteryGain,0);
+ const chargeEfficiency=wallKwh>0?batteryGainKwh/wallKwh*100:null;
+ const quality=valid.length>=10&&km>=200?'Sterk':valid.length>=4&&km>=60?'Opbouwend':'Beperkt';
+ return {valid,km,energy,kwh100,range,avgTemp,avgTarget,avgGap,avgDemand,predicted,rangeDelta,tempCorrelation,gapCorrelation,chargeSamples:charge.length,wallKwh,batteryGainKwh,chargeEfficiency,quality};
+}
+function ehCupraKmChart(buckets,period){
+ const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
+ if(!rows.length)return '<div class="no-chart">Nog geen kilometerhistorie voor deze periode beschikbaar.</div>';
+ const W=690,H=220,L=48,R=12,T=18,B=38,CW=W-L-R,CH=H-T-B,max=Math.max(1,...rows.map(x=>x.km));
+ const minT=Math.min(...rows.map(x=>x.t)),maxT=Math.max(...rows.map(x=>x.t));
+ const step=rows.length>1?CW/(rows.length-1):CW/2,bw=Math.max(3,Math.min(28,CW/Math.max(1,rows.length)*.62));
+ const xp=(row,i)=>rows.length===1?L+CW/2:L+i*step;
+ const yp=v=>T+(max-v)/max*CH;
+ const grid=Array.from({length:4},(_,i)=>max-max*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
+ const bars=rows.map((r,i)=>{const x=xp(r,i)-bw/2,y=yp(r.km),h=Math.max(1,T+CH-y);return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#69b8ff" opacity=".9"><title>'+ehEsc(r.label||'')+' · '+ehEsc(ehFmt(r.km,1))+' km</title></rect>';}).join('');
+ const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1].filter((v,i,a)=>a.indexOf(v)===i);
+ const ticks=tickIdx.map(i=>'<text x="'+xp(rows[i],i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===rows.length-1?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(rows[i].label||'')+'</text>').join('');
+ return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
+}
+
+function ehCupraTempRangeChart(groups,currentTemp){
+ const rows=(groups||[]).map((g,i)=>({...g,i})).filter(g=>Number.isFinite(g.range)&&g.count>0);
+ if(rows.length<2)return '<div class="no-chart small">Nog te weinig temperatuurklassen voor een trendgrafiek.</div>';
+ const W=690,H=235,L=52,R=14,T=18,B=48,CW=W-L-R,CH=H-T-B;
+ const vals=rows.map(r=>r.range),rawMin=Math.min(...vals),rawMax=Math.max(...vals),pad=Math.max(15,(rawMax-rawMin)*.18);
+ const min=Math.max(0,rawMin-pad),max=rawMax+pad;
+ const xp=i=>L+i/5*CW,yp=v=>T+(max-v)/(max-min)*CH;
+ const grid=Array.from({length:4},(_,i)=>max-(max-min)*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
+ const d=rows.map((r,j)=>(j?'L':'M')+xp(r.i).toFixed(1)+','+yp(r.range).toFixed(1)).join(' ');
+ const currentIndex=Number.isFinite(currentTemp)?(currentTemp<0?0:currentTemp<5?1:currentTemp<10?2:currentTemp<15?3:currentTemp<20?4:5):-1;
+ const dots=rows.map(r=>'<circle cx="'+xp(r.i).toFixed(1)+'" cy="'+yp(r.range).toFixed(1)+'" r="'+(r.i===currentIndex?6:4)+'" fill="'+(r.i===currentIndex?'#ffe09b':'#52dfad')+'" stroke="#071522" stroke-width="2"><title>'+ehEsc(r.label)+' · '+ehEsc(ehFmt(r.range,0))+' km · '+ehEsc(ehFmt(r.km,0))+' km historie</title></circle>').join('');
+ const labels=(groups||[]).map((g,i)=>'<text x="'+xp(i).toFixed(1)+'" y="'+(H-15)+'" text-anchor="middle" fill="#9fbdd0" font-size="9">'+ehEsc(g.label)+'</text>').join('');
+ return '<svg class="cupra-temp-chart" role="img" aria-label="Praktijkactieradius per temperatuurklasse" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+'<path d="'+d+'" fill="none" stroke="#52dfad" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>'+dots+labels+'</svg>';
+}
 class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;this._cupraInsightsPeriod='month';this._cupraInsightsResult=null;this._cupraInsightsCache=new Map();this._cupraInsightsLoadingKey=null;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -555,9 +754,16 @@ class EnergiehuisCard extends HTMLElement {
        this._view=next;this._detail=null;
        this._schedule();
        if(next==='costs')this._loadCostCompare();
+       if(next==='cupra')this._loadCupraInsights();
        requestAnimationFrame(()=>{if(this.isConnected)this.scrollIntoView({behavior:'smooth',block:'start'});});
        // De pagina blijft binnen dezelfde Lovelace kaart: geen route of backend wijziging.
      }
+     return;
+   }
+   const insightPeriod=e.target.closest('[data-eh-cupra-insight-period]');
+   if(insightPeriod){
+     const p=insightPeriod.dataset.ehCupraInsightPeriod;
+     if(EH_CUPRA_PERIODS.some(x=>x[0]===p)){this._cupraInsightsPeriod=p;this._cupraInsightsResult=null;this._schedule();this._loadCupraInsights();}
      return;
    }
    const costPeriod=e.target.closest('[data-eh-cost-period]');
@@ -870,14 +1076,14 @@ class EnergiehuisCard extends HTMLElement {
  }
  setConfig(config){
   if(!config || typeof config!=='object')throw new Error('Ongeldige Energiehuis-configuratie');
-  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._schedule();this._loadMetricData();this._loadCostCompare();
+  this.config={...EH_DEFAULTS,...config};this._historyAt=0;this._metricCache.clear();this._metricResult=null;this._costCompareResult=null;this._costCompareKey='';this._costCompareAt=0;this._cupraInsightsResult=null;this._cupraInsightsCache.clear();this._cupraInsightsLoadingKey=null;this._schedule();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();
  }
- set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();}
+ set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();}
  getCardSize(){return 9}
  static getStubConfig(){return {type:'custom:energiehuis-card'}}
  connectedCallback(){
-  this._loadHistory();this._loadMetricData();this._loadCostCompare();
-  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();},5*60*1000);
+  this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();
+  if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();this._loadCupraInsights();},5*60*1000);
  }
  disconnectedCallback(){if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}}
  _schedule(){
@@ -906,6 +1112,78 @@ class EnergiehuisCard extends HTMLElement {
     this._historyError=true;this._historyKey=key;this._historyAt=Date.now();
     // Fouten blijven beperkt tot de historiegrafiek; live-sensoren blijven bruikbaar.
   } finally {this._historyLoading=false;this._schedule();}
+ }
+ async _loadCupraInsights(){
+  const h=this._hass,c=this.config,p=this._cupraInsightsPeriod;
+  if(this._view!=='cupra'||!h?.callWS||!c)return;
+  const now=new Date(),lim=ehCupraPeriodLimits(p,now),yearStart=new Date(now.getFullYear(),0,1);
+  const ids=[c.cupra,c.cupra_mileage,c.cupra_range,c.cupra_outside_temp,c.cupra_target_temp,c.cupra_climate_usage,c.cupra_onboard_usage,c.laad_energie].filter(Boolean);
+  const key=p+'|'+ehDayKey(lim.from)+'|'+ids.join('|');
+  const ttl=Math.max(5,Number(c.cupra_refresh_minutes)||15)*60*1000;
+  const cached=this._cupraInsightsCache.get(key);
+  if(cached&&Date.now()-cached.fetched<ttl){this._cupraInsightsResult=cached;this._schedule();return;}
+  if(this._cupraInsightsLoadingKey===key)return;
+  this._cupraInsightsLoadingKey=key;this._cupraInsightsResult=null;this._schedule();
+  let daily=[],statsWarning='',historyWarning='',history=null,dailyCoverageFrom=yearStart.getTime();
+  try{
+   const before=new Date(yearStart.getFullYear()-1,11,31);
+   const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:now.toISOString(),statistic_ids:[c.cupra_mileage],period:'day',types:['change','min','max','mean']});
+   daily=ehCupraKmDaily(stats,c.cupra_mileage);
+   const covered=daily.filter(x=>x.t>=yearStart.getTime()&&x.t<=now.getTime()&&Number.isFinite(x.km));
+   dailyCoverageFrom=covered.length?Math.max(yearStart.getTime(),covered[0].t):lim.from.getTime();
+  }catch(_){statsWarning='Kilometer-langetermijnstatistieken niet beschikbaar.';dailyCoverageFrom=lim.from.getTime();}
+  try{
+   history=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:now.toISOString(),entity_ids:[...new Set(ids)],minimal_response:true,no_attributes:false,significant_changes_only:false});
+  }catch(_){historyWarning='Detailhistorie voor de Cupra-analyse kon niet worden opgehaald.';}
+  if(!daily.length&&history){
+   const ms=ehNumericHistory(history,c.cupra_mileage,h);const byDay=new Map();
+   for(let i=1;i<ms.length;i++){const d=ms[i].v-ms[i-1].v;if(!Number.isFinite(d)||d<=0||d>400)continue;const date=new Date(ms[i].t),t=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();byDay.set(t,(byDay.get(t)||0)+d);}
+   daily=[...byDay.entries()].map(([t,km])=>({t,km})).sort((a,b)=>a.t-b.t);
+   if(daily.length){statsWarning='Kilometertotalen zijn voorlopig uit beschikbare detailhistorie berekend.';dailyCoverageFrom=ms[0]?.t??lim.to.getTime();}
+  }
+  const capacity=ehNum(c.cupra_usable_kwh)||59;
+  const seg=history?ehCupraSegments(history,c,h,lim.from,now,capacity):{segments:[],anchors:0,homeChargeExcluded:0,externalChargeSuspected:0,noiseExcluded:0,coverageFrom:null,coverageTo:null};
+  const temp=ehTempGroups(seg.segments,capacity),metrics=ehCupraInsightMetrics(seg,capacity);
+  const result={key,period:p,limits:lim,capacity,daily,summary:ehCupraDistanceSummary(daily,now,dailyCoverageFrom),dailyCoverageFrom,kmBuckets:ehCupraKmBuckets(daily,p,now),segments:seg.segments,anchors:seg.anchors,homeChargeExcluded:seg.homeChargeExcluded,externalChargeSuspected:seg.externalChargeSuspected,noiseExcluded:seg.noiseExcluded,coverageFrom:seg.coverageFrom,coverageTo:seg.coverageTo,tempGroups:temp.groups,tempBaseline:temp.baseline,metrics,statsWarning,historyWarning,fetched:Date.now()};
+  this._cupraInsightsCache.set(key,result);
+  if(this._cupraInsightsCache.size>8)this._cupraInsightsCache.delete(this._cupraInsightsCache.keys().next().value);
+  if(this._cupraInsightsLoadingKey===key){this._cupraInsightsResult=result;this._cupraInsightsLoadingKey=null;this._schedule();}
+ }
+ _cupraInsightsHtml(h,c){
+  const r=this._cupraInsightsResult?.period===this._cupraInsightsPeriod?this._cupraInsightsResult:null;
+  const periodLabel=EH_CUPRA_PERIODS.find(x=>x[0]===this._cupraInsightsPeriod)?.[1]||'Deze maand';
+  const fmtKm=v=>Number.isFinite(v)?ehFmt(v,1)+' km':'—';
+  const fmtPct=v=>Number.isFinite(v)?(v>0?'+':'')+ehFmt(v,1)+'%':'—';
+  const corrLabel=v=>{if(!Number.isFinite(v))return 'Nog onvoldoende meetpunten';const a=Math.abs(v),s=a>=.65?'sterk':a>=.4?'matig':a>=.2?'licht':'zwak';return s+' · r '+ehFmt(v,2);};
+  if(!r)return `<section class="cupra-card cupra-insights"><div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Analyse</span></div><div class="energy-loading">Cupra- en Alfen-historie analyseren…</div></section>`;
+  const s=r.summary||{},m=r.metrics||{};
+  const selectedKm=this._cupraInsightsPeriod==='today'?s.today:this._cupraInsightsPeriod==='week'?s.week:this._cupraInsightsPeriod==='year'?s.year:s.month;
+  const now=new Date(),from=r.limits?.from||now;
+  const day0=new Date(from.getFullYear(),from.getMonth(),from.getDate()),today0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const days=Math.max(1,Math.round((today0-day0)/86400000)+1),avgDay=Number.isFinite(selectedKm)?selectedKm/days:null;
+  const liveTarget=ehRead(h,c.cupra_target_temp),liveOutside=ehRead(h,c.cupra_outside_temp),liveGap=Number.isFinite(liveTarget)&&Number.isFinite(liveOutside)?liveTarget-liveOutside:null;
+  const liveClimate=ehMeasure(h,c.cupra_climate_usage,2),liveBoard=ehMeasure(h,c.cupra_onboard_usage,2);
+  const currentTempGroup=Number.isFinite(liveOutside)?(r.tempGroups||[]).find(g=>liveOutside>=g.lo&&liveOutside<g.hi&&g.count>=2&&g.km>=20&&Number.isFinite(g.range)):null;
+  const expectedNow=currentTempGroup?.range??null;
+  const maxRange=Math.max(1,...(r.tempGroups||[]).map(g=>g.range||0));
+  const tempRows=(r.tempGroups||[]).filter(g=>g.count>0).map(g=>`<div class="temp-row"><div class="temp-copy"><strong>${ehEsc(g.label)}</strong><span>${ehEsc(ehFmt(g.km,0))} km · ${g.count} segment${g.count===1?'':'en'}</span></div><div class="temp-bar"><i style="width:${Math.max(5,Math.min(100,(g.range||0)/maxRange*100)).toFixed(0)}%"></i></div><div class="temp-values"><strong>${Number.isFinite(g.range)?ehEsc(ehFmt(g.range,0)+' km'):'—'}</strong><span>${Number.isFinite(g.kwh100)?ehEsc(ehFmt(g.kwh100,1)+' kWh/100 km'):'—'}${Number.isFinite(g.delta)?' · '+ehEsc(fmtPct(g.delta))+' vs 15–20°C':''}</span></div></div>`).join('');
+  const coverage=r.coverageFrom?`${new Date(r.coverageFrom).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})} – ${new Date(r.coverageTo||Date.now()).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}`:'Geen detailhistorie';
+  const warnings=[r.statsWarning,r.historyWarning].filter(Boolean).map(x=>`<p class="plan-warning">${ehEsc(x)}</p>`).join('');
+  return `<section class="cupra-card cupra-insights">
+   <div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Praktijkanalyse</span></div>
+   <p class="subtle">Gebaseerd op jouw Cupra-data, 15-minutenupdates en Alfen-laadenergie. Segmenten met thuisladen of vermoedelijk extern laden worden uit de efficiëntieanalyse gefilterd.</p>
+   <div class="insight-periods">${EH_CUPRA_PERIODS.map(([id,label])=>`<button type="button" data-eh-cupra-insight-period="${id}" class="${this._cupraInsightsPeriod===id?'chosen':''}">${label}</button>`).join('')}</div>
+   <div class="km-summary"><div><small>Vandaag</small><strong>${fmtKm(s.today)}</strong></div><div><small>Deze week</small><strong>${fmtKm(s.week)}</strong></div><div><small>Deze maand</small><strong>${fmtKm(s.month)}</strong></div><div><small>Dit jaar</small><strong>${fmtKm(s.year)}</strong></div></div>
+   <div class="insight-headline"><div><small>${ehEsc(periodLabel)}</small><strong>${fmtKm(selectedKm)}</strong><span>${Number.isFinite(avgDay)?ehEsc(ehFmt(avgDay,1)+' km gemiddeld per kalenderdag'):'Gemiddelde nog niet beschikbaar'}</span></div><div class="quality-pill ${String(m.quality||'').toLowerCase()}"><small>Datakwaliteit</small><strong>${ehEsc(m.quality||'Beperkt')}</strong></div></div>
+   ${ehCupraKmChart(r.kmBuckets,this._cupraInsightsPeriod)}
+   <div class="insight-metrics"><div><small>Praktijkactieradius</small><strong>${Number.isFinite(m.range)?ehEsc(ehFmt(m.range,0)+' km'):'—'}</strong><span>Uit ${ehEsc(ehFmt(m.km||0,0))} km geldige segmenten</span></div><div><small>Geschat verbruik</small><strong>${Number.isFinite(m.kwh100)?ehEsc(ehFmt(m.kwh100,1)+' kWh/100 km'):'—'}</strong><span>SOC-verlies × ${ehEsc(ehFmt(r.capacity,0))} kWh</span></div><div><small>Cupra voorspelling</small><strong>${Number.isFinite(m.predicted)?ehEsc(ehFmt(m.predicted,0)+' km'):'—'}</strong><span>${Number.isFinite(m.rangeDelta)?'Praktijk '+ehEsc(fmtPct(m.rangeDelta)):'Nog geen vergelijking'}</span></div><div><small>Verwacht bij huidige temperatuur</small><strong>${Number.isFinite(expectedNow)?ehEsc(ehFmt(expectedNow,0)+' km'):'—'}</strong><span>${currentTempGroup?ehEsc(currentTempGroup.label+' · '+ehFmt(currentTempGroup.km,0)+' km historie'):'Nog onvoldoende data in deze temperatuurklasse'}</span></div><div><small>Laadefficiëntie thuis</small><strong>${Number.isFinite(m.chargeEfficiency)&&m.chargeSamples>=2?ehEsc(ehFmt(m.chargeEfficiency,1)+'%'):'—'}</strong><span>${m.chargeSamples?`${m.chargeSamples} Alfen/Cupra intervallen · ${ehEsc(ehFmt(m.wallKwh||0,1))} kWh muur`:'Nog onvoldoende gekoppelde laadintervallen'}</span></div><div><small>Geldige segmenten</small><strong>${m.valid?.length??0}</strong><span>${ehEsc(coverage)}</span></div></div>
+   <div class="insight-panel temp-trend-panel"><div class="detail-small-title">Temperatuur → praktijkactieradius</div>${ehCupraTempRangeChart(r.tempGroups,liveOutside)}<p class="detail-muted">De gemarkeerde klasse bevat de huidige buitentemperatuur. De lijn toont jouw eigen historische praktijkrange per temperatuurklasse.</p></div>
+   <div class="insight-split"><div class="insight-panel"><div class="detail-small-title">Temperatuurklassen</div>${tempRows||'<p class="detail-muted">Nog onvoldoende geldige ritsegmenten om temperatuurklassen te vullen.</p>'}<p class="detail-muted">Referentie voor percentages is 15–20°C zodra daar voldoende kilometers beschikbaar zijn.</p></div>
+   <div class="insight-panel"><div class="detail-small-title">Klimaatvraag & doeltemperatuur</div><div class="climate-grid"><div><span>Buiten gemiddeld</span><strong>${Number.isFinite(m.avgTemp)?ehEsc(ehFmt(m.avgTemp,1)+' °C'):'—'}</strong></div><div><span>Doeltemperatuur gemiddeld</span><strong>${Number.isFinite(m.avgTarget)?ehEsc(ehFmt(m.avgTarget,1)+' °C'):'—'}</strong></div><div><span>Gemiddeld klimaatverschil</span><strong>${Number.isFinite(m.avgDemand)?ehEsc(ehFmt(m.avgDemand,1)+' °C'):'—'}</strong></div><div><span>Nu: doel − buiten</span><strong>${Number.isFinite(liveGap)?ehEsc((liveGap>0?'+':'')+ehFmt(liveGap,1)+' °C'):'—'}</strong></div><div><span>Cupra klimaatwaarde</span><strong>${ehEsc(liveClimate.text)}</strong></div><div><span>Cupra boordnetwaarde</span><strong>${ehEsc(liveBoard.text)}</strong></div></div><div class="correlation-row"><span>Buitentemperatuur ↔ verbruik</span><strong>${ehEsc(corrLabel(m.tempCorrelation))}</strong></div><div class="correlation-row"><span>|Doel − buiten| ↔ verbruik</span><strong>${ehEsc(corrLabel(m.gapCorrelation))}</strong></div><p class="detail-muted">De doeltemperatuur is het ingestelde cabine-setpoint, niet de gemeten binnentemperatuur. De samenhang is daarom indicatief en bewijst geen oorzaak op zichzelf.</p></div></div>
+   <div class="insight-quality"><span>Thuisladen uitgesloten: <strong>${r.homeChargeExcluded||0}</strong></span><span>Vermoedelijk extern laden: <strong>${r.externalChargeSuspected||0}</strong></span><span>Meetruis uitgesloten: <strong>${r.noiseExcluded||0}</strong></span><span>Cupra meetpunten: <strong>${r.anchors||0}</strong></span></div>
+   ${warnings}
+   <p class="subtle"><strong>Gemeten:</strong> kilometerstand, SOC, Cupra-range, buitentemperatuur, doeltemperatuur en Alfen-laadenergie. <strong>Afgeleid:</strong> praktijkrange en kWh/100 km. Klimaatverbruik en boordnet blijven contextwaarden totdat hun semantiek in de Cupra-feed volledig is gevalideerd.</p>
+  </section>`;
  }
  _cupraHtml(h,c){
   const soc=ehRead(h,c.cupra);
@@ -1008,6 +1286,7 @@ class EnergiehuisCard extends HTMLElement {
       <div class="cupra-car-copy"><div class="cupra-name">Cupra Born</div><div class="cupra-connection">${ehEsc(connectionText)}</div><div class="cupra-big">${soc===null?'—':ehEsc(ehFmt(soc,0)+'%')} <span>SOC</span></div><div class="cupra-small">${range===null?'Actieradius niet gekoppeld':ehEsc(ehFmt(range,0)+' km geschatte actieradius')}</div></div>
     </section>
     <section class="cupra-card vehicle-dashboard"><div class="section-title">${ehIcon('car')} Huidige voertuigstatus</div>${vehicleStatusCards}<button type="button" class="vehicle-details-toggle" data-eh-cupra-details="1">${this._cupraDetails?'Minder details':'Uitgebreide voertuigdetails'} <span>${this._cupraDetails?'↑':'→'}</span></button>${vehicleDetails}</section>
+    ${this._cupraInsightsHtml(h,c)}
     <section class="cupra-card"><div class="section-label">Huidige laadstatus</div><div class="charge-row"><div><strong class="charge-power">${ehEsc(ehPower(ev))}</strong><p>${ehEsc(chargeLabel)}</p></div><div class="charge-amps"><span>Stroom L1</span><strong>${amps===null?'—':ehEsc(ehFmt(amps,1)+' A')}</strong></div></div><div class="charge-progress"><div style="width:${Math.min(100,Math.max(0,soc??0))}%"></div></div><p class="subtle">Actueel laadvermogen: Alfen · ${soc===null?'Cupra-accustand niet gekoppeld':'Accustand: Cupra-sensor'}</p></section>
     <section class="cupra-card"><div class="section-title">${ehIcon('clock')} Jouw laadscenario <span class="only-sim">Niet actief</span></div>
       <div class="planning-inputs">
@@ -1210,7 +1489,7 @@ class EnergiehuisCard extends HTMLElement {
 .cupra-big{font-size:37px;font-weight:850;letter-spacing:-1px;margin-top:8px}.cupra-big span{font-size:13px;color:#a4c2d2;letter-spacing:0}
 .cupra-small{font-size:12px;color:#c4d8e4;margin-top:3px}
 .vehicle-status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.vehicle-status{border:1px solid #82abc52d;border-radius:15px;background:#0b2132;padding:12px;min-width:0;display:flex;flex-direction:column;gap:4px}.vehicle-status-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#102c40;margin-bottom:4px}.vehicle-status-icon .icon{width:20px;height:20px}.vehicle-status small{font-size:10px;color:#9db9cb}.vehicle-status strong{font-size:18px;overflow-wrap:anywhere}.vehicle-status em{font-size:9px;color:#7699ae;font-style:normal;line-height:1.3}.vehicle-details-toggle{appearance:none;width:100%;margin-top:10px;border:1px solid #66b7d94a;border-radius:13px;background:#102a3d;color:#dff5ff;padding:11px 13px;font:inherit;font-size:12px;font-weight:750;display:flex;justify-content:space-between;align-items:center;cursor:pointer}.vehicle-details{display:none;margin-top:10px;border-top:1px solid #82a7bd25;padding-top:12px}.vehicle-details.open{display:block}.vehicle-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}.vehicle-detail-grid>div{background:#081b2a;border:1px solid #80a5bc26;border-radius:12px;padding:10px;min-width:0}.vehicle-detail-grid span{display:block;color:#8faec1;font-size:9px}.vehicle-detail-grid strong{display:block;margin-top:5px;font-size:12px;overflow-wrap:anywhere}
-.cupra-card{border:1px solid #a0bfd336;background:linear-gradient(148deg,#142d42,#0d2234);border-radius:20px;padding:17px}
+.cupra-insights{overflow:hidden}.insight-periods{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 13px}.insight-periods button{appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:7px 11px;font:inherit;font-size:10px;font-weight:750;cursor:pointer}.insight-periods button.chosen{background:#153c50;border-color:#55d7b66b;color:#eafff8}.km-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:11px 0}.km-summary>div,.insight-metrics>div{background:#081d2c;border:1px solid #7da5bc2b;border-radius:13px;padding:10px;min-width:0}.km-summary small,.insight-metrics small{display:block;color:#8fadc0;font-size:9px}.km-summary strong{display:block;font-size:17px;margin-top:5px;white-space:nowrap}.insight-headline{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:13px 0 7px;padding:12px 13px;background:linear-gradient(135deg,#0b2637,#102e3f);border:1px solid #70a4be32;border-radius:14px}.insight-headline>div:first-child{display:flex;flex-direction:column;gap:3px}.insight-headline small{color:#92b2c5;font-size:9px}.insight-headline strong{font-size:24px}.insight-headline span{color:#a7c4d4;font-size:10px}.quality-pill{min-width:88px;text-align:center;border-radius:11px;padding:8px 10px;border:1px solid #789db13d;background:#102636}.quality-pill small{display:block;font-size:8px;color:#91adbe}.quality-pill strong{display:block;margin-top:4px;font-size:12px}.quality-pill.sterk{border-color:#42dca072;background:#0d3a2f}.quality-pill.opbouwend{border-color:#e2b75c69;background:#3c3114}.quality-pill.beperkt{border-color:#e8916a5c;background:#382319}.cupra-km-chart,.cupra-temp-chart{display:block;width:100%;height:auto;margin:7px 0 3px}.temp-trend-panel{margin-top:10px}.insight-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.insight-metrics strong{display:block;font-size:16px;margin-top:5px;overflow-wrap:anywhere}.insight-metrics span{display:block;color:#789aad;font-size:9px;line-height:1.35;margin-top:5px}.insight-split{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin-top:10px}.insight-panel{background:#071b29;border:1px solid #759bb12a;border-radius:14px;padding:12px;min-width:0}.temp-row{display:grid;grid-template-columns:82px minmax(60px,1fr) 130px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #7194a61c}.temp-row:last-of-type{border-bottom:0}.temp-copy,.temp-values{display:flex;flex-direction:column;gap:3px}.temp-copy strong,.temp-values strong{font-size:11px}.temp-copy span,.temp-values span{font-size:8px;color:#819fb1;line-height:1.3}.temp-values{text-align:right}.temp-bar{height:8px;background:#153043;border-radius:999px;overflow:hidden}.temp-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4ca4e7,#52e0ad)}.climate-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.climate-grid>div{background:#0b2636;border:1px solid #7193a42b;border-radius:10px;padding:9px;min-width:0}.climate-grid span{display:block;color:#87a8ba;font-size:8px;line-height:1.3}.climate-grid strong{display:block;margin-top:5px;font-size:13px}.correlation-row{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #769aac20;padding:9px 1px 0;margin-top:9px;font-size:9px;color:#91afc0}.correlation-row strong{color:#d9edf7;text-align:right}.insight-quality{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.insight-quality span{font-size:9px;color:#8faec0;background:#0b2232;border:1px solid #7395a82a;border-radius:999px;padding:6px 8px}.insight-quality strong{color:#e7f7ff}.cupra-card{border:1px solid #a0bfd336;background:linear-gradient(148deg,#142d42,#0d2234);border-radius:20px;padding:17px}
 .cupra-card .section-label{font-size:13px;color:#dbe9f2;font-weight:750;margin-bottom:10px}
 .charge-row{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .charge-power{font-size:30px;font-weight:820}.charge-row p{font-size:12px;color:#b5d0de;margin:3px 0 0}.charge-amps{text-align:right;display:grid;gap:6px;color:#a9c7d6;font-size:11px}.charge-amps strong{font-size:17px;color:#f4fbff}
@@ -1247,7 +1526,7 @@ class EnergiehuisCard extends HTMLElement {
 .energy-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:#b8d1df;margin:12px 0}
 .energy-legend>span{display:flex;align-items:center;gap:6px}.energy-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
 @media(max-width:760px){.energy-periods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.energy-period{font-size:10px;padding:8px 4px}.energy-totals strong{font-size:17px}.energy-detail{padding:12px 9px}}
-@media(max-width:720px){.subpage{padding:13px 10px 82px}.subpage-head{padding:10px 2px;align-items:center}.subpage-head h2{font-size:27px}.subpage-head p{font-size:11px}.subgrid,.subgrid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subcard{min-height:118px;padding:13px}.subcard strong{font-size:20px}.soc-ring{width:88px;height:88px;border-width:7px}.soc-ring strong{font-size:20px}.price-badge{min-width:110px;padding:10px}.utility-grid{grid-template-columns:1fr}.utility-head strong{font-size:21px}.cost-compare-readout{grid-template-columns:1fr 1fr}.cost-compare-readout span{grid-column:1/-1}.cost-compare-readout strong{text-align:left}}
+@media(max-width:720px){.subpage{padding:13px 10px 82px}.subpage-head{padding:10px 2px;align-items:center}.subpage-head h2{font-size:27px}.subpage-head p{font-size:11px}.subgrid,.subgrid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.subcard{min-height:118px;padding:13px}.subcard strong{font-size:20px}.soc-ring{width:88px;height:88px;border-width:7px}.soc-ring strong{font-size:20px}.price-badge{min-width:110px;padding:10px}.utility-grid{grid-template-columns:1fr}.utility-head strong{font-size:21px}.cost-compare-readout{grid-template-columns:1fr 1fr}.cost-compare-readout span{grid-column:1/-1}.cost-compare-readout strong{text-align:left}.km-summary,.insight-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.insight-split{grid-template-columns:1fr}.temp-row{grid-template-columns:72px minmax(45px,1fr) 116px}.insight-headline strong{font-size:21px}.quality-pill{min-width:78px}.climate-grid{grid-template-columns:1fr 1fr}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
  ${this._view==='cupra'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
@@ -1275,5 +1554,5 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.5.0',description:'Interactieve cumulatieve kostenvergelijking per maand en jaar, naast Cupra, batterij, gas en water.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.6.0',description:'Cupra Insights met kilometers, praktijkactieradius, temperatuur- en doeltemperatuuranalyse.'});
 }
