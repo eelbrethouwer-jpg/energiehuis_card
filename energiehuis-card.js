@@ -711,6 +711,20 @@ function ehCupraKmChart(buckets,period){
  return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
 }
 
+function ehCupraTempRangeChart(groups,currentTemp){
+ const rows=(groups||[]).map((g,i)=>({...g,i})).filter(g=>Number.isFinite(g.range)&&g.count>0);
+ if(rows.length<2)return '<div class="no-chart small">Nog te weinig temperatuurklassen voor een trendgrafiek.</div>';
+ const W=690,H=235,L=52,R=14,T=18,B=48,CW=W-L-R,CH=H-T-B;
+ const vals=rows.map(r=>r.range),rawMin=Math.min(...vals),rawMax=Math.max(...vals),pad=Math.max(15,(rawMax-rawMin)*.18);
+ const min=Math.max(0,rawMin-pad),max=rawMax+pad;
+ const xp=i=>L+i/5*CW,yp=v=>T+(max-v)/(max-min)*CH;
+ const grid=Array.from({length:4},(_,i)=>max-(max-min)*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
+ const d=rows.map((r,j)=>(j?'L':'M')+xp(r.i).toFixed(1)+','+yp(r.range).toFixed(1)).join(' ');
+ const currentIndex=Number.isFinite(currentTemp)?(currentTemp<0?0:currentTemp<5?1:currentTemp<10?2:currentTemp<15?3:currentTemp<20?4:5):-1;
+ const dots=rows.map(r=>'<circle cx="'+xp(r.i).toFixed(1)+'" cy="'+yp(r.range).toFixed(1)+'" r="'+(r.i===currentIndex?6:4)+'" fill="'+(r.i===currentIndex?'#ffe09b':'#52dfad')+'" stroke="#071522" stroke-width="2"><title>'+ehEsc(r.label)+' · '+ehEsc(ehFmt(r.range,0))+' km · '+ehEsc(ehFmt(r.km,0))+' km historie</title></circle>').join('');
+ const labels=(groups||[]).map((g,i)=>'<text x="'+xp(i).toFixed(1)+'" y="'+(H-15)+'" text-anchor="middle" fill="#9fbdd0" font-size="9">'+ehEsc(g.label)+'</text>').join('');
+ return '<svg class="cupra-temp-chart" role="img" aria-label="Praktijkactieradius per temperatuurklasse" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+'<path d="'+d+'" fill="none" stroke="#52dfad" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>'+dots+labels+'</svg>';
+}
 class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
