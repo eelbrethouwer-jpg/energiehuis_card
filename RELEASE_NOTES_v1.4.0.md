@@ -45,6 +45,8 @@ Alle vijf knoppen zijn nu intern bruikbaar:
 - Accupercentage, actieradius, laadstatus en resterende laadtijd in één oogopslag.
 - Uitklapbare **Uitgebreide voertuigdetails** met ruimte voor kilometerstand, vergrendeling, portieren, laadkabel, laadvermogen, geladen energie, laadsnelheid, laadscenario, laadschema, portalfeed en verbinding.
 - Ontbrekende Cupra-data wordt niet verzonnen; velden blijven leeg totdat de bijbehorende entiteit is gekoppeld.
+- Auto-detectie op Cupra friendly names toegevoegd voor o.a. Actieradius, Kilometerstand, Deuren vergrendeld, Buitentemperatuur, Doeltemperatuur, Klimaatverbruik, Laaddoel, Laadschema, Status portaalfeed en Verbruik boordnet.
+- Compacte Cupra-tegels tonen voortaan Accu, Actieradius, Vergrendeling en Buitentemperatuur; laadgegevens blijven beschikbaar in de uitgebreide sectie.
 
 ## Veiligheid
 Deze release blijft **alleen-lezen voor laadsturing**. De Cupra-planner simuleert laadmomenten, maar verstuurt geen commando's naar de Alfen. De bestaande Home Assistant EMS en Active Load Balancing blijven leidend.
