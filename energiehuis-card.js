@@ -544,7 +544,7 @@ class EnergiehuisCard extends HTMLElement {
  constructor(){
   super();this.attachShadow({mode:'open'});
   this._history=null;this._historyAt=0;this._historyKey='';this._historyLoading=false;this._historyError=false;
-  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;
+  this._refreshTimer=null;this._queued=false;this._detail=null;this._selectedAt=null;this._dragging=false;this._priceSelected=0;this._cupraPriceSelected=null;this._metricPeriod='today';this._metricResult=null;this._metricCache=new Map();this._metricLoadingKey=null;this._metricRequestId=0;this._metricSelectedTime=null;this._metricDragging=false;this._cupraDetails=false;this._costComparePeriod='month';this._costCompareResult=null;this._costCompareLoading=false;this._costCompareAt=0;this._costCompareKey='';this._costCompareSelectedTime=null;this._costCompareDragging=false;
    this._view='overview';this._chargeMode='slim';this._targetSoc=80;this._departure=ehDefaultDeparture();this._simNeed=null;this._simPower=null;
   this.shadowRoot.addEventListener('click',e=>{
     const page=e.target.closest('[data-eh-page]');
@@ -553,9 +553,16 @@ class EnergiehuisCard extends HTMLElement {
      if(['overview','cupra','battery','costs','more'].includes(next)){
        this._view=next;this._detail=null;
        this._schedule();
+       if(next==='costs')this._loadCostCompare();
        requestAnimationFrame(()=>{if(this.isConnected)this.scrollIntoView({behavior:'smooth',block:'start'});});
        // De pagina blijft binnen dezelfde Lovelace kaart: geen route of backend wijziging.
      }
+     return;
+   }
+   const costPeriod=e.target.closest('[data-eh-cost-period]');
+   if(costPeriod){
+     const p=costPeriod.dataset.ehCostPeriod;
+     if(['month','year'].includes(p)){this._costComparePeriod=p;this._costCompareSelectedTime=null;this._costCompareResult=null;this._schedule();this._loadCostCompare();}
      return;
    }
    const details=e.target.closest('[data-eh-cupra-details]');
@@ -622,6 +629,8 @@ class EnergiehuisCard extends HTMLElement {
      }
    });
   this.shadowRoot.addEventListener('pointerdown',e=>{
+    const cost=e.target.closest('[data-eh-cost-plot]');
+    if(cost){this._costCompareDragging=true;this._selectCostCompareFromPointer(cost,e);return;}
     const metric=e.target.closest('[data-eh-metric-plot]');
     if(metric){this._metricDragging=true;this._selectMetricFromPointer(metric,e);return;}
     const svg=e.target.closest('[data-eh-history-chart]');
@@ -631,13 +640,15 @@ class EnergiehuisCard extends HTMLElement {
     this._selectFromPointer(svg,e);
   });
   this.shadowRoot.addEventListener('pointermove',e=>{
+    const cost=e.target.closest('[data-eh-cost-plot]');
+    if(cost && (this._costCompareDragging||e.pointerType==='mouse')){this._selectCostCompareFromPointer(cost,e);return;}
     const metric=e.target.closest('[data-eh-metric-plot]');
     if(metric && (this._metricDragging||e.pointerType==='mouse')){this._selectMetricFromPointer(metric,e);return;}
     const svg=e.target.closest('[data-eh-history-chart]');
     if(svg && (this._dragging || e.pointerType==='mouse'))this._selectFromPointer(svg,e);
   });
-  this.shadowRoot.addEventListener('pointerup',()=>{this._dragging=false;this._metricDragging=false});
-  this.shadowRoot.addEventListener('pointercancel',()=>{this._dragging=false;this._metricDragging=false});
+  this.shadowRoot.addEventListener('pointerup',()=>{this._dragging=false;this._metricDragging=false;this._costCompareDragging=false});
+  this.shadowRoot.addEventListener('pointercancel',()=>{this._dragging=false;this._metricDragging=false;this._costCompareDragging=false});
  }
  _selectFromPointer(svg,e){
   const hist=this._history;
