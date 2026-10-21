@@ -18,7 +18,7 @@ Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energ
 
 ### Eenmalige installatie voor Meterbeheer
 
-Installeer het optionele [nulmeting-package](packages/energiehuis_v17_reset.yaml) in Home Assistant op `/config/packages/energiehuis_v17_reset.yaml` (mits packages in `configuration.yaml` zijn geactiveerd). Controleer de configuratie en herstart. De benodigde helper is `input_text.energiehuis_reset_baselines`. De helper bewaart baselines over Home Assistant-herstarts; HACS installeert het YAML-package niet automatisch.
+Installeer het optionele [nulmeting-package](packages/energiehuis_v17_reset.yaml) in Home Assistant op `/config/packages/energiehuis_v17_reset.yaml` (mits packages in `configuration.yaml` zijn geactiveerd). Controleer de configuratie en herstart. De benodigde helper is `input_text.energiehuis_reset_baselines`. De helper bewaart baselines over Home Assistant-herstarts; HACS installeert het YAML-package niet automatisch. **Alternatief zonder YAML:** ga in Home Assistant naar Instellingen → Apparaten & diensten → Helpers → Helper toevoegen → Tekst. Kies maximale lengte 255 en stel het entiteits-ID in op `input_text.energiehuis_reset_baselines` (of pas `reset_store` in de kaartconfiguratie aan). Maak dezelfde helper niet óók via het package aan.
 
 Kies in de verborgen meterbeheeromgeving de gewenste meters en klik op **Nieuwe nulmeting voor selectie**. Bevestig in de aparte waarschuwingsdialoog. De historische sensoren en fysieke meters blijven onaangetast. De verschilwaarden worden op dit moment zichtbaar in Meterbeheer, en de nieuwe beginstand is ook beschikbaar in de aanvullende contractperiode-uitlezing. Oude maand- en jaarkosten worden niet overschreven.
 
