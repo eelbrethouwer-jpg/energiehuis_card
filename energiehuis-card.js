@@ -1108,6 +1108,38 @@ class EnergiehuisCard extends HTMLElement {
   if(this._cupraInsightsCache.size>8)this._cupraInsightsCache.delete(this._cupraInsightsCache.keys().next().value);
   if(this._cupraInsightsLoadingKey===key){this._cupraInsightsResult=result;this._cupraInsightsLoadingKey=null;this._schedule();}
  }
+ _cupraInsightsHtml(h,c){
+  const r=this._cupraInsightsResult?.period===this._cupraInsightsPeriod?this._cupraInsightsResult:null;
+  const periodLabel=EH_CUPRA_PERIODS.find(x=>x[0]===this._cupraInsightsPeriod)?.[1]||'30 dagen';
+  const fmtKm=v=>Number.isFinite(v)?ehFmt(v,1)+' km':'—';
+  const fmtPct=v=>Number.isFinite(v)?(v>0?'+':'')+ehFmt(v,1)+'%':'—';
+  const corrLabel=v=>{if(!Number.isFinite(v))return 'Nog onvoldoende meetpunten';const a=Math.abs(v),s=a>=.65?'sterk':a>=.4?'matig':a>=.2?'licht':'zwak';return s+' · r '+ehFmt(v,2);};
+  if(!r)return `<section class="cupra-card cupra-insights"><div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Analyse</span></div><div class="energy-loading">Cupra- en Alfen-historie analyseren…</div></section>`;
+  const s=r.summary||{},m=r.metrics||{};
+  const selectedKm=this._cupraInsightsPeriod==='today'?s.today:this._cupraInsightsPeriod==='7d'?s.d7:this._cupraInsightsPeriod==='year'?s.year:s.d30;
+  const now=new Date(),from=r.limits?.from||now;
+  const day0=new Date(from.getFullYear(),from.getMonth(),from.getDate()),today0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const days=Math.max(1,Math.round((today0-day0)/86400000)+1),avgDay=Number.isFinite(selectedKm)?selectedKm/days:null;
+  const liveTarget=ehRead(h,c.cupra_target_temp),liveOutside=ehRead(h,c.cupra_outside_temp),liveGap=Number.isFinite(liveTarget)&&Number.isFinite(liveOutside)?liveTarget-liveOutside:null;
+  const maxRange=Math.max(1,...(r.tempGroups||[]).map(g=>g.range||0));
+  const tempRows=(r.tempGroups||[]).filter(g=>g.count>0).map(g=>`<div class="temp-row"><div class="temp-copy"><strong>${ehEsc(g.label)}</strong><span>${ehEsc(ehFmt(g.km,0))} km · ${g.count} segment${g.count===1?'':'en'}</span></div><div class="temp-bar"><i style="width:${Math.max(5,Math.min(100,(g.range||0)/maxRange*100)).toFixed(0)}%"></i></div><div class="temp-values"><strong>${Number.isFinite(g.range)?ehEsc(ehFmt(g.range,0)+' km'):'—'}</strong><span>${Number.isFinite(g.kwh100)?ehEsc(ehFmt(g.kwh100,1)+' kWh/100 km'):'—'}${Number.isFinite(g.delta)?' · '+ehEsc(fmtPct(g.delta))+' vs 15–20°C':''}</span></div></div>`).join('');
+  const coverage=r.coverageFrom?`${new Date(r.coverageFrom).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})} – ${new Date(r.coverageTo||Date.now()).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}`:'Geen detailhistorie';
+  const warnings=[r.statsWarning,r.historyWarning].filter(Boolean).map(x=>`<p class="plan-warning">${ehEsc(x)}</p>`).join('');
+  return `<section class="cupra-card cupra-insights">
+   <div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Praktijkanalyse</span></div>
+   <p class="subtle">Gebaseerd op jouw Cupra-data, 15-minutenupdates en Alfen-laadenergie. Segmenten met thuisladen of vermoedelijk extern laden worden uit de efficiëntieanalyse gefilterd.</p>
+   <div class="insight-periods">${EH_CUPRA_PERIODS.map(([id,label])=>`<button type="button" data-eh-cupra-insight-period="${id}" class="${this._cupraInsightsPeriod===id?'chosen':''}">${label}</button>`).join('')}</div>
+   <div class="km-summary"><div><small>Vandaag</small><strong>${fmtKm(s.today)}</strong></div><div><small>7 dagen</small><strong>${fmtKm(s.d7)}</strong></div><div><small>30 dagen</small><strong>${fmtKm(s.d30)}</strong></div><div><small>Dit jaar</small><strong>${fmtKm(s.year)}</strong></div></div>
+   <div class="insight-headline"><div><small>${ehEsc(periodLabel)}</small><strong>${fmtKm(selectedKm)}</strong><span>${Number.isFinite(avgDay)?ehEsc(ehFmt(avgDay,1)+' km gemiddeld per kalenderdag'):'Gemiddelde nog niet beschikbaar'}</span></div><div class="quality-pill ${String(m.quality||'').toLowerCase()}"><small>Datakwaliteit</small><strong>${ehEsc(m.quality||'Beperkt')}</strong></div></div>
+   ${ehCupraKmChart(r.kmBuckets,this._cupraInsightsPeriod)}
+   <div class="insight-metrics"><div><small>Praktijkactieradius</small><strong>${Number.isFinite(m.range)?ehEsc(ehFmt(m.range,0)+' km'):'—'}</strong><span>Uit ${ehEsc(ehFmt(m.km||0,0))} km geldige segmenten</span></div><div><small>Geschat verbruik</small><strong>${Number.isFinite(m.kwh100)?ehEsc(ehFmt(m.kwh100,1)+' kWh/100 km'):'—'}</strong><span>SOC-verlies × ${ehEsc(ehFmt(r.capacity,0))} kWh</span></div><div><small>Cupra voorspelling</small><strong>${Number.isFinite(m.predicted)?ehEsc(ehFmt(m.predicted,0)+' km'):'—'}</strong><span>${Number.isFinite(m.rangeDelta)?'Praktijk '+ehEsc(fmtPct(m.rangeDelta)):'Nog geen vergelijking'}</span></div><div><small>Geldige segmenten</small><strong>${m.valid?.length??0}</strong><span>${ehEsc(coverage)}</span></div></div>
+   <div class="insight-split"><div class="insight-panel"><div class="detail-small-title">Temperatuur → praktijkrange</div>${tempRows||'<p class="detail-muted">Nog onvoldoende geldige ritsegmenten om temperatuurklassen te vullen.</p>'}<p class="detail-muted">Referentie voor percentages is 15–20°C zodra daar voldoende kilometers beschikbaar zijn.</p></div>
+   <div class="insight-panel"><div class="detail-small-title">Klimaatvraag & doeltemperatuur</div><div class="climate-grid"><div><span>Buiten gemiddeld</span><strong>${Number.isFinite(m.avgTemp)?ehEsc(ehFmt(m.avgTemp,1)+' °C'):'—'}</strong></div><div><span>Doeltemperatuur gemiddeld</span><strong>${Number.isFinite(m.avgTarget)?ehEsc(ehFmt(m.avgTarget,1)+' °C'):'—'}</strong></div><div><span>Gemiddeld setpointverschil</span><strong>${Number.isFinite(m.avgGap)?ehEsc((m.avgGap>0?'+':'')+ehFmt(m.avgGap,1)+' °C'):'—'}</strong></div><div><span>Nu: doel − buiten</span><strong>${Number.isFinite(liveGap)?ehEsc((liveGap>0?'+':'')+ehFmt(liveGap,1)+' °C'):'—'}</strong></div></div><div class="correlation-row"><span>Buitentemperatuur ↔ verbruik</span><strong>${ehEsc(corrLabel(m.tempCorrelation))}</strong></div><div class="correlation-row"><span>Setpointverschil ↔ verbruik</span><strong>${ehEsc(corrLabel(m.gapCorrelation))}</strong></div><p class="detail-muted">De doeltemperatuur is het ingestelde cabine-setpoint, niet de gemeten binnentemperatuur. De samenhang is daarom indicatief en bewijst geen oorzaak op zichzelf.</p></div></div>
+   <div class="insight-quality"><span>Thuisladen uitgesloten: <strong>${r.homeChargeExcluded||0}</strong></span><span>Vermoedelijk extern laden: <strong>${r.externalChargeSuspected||0}</strong></span><span>Meetruis uitgesloten: <strong>${r.noiseExcluded||0}</strong></span><span>Cupra meetpunten: <strong>${r.anchors||0}</strong></span></div>
+   ${warnings}
+   <p class="subtle"><strong>Gemeten:</strong> kilometerstand, SOC, Cupra-range, buitentemperatuur, doeltemperatuur en Alfen-laadenergie. <strong>Afgeleid:</strong> praktijkrange en kWh/100 km. Klimaatverbruik en boordnet blijven contextwaarden totdat hun semantiek in de Cupra-feed volledig is gevalideerd.</p>
+  </section>`;
+ }
  _cupraHtml(h,c){
   const soc=ehRead(h,c.cupra);
   const rangeState=ehCupraByName(h,c.cupra_range,'Actieradius');
