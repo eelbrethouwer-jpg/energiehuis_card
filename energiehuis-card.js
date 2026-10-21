@@ -1,8 +1,8 @@
-/* Energiehuis v1.4.2 — Kostenvergelijking per maand en jaar.
+/* Energiehuis v1.5.0 — Cumulatieve kostenvergelijking.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
- * Nieuw: maand- en jaarvergelijkingen zijn visueel en rekenkundig gescheiden.
+ * Nieuw: interactieve cumulatieve verschilgrafiek voor maand en jaar.
  */
-const EH_VERSION = '1.4.2';
+const EH_VERSION = '1.5.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -444,6 +444,56 @@ function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  const cursor=chosen?`<line x1="${tx.toFixed(1)}" x2="${tx.toFixed(1)}" y1="${T}" y2="${H-B}" stroke="#f5faff" stroke-dasharray="4 4" opacity=".8"/>`:'';
  return `<svg class="metric-history" data-eh-metric-plot="1" data-eh-left="${L}" data-eh-right="${W-R}" data-eh-width="${W}" role="img" aria-label="${ehEsc(type==='grid'?'Afname en teruglevering':'Energiehistorie')}, tik of klik voor waarden per tijdstip" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><text x="6" y="12" fill="#a6c4d6" font-size="12">${isRaw?'kW':'kWh'}</text>${axis}<line x1="${L}" x2="${W-R}" y1="${yp(0).toFixed(1)}" y2="${yp(0).toFixed(1)}" stroke="#c2dcef66"/>${lines}${cursor}${ticks}<rect x="${L}" y="${T}" width="${CW}" height="${CH}" fill="transparent" style="cursor:crosshair"/></svg>`;
 }
+function ehCostComparePoints(stats,ids,bins,step,h,live,now){
+ const mapped=ehCountersByWindow(stats,ids,bins,step,h);
+ const val=(id,b)=>id?mapped[id]?.totals.get(b.key):undefined;
+ let z=0,v1=0,v3=0,historyCount=0;
+ const points=[];
+ if(bins.length)points.push({t:bins[0].t,v1:0,v3:0});
+ for(const b of bins){
+   const dz=val(ids[0],b),d1=val(ids[1],b),d3=val(ids[2],b);
+   if([dz,d1,d3].every(Number.isFinite)){
+     z+=dz;v1+=d1;v3+=d3;historyCount++;
+     points.push({t:b.end,v1:v1-z,v3:v3-z});
+   }
+ }
+ if(live&&[live.z,live.v1,live.v3].every(Number.isFinite)){
+   const endpoint={t:now.getTime(),v1:live.v1-live.z,v3:live.v3-live.z};
+   if(points.length&&Math.abs(points[points.length-1].t-endpoint.t)<60000)points[points.length-1]=endpoint;
+   else points.push(endpoint);
+ }
+ return {points,historyCount};
+}
+function ehCostCompareChart(result,selectedAt){
+ const points=result?.points||[];
+ if(points.length<2||!result?.historyCount)return '<div class="no-chart">Nog onvoldoende langetermijnstatistieken voor een betrouwbare cumulatieve grafiek.</div>';
+ const W=690,H=260,L=58,R=14,T=18,B=42,CW=W-L-R,CH=H-T-B;
+ const nums=points.flatMap(p=>[p.v1,p.v3]).filter(Number.isFinite);
+ if(!nums.length)return '<div class="no-chart">Geen cumulatieve kostenverschillen beschikbaar.</div>';
+ let min=Math.min(0,...nums),max=Math.max(0,...nums);
+ const pad=Math.max((max-min)*.14,.5);min-=pad;max+=pad;
+ const from=result.from.getTime(),to=result.to.getTime();
+ const xp=t=>L+(Math.max(from,Math.min(t,to))-from)/Math.max(1,to-from)*CW;
+ const yp=v=>T+(max-v)/(max-min)*CH;
+ const axis=Array.from({length:5},(_,i)=>max-(max-min)*i/4).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-8)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">€ '+ehEsc(ehFmt(v,1))+'</text>').join('');
+ const ticks=Array.from({length:5},(_,i)=>{
+   const t=from+(to-from)*i/4,d=new Date(t);
+   const label=result.period==='month'?d.toLocaleDateString('nl-NL',{day:'numeric',month:'short'}):d.toLocaleDateString('nl-NL',{month:'short'});
+   const x=xp(t);return '<text x="'+x.toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===4?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(label)+'</text>';
+ }).join('');
+ const series=[['v1','#4ee3a6'],['v3','#69b8ff']];
+ const lines=series.map(([key,color])=>{
+   const valid=points.filter(p=>Number.isFinite(p[key]));
+   if(valid.length<2)return '';
+   const d=valid.map((p,i)=>(i?'L':'M')+xp(p.t).toFixed(1)+','+yp(p[key]).toFixed(1)).join(' ');
+   return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+ }).join('');
+ const chosen=points.reduce((a,b)=>Math.abs(b.t-selectedAt)<Math.abs(a.t-selectedAt)?b:a,points[0]);
+ const cx=xp(chosen.t);
+ const dots=series.map(([key,color])=>Number.isFinite(chosen[key])?'<circle cx="'+cx.toFixed(1)+'" cy="'+yp(chosen[key]).toFixed(1)+'" r="5" fill="'+color+'" stroke="#071522" stroke-width="2"/>':'').join('');
+ return '<svg class="cost-compare-chart" data-eh-cost-plot="1" data-eh-left="'+L+'" data-eh-right="'+(W-R)+'" data-eh-width="'+W+'" role="img" aria-label="Cumulatief kostenverschil ten opzichte van Vattenfall" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'+axis+'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(0).toFixed(1)+'" y2="'+yp(0).toFixed(1)+'" stroke="#f0f8ff99" stroke-width="1.8"/><text x="'+(L+4)+'" y="'+(yp(0)-6).toFixed(1)+'" fill="#d5e8f4" font-size="10">€0</text>'+lines+'<line x1="'+cx.toFixed(1)+'" x2="'+cx.toFixed(1)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="#f5faff" stroke-dasharray="4 4" opacity=".75"/>'+dots+ticks+'<rect x="'+L+'" y="'+T+'" width="'+CW+'" height="'+CH+'" fill="transparent" style="cursor:crosshair"/></svg>';
+}
+
 function ehPricesForDay(h,c,now){
  const sources=[c.kwartier_forecast,c.prijs].filter(Boolean);
  let forecasts=sources.map(id=>ehForecast(h,id).filter(p=>p.t&&Number.isFinite(Date.parse(p.t))).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t)));
