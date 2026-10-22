@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'develop/v1.8.0'
+      - 'hotfix/v1.8.1-correct-code'
   workflow_dispatch:
 
 permissions:
