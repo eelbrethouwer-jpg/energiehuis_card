@@ -1,0 +1,24 @@
+name: Energiehuis v1.8.0 development validation
+on:
+  push:
+    branches:
+      - 'develop/v1.8.0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax check
+        run: node --check energiehuis-card.js
+      - name: Run all regression tests
+        run: node --test tests/*.test.cjs
+      - name: Validate HACS manifest
+        run: python -m json.tool hacs.json > /dev/null
