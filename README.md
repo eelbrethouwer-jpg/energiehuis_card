@@ -1,16 +1,16 @@
 # Energiehuis — Home Assistant dashboardkaart
 
-## In ontwikkeling: v1.8.0 – Energy Insights & Cost Control
+## Herstelrelease v1.8.1 – correcte Energy Insights & Cost Control-code
 
-In de aparte branch [develop/v1.8.0](https://github.com/eelbrethouwer-jpg/energiehuis_card/tree/develop/v1.8.0) worden Gas Insights, Kosten & Besparing 2.0, Slim laden 2.1, Zonne-energie Insights, een compactere mobiele interface en systeemcontrole getest. De stabiele HACS-versie blijft v1.7.1. Zie [v1.8.0 release notes](RELEASE_NOTES_v1.8.0.md).
+**Let op:** de op 22 oktober 2026 gepubliceerde `v1.8.0`-tag verwijst abusievelijk naar dezelfde commit als `v1.7.1`. Daardoor bevatte de HACS-installatie geen nieuwe v1.8.0-functionaliteit. De correcte implementatie is voorbereid als **v1.8.1**. Zie [de v1.8.1 release notes](RELEASE_NOTES_v1.8.1.md). Installeer pas na publicatie de nieuwe tag in HACS; controleer in het dashboard de daadwerkelijke functies.
 
-**Na v1.8.0:** [Energiehuis v1.9.0 – Standalone PWA Edition](ROADMAP_v1.9.0_PWA.md), met een zelfstandiger app-gevoel op iPhone en Android.
+**Na v1.8.1:** [Energiehuis v1.9.0 – Standalone PWA Edition](ROADMAP_v1.9.0_PWA.md), met een zelfstandiger app-gevoel op iPhone en Android.
 
 ![Energiehuis dashboard](energiehuis-preview.png)
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis v1.7.1 blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
 
 ## Nieuw in v1.7.1 — Gas & Water hotfix
 
