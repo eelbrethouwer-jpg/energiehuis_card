@@ -5,7 +5,7 @@ const registry=new Map();
 class FakeElement {attachShadow(){return {addEventListener(){}}}}
 const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,window:{customCards:[]},customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
 vm.runInNewContext(src+'\n;globalThis.API18={EH18_CONTRACT_START,EH_DEFAULTS,eh18Unit,eh18Rows,eh18Health,eh18Costs,eh18Charge,eh18Graphic,eh18Insight,eh17Plan,EnergiehuisCard};',ctx);
-const {EH_DEFAULTS,eh18Unit,eh18Rows,eh18Health,eh18Costs,eh18Charge,eh18Graphic,eh18Insight,EnergiehuisCard}=ctx.API18;
+const {EH_DEFAULTS,eh18Unit,eh18Rows,eh18Health,eh18Costs,eh18Charge,eh18Graphic,eh18Insight,eh17Plan,EnergiehuisCard}=ctx.API18;
 const sensor=(state,unit)=>({state:String(state),attributes:{unit_of_measurement:unit}});
 test('v1.8.0 kaartnaam, basisconfiguratie en 6 navigatieschermen behouden',()=>{
  assert.match(src,/EH_VERSION = '1.8.0'/);
