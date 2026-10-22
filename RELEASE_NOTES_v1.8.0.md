@@ -1,6 +1,6 @@
 # ⚡ Energiehuis v1.8.0 – Energy Insights & Cost Control
 
-**Releasekandidaat in ontwikkelbranch. Niet als HACS-release gepubliceerd.**
+**Historische correctie:** de gepubliceerde v1.8.0-tag van 22 oktober 2026 verwijst naar v1.7.1-code. De hieronder beschreven nieuwe functies zijn daarom **niet** beschikbaar via die tag. Zie de [herstelrelease v1.8.1](RELEASE_NOTES_v1.8.1.md).
 
 Energiehuis v1.8.0 bouwt verder op v1.7.1 en behoudt alle bestaande Home Assistant-entiteiten, Cupra Insights, batterijfuncties, geschiedenis, zes navigatietabbladen en de dubbel bevestigde nulmetingfunctie.
 
