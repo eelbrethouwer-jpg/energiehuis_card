@@ -2139,8 +2139,9 @@ function eh18Css() {
   this._eh18Cache=this._eh18Cache||new Map();
   const cached=this._eh18Cache.get(key);
   if(cached&&Date.now()-cached.at<5*60000){this._eh18Results=this._eh18Results||{};this._eh18Results[type]=cached;return;}
-  if(this._eh18Loading===key)return;
-  this._eh18Loading=key;
+  this._eh18Loading=this._eh18Loading||new Set();
+  if(this._eh18Loading.has(key))return;
+  this._eh18Loading.add(key);
   const h=this._hass,c=this.config,lim=ehPeriodLimits(period,new Date());
   const ids=type==='gas'?[c.gas]:[c.pv_total_energy||c.zonne_energie,c.import,c.export];
   try{
@@ -2148,12 +2149,13 @@ function eh18Css() {
    const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:from.toISOString(),end_time:lim.to.toISOString(),statistic_ids:[...new Set(ids.filter(Boolean))],period:lim.step,types:['change','sum']});
    const bins=ehWindows(lim),rows=eh18Rows(stats,bins,lim.step,c,h,type);
    const out={period,rows,at:Date.now(),error:null};
-   this._eh18Cache.set(key,out);this._eh18Results=this._eh18Results||{};this._eh18Results[type]=out;
+   this._eh18Cache.set(key,out);this._eh18Results=this._eh18Results||{};
+   if(eh18Period(this,type)===period)this._eh18Results[type]=out;
    if(this._eh18Cache.size>15)this._eh18Cache.delete(this._eh18Cache.keys().next().value);
   }catch(e){
    this._eh18Results=this._eh18Results||{};
-   this._eh18Results[type]={period,rows:[],at:Date.now(),error:'Recorder-historie voor '+type+' is niet beschikbaar.'};
-  }finally{if(this._eh18Loading===key)this._eh18Loading=null;if(this.isConnected)this._schedule();}
+   if(eh18Period(this,type)===period)this._eh18Results[type]={period,rows:[],at:Date.now(),error:'Recorder-historie voor '+type+' is niet beschikbaar.'};
+  }finally{this._eh18Loading.delete(key);if(this.isConnected)this._schedule();}
  };
  P._moreHtml=function(h,c){
   const original=oldMore.call(this,h,c);
