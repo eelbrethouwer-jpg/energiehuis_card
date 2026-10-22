@@ -86,3 +86,22 @@ test('geen nieuw gevaarlijk Home Assistant schrijfgedrag geïntroduceerd',()=>{
  assert.doesNotMatch(src,/callService\s*\(\s*['"](?:alfen|cupra|switch|number|button)/);
  assert.match(src,/input_text","set_value"/);
 });
+
+
+test('40 kWh kan over meerdere volledige uren gepland worden met negatieve tarieven',()=>{
+ const now=new Date('2026-11-02T17:10:00Z'),departure='2026-11-03T10:00:00Z';
+ const prices=Array.from({length:16},(_,i)=>({t:new Date(Date.UTC(2026,10,2,18+i)).toISOString(),p:i===5?-.04:.2+i/100}));
+ const result=eh17Plan(prices,now,departure,40,7.36,'slim',{fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:1500,efficiency:.9});
+ assert.equal(result.error,null);
+ assert.ok(result.remaining<.01);
+ assert.ok(result.selected.some(s=>s.price<0));
+ for(const row of result.selected){assert.equal(row.slotEnd-row.slotStart,3600000);assert.ok(row.wallKw<=7.36);}
+});
+test('zomer-/wintertijd moet twee verschillende absolute uren kunnen onderscheiden',()=>{
+ const now=new Date('2026-10-24T23:15:00Z'),departure='2026-10-25T05:00:00Z';
+ const prices=['2026-10-25T00:00:00Z','2026-10-25T01:00:00Z','2026-10-25T02:00:00Z'].map((t,i)=>({t,p:[.01,.02,.6][i]}));
+ const result=eh17Plan(prices,now,departure,5,3.7,'slim',{houseW:500,efficiency:1});
+ assert.equal(result.error,null);
+ assert.equal(result.selected.length,2);
+ assert.equal(new Set(result.selected.map(x=>x.t)).size,2);
+});
