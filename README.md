@@ -1,5 +1,11 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: v1.8.0 – Energy Insights & Cost Control
+
+In de aparte branch [develop/v1.8.0](https://github.com/eelbrethouwer-jpg/energiehuis_card/tree/develop/v1.8.0) worden Gas Insights, Kosten & Besparing 2.0, Slim laden 2.1, Zonne-energie Insights, een compactere mobiele interface en systeemcontrole getest. De stabiele HACS-versie blijft v1.7.1. Zie [v1.8.0 release notes](RELEASE_NOTES_v1.8.0.md).
+
+**Na v1.8.0:** [Energiehuis v1.9.0 – Standalone PWA Edition](ROADMAP_v1.9.0_PWA.md), met een zelfstandiger app-gevoel op iPhone en Android.
+
 ![Energiehuis dashboard](energiehuis-preview.png)
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
