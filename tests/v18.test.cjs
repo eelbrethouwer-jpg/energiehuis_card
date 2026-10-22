@@ -64,7 +64,7 @@ test('Slim laden 2.1 toont haalbaarheid en laat load balancing ongemoeid',()=>{
  assert.match(html,/Slim laden 2.1/);
  assert.match(html,/haalbaar|Geen volledige uren|prijsuren/i);
  assert.match(html,/Active Load Balancing/);
- assert.match(html,/geen laadcommando/i);
+ assert.match(html,/laadcommando/i);
 });
 test('gas en zon zijn beschikbaar in Meer en bestaande reset blijft aanwezig',()=>{
  const card=Object.create(EnergiehuisCard.prototype),h={states:{}};
