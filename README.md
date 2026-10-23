@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Hotfix v1.8.2 – selectie virtuele batterij
+
+De virtuele-batterijcapaciteit (5, 10 of 15 kWh) is weer aanklikbaar. De keuze past uitsluitend de simulatie aan. Zie [release notes v1.8.2](RELEASE_NOTES_v1.8.2.md).
+
 ## Herstelrelease v1.8.1 – correcte Energy Insights & Cost Control-code
 
 **Let op:** de op 22 oktober 2026 gepubliceerde `v1.8.0`-tag verwijst abusievelijk naar dezelfde commit als `v1.7.1`. Daardoor bevatte de HACS-installatie geen nieuwe v1.8.0-functionaliteit. De correcte implementatie is voorbereid als **v1.8.1**. Zie [de v1.8.1 release notes](RELEASE_NOTES_v1.8.1.md). Installeer pas na publicatie de nieuwe tag in HACS; controleer in het dashboard de daadwerkelijke functies.
