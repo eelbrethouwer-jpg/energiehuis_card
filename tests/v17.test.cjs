@@ -12,8 +12,8 @@ const {eh17Plan,eh17ResetState,eh17Hash,EnergiehuisCard}=context.TEST;
 const hour=i=>new Date(Date.UTC(2026,9,22,i)).toISOString();
 const prices=[{t:hour(0),p:.29},{t:hour(1),p:.12},{t:hour(2),p:.22},{t:hour(3),p:.09}];
 const now=new Date('2026-10-21T22:15:00Z'),departure='2026-10-22T05:00:00Z';
-test('v1.8.1 versie en bestaande custom card behouden',()=>{
-  assert.match(src,/const EH_VERSION = '1.8.1'/);
+test('v1.8.2 versie en bestaande custom card behouden',()=>{
+  assert.match(src,/const EH_VERSION = '1.8.2'/);
   assert.equal(typeof registry.get('energiehuis-card'),'function');
 });
 test('Slim selecteert goedkope volledige uren; Direct selecteert chronologisch',()=>{
@@ -106,4 +106,43 @@ test('Laadpagina bevat scenariovergelijking en blijft een veilige simulatie',()=
  assert.match(html,/Slim laden 2.0/);
  assert.match(html,/geen laadcommando’s|geen laadcommando's|geen laadopdrachten/i);
  assert.match(html,/Zonneladen/);
+});
+
+
+test('Virtuele batterij 5/10/15 kWh knoppen reageren na render',()=>{
+  const listeners={};
+  const style={textContent:''};
+  const card=Object.create(EnergiehuisCard.prototype);
+  card.shadowRoot={
+    innerHTML:'',
+    querySelector:selector=>selector==='style'?style:null,
+    addEventListener(type,handler){(listeners[type]??=[]).push(handler);}
+  };
+  card.config=context.TEST.EH_DEFAULTS;
+  card._hass={states:{}};
+  card._view='battery';
+  card._historyKey='';
+  card._eh17BatteryLoading=true;
+  card.isConnected=true;
+  card._schedule=()=>{};
+  card._render();
+  assert.match(card.shadowRoot.innerHTML,/data-eh17-cap="5"/);
+  assert.equal(card._eh17Capacity,10);
+  const clickCapacity=n=>{
+    const button={
+      dataset:{eh17Cap:String(n)},
+      hasAttribute:name=>name==='data-eh17-cap'
+    };
+    const target={closest:selector=>selector.includes('data-eh17-cap')?button:null};
+    for(const handler of listeners.click??[])handler({target});
+  };
+  clickCapacity(5);
+  assert.equal(card._eh17Capacity,5);
+  card._render();
+  assert.match(card.shadowRoot.innerHTML,/data-eh17-cap="5" class="active"/);
+  clickCapacity(10);
+  assert.equal(card._eh17Capacity,10);
+  clickCapacity(15);
+  assert.equal(card._eh17Capacity,15);
+  assert.equal(card._eh17EventsReady,true);
 });

@@ -1,8 +1,8 @@
-/* Energiehuis v1.8.1 — herstelrelease Energy Insights & Cost Control.
+/* Energiehuis v1.8.2 — herstelrelease Energy Insights & Cost Control.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
  * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.8.1';
+const EH_VERSION = '1.8.2';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1578,7 +1578,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.8.1',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.8.2',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -1782,7 +1782,7 @@ function eh17Css(){
 
 function eh17Enhance(){
  const P=EnergiehuisCard.prototype;
- const oldCupra=P._cupraHtml,oldBattery=P._batteryHtml,oldCosts=P._costsHtml,oldMore=P._moreHtml,oldRender=P._render,oldConnected=P.connectedCallback;
+ const oldCupra=P._cupraHtml,oldBattery=P._batteryHtml,oldCosts=P._costsHtml,oldMore=P._moreHtml,oldRender=P._render;
  P._cupraHtml=function(h,c){
   const base=oldCupra.call(this,h,c);
   return base.replace("</main>",(this._view==="charge"?eh17Charge(h,c,this):eh17SessionsHtml(this,h,c))+"</main>");
@@ -1793,6 +1793,9 @@ function eh17Enhance(){
  P._render=function(){
   oldRender.call(this);
   if(!this.shadowRoot||!this.config||!this._hass)return;
+  // Lifecycle callbacks were captured when customElements.define() ran.
+  // Install battery/reset click handling when the card actually renders.
+  if(!this._eh17EventsReady)this._eh17BindControls();
   const style=this.shadowRoot.querySelector("style");
   if(style)style.textContent+="\n"+eh17Css();
   if(this._view==="overview"){
@@ -1845,8 +1848,7 @@ function eh17Enhance(){
   }catch(err){this._eh17ResetMsg="Opslaan is mislukt. De bestaande nulmeting is niet bevestigd: "+String(err?.message||"onbekende fout");this._eh17Confirm=null;}
   finally{this._eh17ResetSaving=false;this._schedule();}
  };
- P.connectedCallback=function(){
-   oldConnected.call(this);
+ P._eh17BindControls=function(){
    if(this._eh17EventsReady)return;
    this._eh17EventsReady=true;this._eh17Capacity=10;this._eh17ResetKeys=new Set();this._eh17ResetOpen=false;
    this.shadowRoot.addEventListener("change",e=>{
@@ -1854,7 +1856,7 @@ function eh17Enhance(){
      if(key){if(e.target.checked)this._eh17ResetKeys.add(key);else this._eh17ResetKeys.delete(key);this._eh17Confirm=null;return;}
    });
    this.shadowRoot.addEventListener("click",e=>{
-     const btn=e.target.closest("[data-eh17-cap], [data-eh17-toggle-reset], [data-eh17-preview], [data-eh17-cancel], [data-eh17-confirm]");
+     const btn=e.target?.closest?.("[data-eh17-cap], [data-eh17-toggle-reset], [data-eh17-preview], [data-eh17-cancel], [data-eh17-confirm]");
      if(!btn)return;
      if(btn.hasAttribute("data-eh17-cap")){this._eh17Capacity=Number(btn.dataset.eh17Cap);this._schedule();return;}
      if(btn.hasAttribute("data-eh17-toggle-reset")){this._eh17ResetOpen=!this._eh17ResetOpen;this._eh17Confirm=null;this._schedule();return;}
