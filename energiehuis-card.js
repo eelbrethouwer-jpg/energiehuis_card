@@ -1,8 +1,8 @@
-/* Energiehuis v1.8.1 — herstelrelease Energy Insights & Cost Control.
+/* Energiehuis v1.8.2 — herstelrelease Energy Insights & Cost Control.
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
  * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.8.1';
+const EH_VERSION = '1.8.2';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1578,7 +1578,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.8.1',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.8.2',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
