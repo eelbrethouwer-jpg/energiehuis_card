@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In voorbereiding: v1.9.1 — Batterijcapaciteit vergelijken
+
+Releasekandidaat: duidelijke 5/10/15-kWh-capaciteitsvergelijking, uitleg bij identieke scenario-uitkomsten, weergave van onvolledige meetdagen en expliciete scheiding van de **vaste 10-kWh-simulatie** bovenaan. Zie [v1.9.1 release notes](RELEASE_NOTES_v1.9.1_RC.md). Nog niet gepubliceerd.
+
 ## In ontwikkeling: v1.9.0-rc.1 – Mobiele App Experience
 
 Er is een aparte releasekandidaat met een mobiele werkbalk, compacte/ruime weergave, veilige offline-indicatie en een zichtbaarheidsgestuurde vaste onderste navigatie. **Nog geen zelfstandige installeerbare PWA**; de HACS-kaart blijft de ondersteunde basis. Bekijk [RC release notes](RELEASE_NOTES_v1.9.0_RC1.md) en [PWA-verkenning](PWA_SPIKE_v1.9.0.md).
