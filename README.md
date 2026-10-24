@@ -20,7 +20,7 @@ De virtuele-batterijcapaciteit (5, 10 of 15 kWh) is weer aanklikbaar. De keuze p
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis is **standaard alleen-lezen**. In de v1.10.0-draft kan na aparte Home Assistant- en veiligheidscontrole optioneel een bedieningspaneel worden ingeschakeld dat uitsluitend twee vooraf gekoppelde HA-scripts aanroept. Cupra Insights en de uurplanner blijven uitlezen en simuleren. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend. Zie [ontwerp en veiligheidsstappen](RELEASE_NOTES_v1.10.0_RC.md).
 
 ## Nieuw in v1.7.1 — Gas & Water hotfix
 
