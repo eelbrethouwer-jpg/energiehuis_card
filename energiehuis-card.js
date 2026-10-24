@@ -2277,6 +2277,12 @@ function eh19Css(){
     this._schedule();
    });
   }
+  // Disabling floating navigation must also stop an observer already running.
+  if(this.config.mobile_fixed_navigation===false&&this._eh19Observer){
+   this._eh19Observer.disconnect();
+   this._eh19Observer=null;
+   this._eh19Visible=true;
+  }
   // Fixed bottom bar only while the host card intersects the viewport.
   // Browsers without IntersectionObserver keep the existing sticky nav.
   if(this.isConnected&&this.config.mobile_fixed_navigation!==false&&
