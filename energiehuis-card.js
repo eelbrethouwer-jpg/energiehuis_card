@@ -2265,7 +2265,7 @@ function eh19Toolbar(card,h){
  return '<header class="eh19-appbar" aria-label="Mobiele Energiehuis-werkbalk">'+
   '<div class="eh19-appname"><small>ENERGIEHUIS</small><strong>'+ehEsc(names[card._view]||'Overzicht')+'</strong></div>'+
   '<span aria-live="polite" class="eh19-connection'+(offline?' eh19-offline':'')+'">'+
-  (offline?'Offline · mogelijk oude meetwaarden':'Alleen uitlezen')+'</span>'+
+  (offline?'Offline · mogelijk oude meetwaarden':(card._view==='charge'&&card.config?.charge_control_enabled===true?'HA-scriptbediening':'Alleen uitlezen'))+'</span>'+
   '<button type="button" data-eh19-density="toggle" class="eh19-density" aria-pressed="'+compact+
   '" aria-label="'+(compact?'Schakel naar ruime weergave':'Schakel naar compacte weergave')+'">'+
   (compact?'Compact':'Ruim')+'</button></header>';
@@ -2370,7 +2370,7 @@ function eh20ControlHtml(card,h,c){
  const pending=card._eh20Pending;
  const msg=card._eh20Message?'<p class="subtle" role="status">'+ehEsc(card._eh20Message)+'</p>':'';
  const confirmed=pending?'<div class="eh20-confirm" role="alertdialog" aria-label="Laadopdracht bevestigen"><strong>'+(pending==='start'?'Nu starten':'Laden pauzeren')+'?</strong><p>Je vraagt Home Assistant een gekoppeld script uit te voeren. Dit is geen garantie dat de auto daadwerkelijk gaat laden of pauzeren. Alfen Active Load Balancing blijft leidend.</p><div class="eh20-actions"><button type="button" data-eh20-cancel="1">Annuleren</button><button type="button" data-eh20-confirm="'+pending+'" '+(card._eh20Busy?'disabled':'')+'>Opdracht versturen</button></div></div>':'';
- return '<section class="cupra-card eh20-control"><div class="section-title">'+ehIcon('shield')+' Laadbediening <span class="eh20-state">'+(enabled?'Gekoppelde scripts':'Nog niet geactiveerd')+'</span></div>'+
+ return '<section class="cupra-card eh20-control"><div class="section-title">'+ehIcon('shield')+' Laadbediening <span class="eh20-state">'+(enabled?(start.ready&&pause.ready?'Scriptbediening gereed':'Configuratie onvolledig'):'Nog niet geactiveerd')+'</span></div>'+
  '<p class="subtle">De knoppen hieronder sturen alleen geconfigureerde Home Assistant-scripts aan. De simulatieknoppen en het laadplan worden niet automatisch uitgevoerd.</p>'+
  '<div class="eh20-actions"><button type="button" data-eh20-action="start" '+(!start.ready||card._eh20Busy?'disabled':'')+'>Nu laden</button><button type="button" data-eh20-action="pause" '+(!pause.ready||card._eh20Busy?'disabled':'')+'>Pauzeren</button></div>'+
  (!start.ready?'<p class="subtle">Starten: '+ehEsc(start.reason)+'</p>':'')+
@@ -2381,7 +2381,12 @@ function eh20ControlHtml(card,h,c){
  const P=EnergiehuisCard.prototype,previousCupra=P._cupraHtml,previousRender=P._render;
  P._cupraHtml=function(h,c){
   const html=previousCupra.call(this,h,c);
-  return this._view==='charge'?html.replace(/(<main\b[^>]*>)/,'$1'+eh20ControlHtml(this,h,c)):html;
+  if(this._view!=='charge')return html;
+  const content=c.charge_control_enabled===true?html
+   .replace('Alleen simulatie','Scriptmodus ingeschakeld')
+   .replace('Er worden geen laadcommando’s verstuurd.','De simulator verstuurt geen laadcommando’s. Alleen de afzonderlijk bevestigde HA-scripts kunnen een opdracht versturen.')
+   .replace('Geen laadopdrachten worden verzonden.','Dit laadplan verzendt geen opdrachten.'):html;
+  return content.replace(/(<main\b[^>]*>)/,'$1'+eh20ControlHtml(this,h,c));
  };
  P._eh20Send=async function(action){
   if(this._eh20Busy||this._eh20Pending!==action)return;
