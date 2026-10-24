@@ -7,8 +7,8 @@ const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,window:{cus
 vm.runInNewContext(src+'\n;globalThis.API18={EH18_CONTRACT_START,EH_DEFAULTS,eh18Unit,eh18Rows,eh18Health,eh18Costs,eh18Charge,eh18Graphic,eh18Insight,eh17Plan,EnergiehuisCard};',ctx);
 const {EH_DEFAULTS,eh18Unit,eh18Rows,eh18Health,eh18Costs,eh18Charge,eh18Graphic,eh18Insight,eh17Plan,EnergiehuisCard}=ctx.API18;
 const sensor=(state,unit)=>({state:String(state),attributes:{unit_of_measurement:unit}});
-test('v1.9.0 RC kaartnaam, basisconfiguratie en 6 navigatieschermen behouden',()=>{
- assert.match(src,/EH_VERSION = '1.9.0-rc.1'/);
+test('v1.9.1 RC kaartnaam, basisconfiguratie en 6 navigatieschermen behouden',()=>{
+ assert.match(src,/EH_VERSION = '1.9.1-rc.1'/);
  assert.ok(registry.get('energiehuis-card'));
  for(const page of ['overview','cupra','charge','battery','costs','more']) assert.match(src,new RegExp("'"+page+"'"));
  assert.equal(EH_DEFAULTS.gas,'sensor.gas_meter_gas');
