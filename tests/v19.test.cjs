@@ -103,3 +103,23 @@ test('navigatie blijft binnen zichtbare kaart en valt veilig terug',()=>{
  assert.equal(disconnected,true);
  delete browser.IntersectionObserver;
 });
+
+
+test('opt-out floating nav schakelt actieve observer direct weer uit',()=>{
+ const f=fakeCard(true);
+ let disconnected=false,observer=null;
+ browser.IntersectionObserver=class {
+  observe() {observer=this;}
+  disconnect() {disconnected=true;}
+ };
+ f.card.config.mobile_fixed_navigation=true;
+ f.card._render();
+ assert.ok(observer);
+ assert.equal(f.classes['eh19-float-nav'],true);
+ f.card.config.mobile_fixed_navigation=false;
+ f.card._render();
+ assert.equal(disconnected,true);
+ assert.equal(f.card._eh19Observer,null);
+ assert.equal(f.classes['eh19-float-nav'],false);
+ delete browser.IntersectionObserver;
+});
