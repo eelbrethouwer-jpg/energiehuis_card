@@ -1,5 +1,11 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: v1.9.0-rc.1 – Mobiele App Experience
+
+Er is een aparte releasekandidaat met een mobiele werkbalk, compacte/ruime weergave, veilige offline-indicatie en een zichtbaarheidsgestuurde vaste onderste navigatie. **Nog geen zelfstandige installeerbare PWA**; de HACS-kaart blijft de ondersteunde basis. Bekijk [RC release notes](RELEASE_NOTES_v1.9.0_RC1.md) en [PWA-verkenning](PWA_SPIKE_v1.9.0.md).
+
+Voor dashboards met meerdere Lovelace-kaarten kun je eventueel `mobile_fixed_navigation: false` gebruiken in de kaartconfiguratie. De standaardmodus blijft compact op mobiele schermen en de keuze wordt alleen als lokale UI-voorkeur bewaard.
+
 ## Hotfix v1.8.2 – selectie virtuele batterij
 
 De virtuele-batterijcapaciteit (5, 10 of 15 kWh) is weer aanklikbaar. De keuze past uitsluitend de simulatie aan. Zie [release notes v1.8.2](RELEASE_NOTES_v1.8.2.md).
