@@ -2,7 +2,7 @@
  * Alleen uitlezen: geen laadcommando's, geen tokens en geen externe requests.
  * Nieuw: praktijkanalyse van kilometers, SOC-verlies, temperatuur en actieradius.
  */
-const EH_VERSION = '1.9.0-rc.1';
+const EH_VERSION = '1.9.1-rc.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1349,7 +1349,7 @@ class EnergiehuisCard extends HTMLElement {
   const avoided=ehRead(h,c.battery_avoided_import_month),gridCost=ehRead(h,c.battery_grid_charge_cost_month),lost=ehRead(h,c.battery_lost_export_month);
   const tile=(label,value,icon,tone='blue',sub='')=>`<div class="subcard"><div class="sub-icon ${tone}">${ehIcon(icon)}</div><small>${ehEsc(label)}</small><strong>${value}</strong>${sub?`<span>${ehEsc(sub)}</span>`:''}</div>`;
   return `<main class="subpage">
-   <div class="subpage-head"><div><div class="eyebrow">Virtuele thuisbatterij · 10 kWh</div><h2>Batterij</h2><p>Volledige financiële businesscase op basis van je eigen energiestromen.</p></div><div class="soc-ring"><strong>${soc===null?'—':ehFmt(soc,0)+'%'}</strong><span>${ehEsc(kwh.text)}</span></div></div>
+   <div class="subpage-head"><div><div class="eyebrow">Vaste 10-kWh-simulatie uit Home Assistant</div><h2>Batterij</h2><p>De cijfers hieronder horen bij het 10-kWh-model. De vergelijking van 5, 10 en 15 kWh staat verderop.</p></div><div class="soc-ring"><strong>${soc===null?'—':ehFmt(soc,0)+'%'}</strong><span>${ehEsc(kwh.text)}</span></div></div>
    <div class="subgrid three">
     ${tile('Zonder batterij',without===null?'—':ehEuro2(without),'home','peach')}
     ${tile('Met batterij',withBattery===null?'—':ehEuro2(withBattery),'battery','blue')}
@@ -1591,7 +1591,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.9.0 RC',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.9.1 RC',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -1742,15 +1742,46 @@ function eh17BatteryFromStats(data,c,h,now){
  return bins.map(b=>({t:b.t,import:convert(bucket[c.import]?.totals?.get(b.key),c.import),export:convert(bucket[c.export]?.totals?.get(b.key),c.export)})).filter(x=>Number.isFinite(x.import)&&Number.isFinite(x.export));
 }
 
+function eh191BatteryScenario(days,cap,eff,buy,sell){
+ if(!Array.isArray(days)||days.length<2)return {capacity:cap,monthKwh:null,monthEuro:null,avgDayKwh:null};
+ const bounded=days.map(d=>Math.min(cap,Math.max(0,d.export),Math.max(0,d.import)/Math.max(.01,eff)));
+ const avgDayKwh=bounded.reduce((s,v)=>s+v,0)/bounded.length;
+ return {
+  capacity:cap,avgDayKwh,
+  monthKwh:avgDayKwh*eff*30.44,
+  monthEuro:avgDayKwh*(eff*buy-sell)*30.44
+ };
+}
 function eh17BatteryHtml(card,h,c){
  if(!card._eh17BatteryLoading&&(!card._eh17Battery||Date.now()-card._eh17Battery.at>30*60000))card._eh17LoadBattery();
- const data=card._eh17Battery,cap=card._eh17Capacity||10;
+ const data=card._eh17Battery,cap=[5,10,15].includes(Number(card._eh17Capacity))?Number(card._eh17Capacity):10;
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08;
- const days=data?.rows||[],usable=days.map(d=>Math.min(cap,d.export,d.import/Math.max(.01,eff))),mean=usable.length>=2?usable.reduce((s,v)=>s+v,0)/usable.length:null;
- const kwhMonth=mean===null?null:mean*eff*30.44;
- const savings=mean===null?null:mean*(eff*buy-sell)*30.44;
- return `<section class="subsection eh17-panel"><div class="eh17-title">${ehIcon("battery")} Virtuele batterij 2.0 · capaciteitsvergelijking</div><div class="eh17-choices">${[5,10,15].map(n=>`<button type="button" data-eh17-cap="${n}" class="${n===cap?"active":""}">${n} kWh</button>`).join("")}</div><div class="eh17-grid"><div><small>Ideaal herbruikbare zonne-energie/maand</small><strong>${kwhMonth===null?"—":ehFmt(kwhMonth,1)+" kWh"}</strong></div><div><small>Indicatief financieel potentieel/maand</small><strong>${ehEuro2(savings)}</strong></div><div><small>Volledige gemeten dagen</small><strong>${days.length} / 7</strong></div></div><p class="subtle">${data?.error?ehEsc(data.error)+" ":""}Bovengrens voor dagelijkse opslag uit gemeten export en latere import; geen daadwerkelijke batterijprestatie, terugverdientijd of uursimulatie. Aannames: ${ehFmt(eff*100,0)}% rondrendement, ${ehEuro2(buy)}/kWh vermeden inkoop en ${ehEuro2(sell)}/kWh gemiste teruglevering. Voor financiële nauwkeurigheid zijn historische uurprijzen en laadstrategie nodig. ${days.length<2?"Onvoldoende betrouwbare historie voor een maandindicatie.":""}</p></section>`;
+ const days=(data?.rows||[]).filter(d=>Number.isFinite(d.import)&&Number.isFinite(d.export));
+ const scenarios=[5,10,15].map(n=>eh191BatteryScenario(days,n,eff,buy,sell));
+ const selected=scenarios.find(s=>s.capacity===cap);
+ const valid=scenarios.every(s=>s.monthKwh!==null);
+ const equal=valid&&Math.abs(scenarios[2].monthKwh-scenarios[0].monthKwh)<.05;
+ const deltakwh=valid?selected.monthKwh-scenarios[0].monthKwh:null;
+ const deltaeur=valid?selected.monthEuro-scenarios[0].monthEuro:null;
+ const status=!data?(card._eh17BatteryLoading?"Recorder-statistieken ophalen…":"Geen meetgegevens ontvangen. Controleer Home Assistant Recorder en de P1 import-/exportsensoren.")
+  :data.error|| (days.length<2?"Nog onvoldoende complete meetdagen: minimaal twee dagen met geldige netafname én teruglevering nodig."
+  :equal?"Alle capaciteiten leveren volgens deze dagtotalen ongeveer dezelfde uitkomst op. Niet de accugrootte, maar de beschikbare teruglevering of netafname beperkt de berekening."
+  :"Grotere capaciteit kan extra energie verschuiven in de indicatieve dagtotalenberekening.");
+ const options=[5,10,15].map(n=>'<button type="button" data-eh17-cap="'+n+'" class="'+(n===cap?'active':'')+'" aria-pressed="'+(n===cap)+'" aria-label="Vergelijk '+n+' kWh">'+n+' kWh</button>').join("");
+ const rows=scenarios.map(s=>'<tr class="'+(s.capacity===cap?'eh191-chosen':'')+'"><th scope="row">'+s.capacity+' kWh'+(s.capacity===cap?' · geselecteerd':'')+'</th><td>'+(s.monthKwh===null?'—':ehFmt(s.monthKwh,1)+' kWh')+'</td><td>'+(s.monthEuro===null?'—':ehEuro2(s.monthEuro))+'</td></tr>').join("");
+ return '<section class="subsection eh17-panel" aria-label="Batterijcapaciteit vergelijken">'+
+  '<div class="eh17-title">'+ehIcon("battery")+' Virtuele batterij 2.0 · capaciteitsvergelijking</div>'+
+  '<p class="eh191-kicker">Gekozen batterij: <strong>'+cap+' kWh</strong> · alleen onderstaande scenariovergelijking verandert. De cijfers bovenaan komen uit de bestaande vaste 10-kWh-simulatie in Home Assistant.</p>'+
+  '<div class="eh17-choices" role="group" aria-label="Selecteer batterijcapaciteit">'+options+'</div>'+
+  '<div class="eh17-grid" aria-live="polite"><div><small>Bij '+cap+' kWh: indicatief hergebruik per maand</small><strong>'+(selected.monthKwh===null?'—':ehFmt(selected.monthKwh,1)+' kWh')+'</strong></div>'+
+  '<div><small>Bij '+cap+' kWh: indicatief financieel potentieel per maand</small><strong>'+(selected.monthEuro===null?'—':ehEuro2(selected.monthEuro))+'</strong></div>'+
+  '<div><small>Verschil met 5 kWh</small><strong>'+(deltakwh===null?'—':(Math.abs(deltakwh)<.05?'0,0':ehFmt(deltakwh,1))+' kWh')+'</strong><small>'+(deltaeur===null?'Niet te bepalen':(Math.abs(deltaeur)<.005?'€ 0,00':ehEuro2(deltaeur))+' per maand')+'</small></div>'+
+  '<div><small>Volledige gemeten dagen</small><strong>'+days.length+' / 7</strong></div></div>'+
+  '<div class="eh191-tablewrap"><table class="eh191-table"><caption>Capaciteiten naast elkaar op basis van dezelfde beschikbare meetdagen</caption><thead><tr><th scope="col">Capaciteit</th><th scope="col">Hergebruik/maand</th><th scope="col">Potentieel/maand</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+  '<p class="eh191-reason" role="status">'+ehEsc(status)+'</p>'+
+  '<p class="subtle">Dit is een theoretische bovengrens op basis van dagelijkse P1-netafname en -teruglevering; geen echte batterijprestatie, uurvolgorde, winstgarantie of terugverdientijd. Aannames: '+ehFmt(eff*100,0)+'% rondrendement, '+ehEuro2(buy)+'/kWh vermeden inkoop en '+ehEuro2(sell)+'/kWh gemiste teruglevering. Voor nauwkeurige kosten zijn historische uurprijzen en een laad-/ontlaadstrategie nodig.</p></section>';
 }
+
 
 function eh17ResetDefs(c,h){
  const source=h?eh171Sources(h,c):null;
@@ -1790,7 +1821,7 @@ function eh17MoreHtml(card,h,c){
 }
 
 function eh17Css(){
- return `.eh17-panel{margin-top:14px}.eh17-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:800;margin-bottom:13px;flex-wrap:wrap}.eh17-title .icon{width:19px;height:19px;color:#59dcbc}.eh17-tag{font-size:10px;color:#b7edda;border:1px solid #60cfa244;border-radius:20px;padding:4px 8px;font-weight:550}.eh17-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}.eh17-grid>div,.eh17-option{padding:12px;border-radius:12px;background:#0a2435;border:1px solid #98cde02b;display:flex;flex-direction:column;gap:5px}.eh17-grid p{margin:4px 0;color:#c6d9e6;line-height:1.5;font-size:12px}.eh17-grid strong{font-size:18px;color:#e9f9ff}.eh17-grid small,.eh17-option small{color:#a8cbdb;font-size:11px}.eh17-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.eh17-option strong{color:#4ae4b3;font-size:21px}.eh17-option span,.eh17-option em{font-size:11px;font-style:normal;color:#c3d7e6;line-height:1.5}.eh17-option em{color:#ffcc78}.eh17-good{color:#56e8b6!important}.eh17-track{height:9px;border-radius:20px;background:#264258;margin-top:15px;overflow:hidden}.eh17-track>div{height:100%;background:#4bd7b3;border-radius:20px}.eh17-session{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:10px;border-top:1px solid #9db9ca2f;padding:12px 0;font-size:12px}.eh17-session>span{display:flex;flex-direction:column;gap:6px}.eh17-session small{font-size:10px;color:#9fbccc}.eh17-choices{display:flex;gap:7px;margin-bottom:14px}.eh17-choices button,.eh17-primary,.eh17-confirm-actions button{font:inherit;color:#d5eaf5;background:#102c40;border:1px solid #6aadc34a;border-radius:9px;padding:10px 13px;cursor:pointer}.eh17-choices button.active,.eh17-primary{background:#15503f;color:#e9fff7;border-color:#53dfad}.eh17-health>div{display:flex;justify-content:space-between;gap:9px;padding:10px 0;border-bottom:1px solid #abc3d422;font-size:12px}.eh17-health span{display:flex;flex-direction:column;gap:4px}.eh17-health small{font-size:10px;color:#a7c0d3;overflow-wrap:anywhere}.eh17-health strong{white-space:nowrap}.eh17-collapse{background:transparent;color:#e8f7ff;border:none;font:inherit;font-size:15px;font-weight:750;cursor:pointer;padding:3px;display:flex;gap:9px;align-items:center}.eh17-reset-items{display:grid;gap:8px;margin:15px 0}.eh17-reset-row{display:flex;align-items:center;gap:10px;border:1px solid #aac3d431;border-radius:10px;background:#0a2636;padding:11px;font-size:12px;cursor:pointer}.eh17-reset-row>span{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}.eh17-reset-row>span:last-child{text-align:right}.eh17-reset-row small{font-size:10px;color:#a8bfcb;overflow-wrap:anywhere}.eh17-reset-row input{accent-color:#34d5a0;width:18px;height:18px}.eh17-confirm{margin-top:12px;padding:17px;border:1px solid #f0b86788;border-radius:13px;background:#3d2b1e;color:#ffe7c3;font-size:13px;line-height:1.55}.eh17-confirm-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.eh17-confirm-actions .danger{background:#9b422e;color:white;border-color:#eb966e}.eh17-primary:disabled{opacity:.5;cursor:not-allowed}.eh17-status{color:#9fe7ce;font-size:12px}.eh17-panel .cupra-safety{margin-top:12px}@media(max-width:550px){.eh17-options{grid-template-columns:1fr}.eh17-session{grid-template-columns:1fr 1fr}.eh17-session>span:last-child{grid-column:1/-1}.eh17-health strong{font-size:11px}.eh17-reset-row{align-items:flex-start}.eh17-reset-row>span:last-child{flex:0 0 34%}}`;
+ return `.eh191-kicker{font-size:12px;line-height:1.5;color:#c6d9e6;margin:0 0 12px}.eh191-kicker strong{color:#62e7bc}.eh191-reason{font-size:12px;line-height:1.5;color:#ffda9d;background:#76551626;border-left:3px solid #e7bc72;padding:10px 12px;border-radius:5px;margin:12px 0}.eh191-tablewrap{overflow-x:auto;margin:13px 0}.eh191-table{border-collapse:collapse;width:100%;font-size:12px;min-width:320px}.eh191-table caption{text-align:left;color:#a9c6d6;font-size:10px;padding:8px 0}.eh191-table th,.eh191-table td{text-align:left;border-bottom:1px solid #b6dae32c;padding:10px 7px}.eh191-table thead{color:#accdde}.eh191-table .eh191-chosen{background:#185a4336;color:#c9ffdf}.eh17-panel{margin-top:14px}.eh17-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:800;margin-bottom:13px;flex-wrap:wrap}.eh17-title .icon{width:19px;height:19px;color:#59dcbc}.eh17-tag{font-size:10px;color:#b7edda;border:1px solid #60cfa244;border-radius:20px;padding:4px 8px;font-weight:550}.eh17-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}.eh17-grid>div,.eh17-option{padding:12px;border-radius:12px;background:#0a2435;border:1px solid #98cde02b;display:flex;flex-direction:column;gap:5px}.eh17-grid p{margin:4px 0;color:#c6d9e6;line-height:1.5;font-size:12px}.eh17-grid strong{font-size:18px;color:#e9f9ff}.eh17-grid small,.eh17-option small{color:#a8cbdb;font-size:11px}.eh17-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.eh17-option strong{color:#4ae4b3;font-size:21px}.eh17-option span,.eh17-option em{font-size:11px;font-style:normal;color:#c3d7e6;line-height:1.5}.eh17-option em{color:#ffcc78}.eh17-good{color:#56e8b6!important}.eh17-track{height:9px;border-radius:20px;background:#264258;margin-top:15px;overflow:hidden}.eh17-track>div{height:100%;background:#4bd7b3;border-radius:20px}.eh17-session{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:10px;border-top:1px solid #9db9ca2f;padding:12px 0;font-size:12px}.eh17-session>span{display:flex;flex-direction:column;gap:6px}.eh17-session small{font-size:10px;color:#9fbccc}.eh17-choices{display:flex;gap:7px;margin-bottom:14px}.eh17-choices button,.eh17-primary,.eh17-confirm-actions button{font:inherit;color:#d5eaf5;background:#102c40;border:1px solid #6aadc34a;border-radius:9px;padding:10px 13px;cursor:pointer}.eh17-choices button.active,.eh17-primary{background:#15503f;color:#e9fff7;border-color:#53dfad}.eh17-health>div{display:flex;justify-content:space-between;gap:9px;padding:10px 0;border-bottom:1px solid #abc3d422;font-size:12px}.eh17-health span{display:flex;flex-direction:column;gap:4px}.eh17-health small{font-size:10px;color:#a7c0d3;overflow-wrap:anywhere}.eh17-health strong{white-space:nowrap}.eh17-collapse{background:transparent;color:#e8f7ff;border:none;font:inherit;font-size:15px;font-weight:750;cursor:pointer;padding:3px;display:flex;gap:9px;align-items:center}.eh17-reset-items{display:grid;gap:8px;margin:15px 0}.eh17-reset-row{display:flex;align-items:center;gap:10px;border:1px solid #aac3d431;border-radius:10px;background:#0a2636;padding:11px;font-size:12px;cursor:pointer}.eh17-reset-row>span{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}.eh17-reset-row>span:last-child{text-align:right}.eh17-reset-row small{font-size:10px;color:#a8bfcb;overflow-wrap:anywhere}.eh17-reset-row input{accent-color:#34d5a0;width:18px;height:18px}.eh17-confirm{margin-top:12px;padding:17px;border:1px solid #f0b86788;border-radius:13px;background:#3d2b1e;color:#ffe7c3;font-size:13px;line-height:1.55}.eh17-confirm-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.eh17-confirm-actions .danger{background:#9b422e;color:white;border-color:#eb966e}.eh17-primary:disabled{opacity:.5;cursor:not-allowed}.eh17-status{color:#9fe7ce;font-size:12px}.eh17-panel .cupra-safety{margin-top:12px}@media(max-width:550px){.eh17-options{grid-template-columns:1fr}.eh17-session{grid-template-columns:1fr 1fr}.eh17-session>span:last-child{grid-column:1/-1}.eh17-health strong{font-size:11px}.eh17-reset-row{align-items:flex-start}.eh17-reset-row>span:last-child{flex:0 0 34%}}`;
 }
 
 function eh17Enhance(){
