@@ -1,41 +1,41 @@
 # PROJECT_STATUS — Energiehuis
 
-> **Momentopname:** gecontroleerd op 23 oktober 2026 via GitHub. Dit is geen live statusmonitor. Bij een nieuwe chat altijd repository, releases, open pull requests en CI opnieuw controleren.
+> **Momentopname:** 24 oktober 2026. Bij een volgende chat opnieuw actuele GitHub main, releases, PR's en CI controleren. HACS-installatiestatus en iPhone-weergave zijn niet uit GitHub af te leiden.
 
-## Huidige status (geverifieerd op GitHub)
+## Gecontroleerde productiestatus
 - **Repository:** [eelbrethouwer-jpg/energiehuis_card](https://github.com/eelbrethouwer-jpg/energiehuis_card), standaardbranch `main`.
-- **Laatste gepubliceerde release:** [v1.8.1 – Energy Insights & Cost Control (herstelrelease)](https://github.com/eelbrethouwer-jpg/energiehuis_card/releases/tag/v1.8.1), gepubliceerd 22 oktober 2026.
-- **Main-commit vóór dit statusbestand:** `7effcaafc5` (afgekort).
-- **Waarom herstelrelease:** v1.8.0 wees volgens GitHub-release notes abusievelijk naar oudere code; v1.8.1 levert de bedoelde implementatie.
-- **HACS geïnstalleerde versie en werking in echte Home Assistant/iPhone:** **niet onafhankelijk bevestigd**.
-- **Open PR:** [#11 – Virtuele batterij 5/10/15 kWh-keuzeknoppen](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/11) (op 23 oktober 2026 open, niet gemerged). De laatst bekeken automatische PR-workflows waren geslaagd; praktijkgedrag na merge is nog niet geverifieerd.
+- **Laatste gepubliceerde release:** [V1.8.2 — batterijcapaciteitskeuze hersteld](https://github.com/eelbrethouwer-jpg/energiehuis_card/releases/tag/V1.8.2), 24 oktober 2026.
+- **Main-commit bij start v1.9:** `a5f0dcd1d815403140ae67a29cd1ea938d8933ab`.
+- **PR #11:** samengevoegd op 24 oktober 2026. Keuzeknoppen 5/10/15 kWh zitten in main.
+- **HACS daadwerkelijk bijgewerkt / gebruikersacceptatie van v1.8.2:** gebruiker meldt dat publicatie is gedaan; werking op iPhone / HA is niet onafhankelijk geverifieerd.
 
-## Functionele basis volgens code-/releasedocumentatie
-- Home Assistant Lovelace-kaart met P1, GoodWe PV, Alfen, Cupra, Zonneplan en optioneel gas/water.
-- v1.8.1: Gas Insights, Kosten & Besparing 2.0, Slim laden 2.1, Zonne-energie Insights, compactere mobiele interface en systeemcontrole.
-- Financieel budgetdoel: **€200 per maand**, met onderscheid tussen echte metingen, schattingen en vergelijkingsscenario's.
-- Eénfase **1×40 A** en Alfen-laadbeperkingen zijn belangrijke randvoorwaarden voor laadsimulaties.
-- **Veiligheidsgrens:** Energiehuis toont laadadvies en analyses, maar stuurt Alfen/Cupra niet aan. Bestaande Active Load Balancing en Home Assistant-backend blijven leidend.
+## In ontwikkeling
+- **v1.9.0-rc.1**, branch `feature/v1.9.0-mobile-app-experience`.
+- **Draft-PR:** [#12 – Mobile App Experience](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/12).
+- **Nieuwe code:** mobiele werkbalk, compacte/ruime bediening, responsieve dichtheid, conservatieve offlinewaarschuwing, zichtbaarheidsgestuurde vaste bottomnav met sticky fallback.
+- **Nieuwe tests:** `tests/v19.test.cjs`; bestaande v1.7 en v1.8 tests behouden.
+- **Documenten:** [release notes](RELEASE_NOTES_v1.9.0_RC1.md) en [standalone PWA verkenning](PWA_SPIKE_v1.9.0.md).
+- **CI / handmatige teststatus:** automatische GitHub-controles gestart; uiteindelijke uitkomst en mobiele praktijkwerking nog verifiëren.
+- **V1.9.0 NIET gereleased, nog niet geïnstalleerd in HACS.**
 
-## Belangrijkste bronbestanden
-- `energiehuis-card.js` – Lovelace-kaart.
-- `packages/` – optionele Home Assistant-helpers/configuratie; niet automatisch geïnstalleerd via HACS.
-- `tests/`, `.github/workflows/` – automatische tests.
-- `RELEASE_NOTES_v1.8.1.md` en [GitHub Releases](https://github.com/eelbrethouwer-jpg/energiehuis_card/releases).
-- `ROADMAP_v1.9.0_PWA.md` – **plan**, geen bewijs van implementatie.
+## Architectuurbesluit
+1. Bestaande HACS/Lovelace-kaart blijft werken en ontvangt zijn `hass`-context van Home Assistant.
+2. Alleen frontendwijzigingen in v1.9 RC; geen nieuwe Home Assistant-entiteiten, Alfen/Cupra-commando's of wijziging aan load balancing.
+3. Zelfstandige PWA is **nog geen werkend product**. Pas bouwen na aparte test van HTTPS, same-origin routing, Home Assistant-authenticatie, scopes en beperkte caching.
+4. Geen tokens of meetgeschiedenis in browseropslag; alleen compacte/ruime UI-voorkeur.
+5. `mobile_fixed_navigation: false` kan vaste navigatie uitschakelen bij meerdere dashboardkaarten.
 
-## Open punten en risico's
-1. Eerst [PR #11](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/11) beoordelen/afronden; na merge de 5/10/15 kWh-keuze in het echte dashboard testen.
-2. v1.8.1 in echte Home Assistant/HACS controleren: Gas Insights, zonne-energie, slim laden, kostenberekeningen en databronnen.
-3. [v1.9.0 standalone PWA-roadmap](ROADMAP_v1.9.0_PWA.md) pas uitwerken na ontwerpkeuze rond veilige authenticatie, hosting en huidig Lovelace-gedrag.
-4. Bepaalde README/releasenotes bevatten nog tekst van vóór de reeds gepubliceerde v1.8.1-release; actualiseren bij volgende documentatiewijziging.
-5. Home Assistant-entiteiten en werkelijke meetwaarden altijd controleren; niet afleiden uit eerdere gesprekken.
+## Acceptatiecriteria vóór release
+- CI volledig groen; code op PR diff inspecteren.
+- Op iPhone Safari en HA Companion: overzicht, Cupra, slim laden, batterij, kosten, meer, grafiekinteractie, scrollen en compact/ruim.
+- Android Chrome, kleine telefoonbreedtes en safe-area.
+- Scroll op dashboard met meerdere kaarten; floating-nav verschijnt niet buiten de kaart en overlapt geen bediening.
+- Offline/online indicator zonder ongefundeerde liveclaims.
+- 5/10/15 kWh-capaciteitselectie blijft bruikbaar.
+- Nogmaals controleren: echte sensordata versus simulaties, Zonneplan-contractstart 1 nov 2026, budgetdoel <€200/maand.
 
-## Eerstvolgende actie
-Controleer de nieuwste main, officiële release, PR #11 en CI. Prioriteit: stabiliteit, praktijkverificatie en eventueel herstel van batterijselectie. Bepaal pas daarna de volgende functionele release. Bestaande sensoren, laadbeveiliging en historische data ongemoeid laten.
+## Eerstvolgende stap
+PR #12 CI nakijken en eventuele regressies herstellen. Daarna praktijkacceptatie op mobiele apparaten. Pas bij groen resultaat en expliciete releasekeuze PR mergen en definitieve `v1.9.0` releasen.
 
-## ChatGPT-werkwijze
-- **Eén nieuwe chat per release, bugfix of afgebakende taak**, binnen het bestaande ChatGPT-project Energiehuis.
-- Nieuwe chat: lees dit statusbestand, inspecteer de actuele repository, toets aannames en maak concrete acceptatiecriteria.
-- Afronding: uitgevoerde wijzigingen, automatische en handmatige tests, onzekerheden, risico's, volgende actie en eventuele rollback. Statusbestand bijwerken als er daadwerkelijk iets is veranderd.
-- Onderscheid altijd **Geverifieerd / Aanname / Advies / Openstaand**. Releasekandidaat ≠ gepubliceerd ≠ geïnstalleerd.
+## Werkafspraak
+Eén chat per release/bugfix; nieuwe chat start met dit bestand en actuele GitHub-controle. Maak onderscheid tussen **gebouwd**, **automatisch getest**, **praktisch getest** en **gepubliceerd**.
