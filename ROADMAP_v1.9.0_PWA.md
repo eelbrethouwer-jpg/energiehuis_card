@@ -1,6 +1,6 @@
 # Energiehuis v1.9.0 – Standalone PWA Edition (roadmap)
 
-**Gepland na stabilisatie van v1.8.0; nog niet geïmplementeerd.**
+**Stand 24 oktober 2026:** de eerste mobiele Lovelace-releasekandidaat v1.9.0-rc.1 is op een aparte branch gebouwd. **De zelfstandige PWA is nog niet geïmplementeerd.** Zie [technische verkenning](PWA_SPIKE_v1.9.0.md) en [release notes](RELEASE_NOTES_v1.9.0_RC1.md).
 
 Doel: Energiehuis op iPhone en Android laten aanvoelen als een eigen installeerbare app.
 
