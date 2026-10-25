@@ -12,8 +12,8 @@ const {eh17Plan,eh17ResetState,eh17Hash,EnergiehuisCard}=context.TEST;
 const hour=i=>new Date(Date.UTC(2026,9,22,i)).toISOString();
 const prices=[{t:hour(0),p:.29},{t:hour(1),p:.12},{t:hour(2),p:.22},{t:hour(3),p:.09}];
 const now=new Date('2026-10-21T22:15:00Z'),departure='2026-10-22T05:00:00Z';
-test('v1.9.0 RC versie en bestaande custom card behouden',()=>{
-  assert.match(src,/const EH_VERSION = '1.9.0-rc.1'/);
+test('v1.9.1 RC versie en bestaande custom card behouden',()=>{
+  assert.match(src,/const EH_VERSION = '1.10.0-rc.1'/);
   assert.equal(typeof registry.get('energiehuis-card'),'function');
 });
 test('Slim selecteert goedkope volledige uren; Direct selecteert chronologisch',()=>{
