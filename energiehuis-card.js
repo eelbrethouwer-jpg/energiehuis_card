@@ -2401,7 +2401,7 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell){
  const priceComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
  if(mode==='smart'&&!priceComplete)return null;
  const threshold=priceComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
- let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,loss=0,lastEnd=null;
+ let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,lastEnd=null;
  const points=[];
  for(let i=0;i<rows.length;i++){
   const r=rows[i];
@@ -2422,7 +2422,7 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell){
   }
   // No same-hour solar charge/discharge or grid charge/discharge: P1 hourly
   // aggregation cannot establish within-hour event ordering.
-  if(chargedSolar===0&&mode==='smart'&&price<=threshold){
+  if(r.export===0&&mode==='smart'&&price<=threshold){
    const future=valid.filter(v=>v.t>r.t&&v.t<r.t+24*3600000);
    const futureMax=future.length?Math.max(...future.map(v=>v.price)):null;
    if(futureMax!==null&&futureMax*roundtrip>price+0.015){
@@ -2432,15 +2432,13 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell){
     benefit-=chargedGrid*price;
    }
   }
-  if(chargedSolar===0&&chargedGrid===0&&r.import>0){
+  if(r.export===0&&chargedGrid===0&&r.import>0){
    used=Math.max(0,Math.min(r.import,maxEnergy,soc*dischargeEff));
    soc-=used/dischargeEff;
    served+=used;
    benefit+=used*price;
   }
   pvCharge+=chargedSolar;
-  loss+=chargedSolar+chargedGrid-used-(soc-(points.length&&points[points.length-1].soc!==null?points[points.length-1].soc:0));
-  // Display SoC only; loss KPI computed independently from energy balance below.
   points.push({t:r.t,soc:Math.max(0,Math.min(cap,soc))});
  }
  const energyLoss=Math.max(0,pvCharge+gridCharge-served-soc);
