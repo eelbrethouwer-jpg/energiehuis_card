@@ -2617,16 +2617,32 @@ function eh20BatteryView(card,h,c){
  if(!data)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
  if(data.error)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p>'+baseNote+'</section>';
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
- const rows=data.rows,coverage=rows.filter(r=>r.import!==null).length;
+ const rows=data.rows,coverage=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
  if(mode==='smart'&&!ratesGood)mode='solar';
- const results=[5,10,15].map(size=>eh20Simulate(rows,size,eff,power,mode,buy,sell));
+ const profiles=[5,10,15].map(size=>eh21BatteryProfile(size,c));
+ const results=profiles.map(p=>eh20Simulate(rows,p.capacity,eff,power,mode,buy,sell,p));
  const selected=results.find(r=>r?.capacity===cap),canShow=coverage>=48&&selected;
- const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell);
- const table=results.map((r,i)=>'<tr class="'+([5,10,15][i]===cap?'eh20-active':'')+'"><th scope="row">'+[5,10,15][i]+' kWh</th><td>'+(!r||coverage<48?'—':ehFmt(r.served,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehEuro2(r.savings))+'</td></tr>').join('');
+ const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell,eh21BatteryProfile(cap,c));
+ const table=results.map((r,i)=>'<tr class="'+([5,10,15][i]===cap?'eh20-active':'')+'"><th scope="row"><button type="button" data-eh17-cap="'+[5,10,15][i]+'" aria-pressed="'+(cap===[5,10,15][i])+'">'+[5,10,15][i]+' kWh</button></th><td>'+(!r||coverage<48?'—':ehFmt(r.served,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehFmt(r.pvLimitedCapacity,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehEuro2(r.savings))+'</td></tr>').join('');
  const modes='<div class="eh20-modes" role="group" aria-label="Batterijlaadstrategie">'+
   '<button type="button" data-eh20-mode="solar" aria-pressed="'+(mode==='solar')+'" class="'+(mode==='solar'?'chosen':'')+'">Alleen zonne-overschot</button>'+
   '<button type="button" data-eh20-mode="smart" aria-pressed="'+(mode==='smart')+'" class="'+(mode==='smart'?'chosen':'')+'" '+(!ratesGood?'disabled title="Geen volledige historische uurprijzen"':'')+'>Zon + goedkoop netladen</button></div>';
+ const batteryChoices=coverage>=48?'<div class="eh21-scenarios" aria-label="Batterijprofielen vergelijken">'+results.map(s=>{
+  const chosen=s.capacity===cap,pct=Math.max(0,Math.min(100,s.peakSoc/s.usableCapacity*100));
+  return '<button type="button" class="eh21-scenario '+(chosen?'chosen':'')+'" data-eh17-cap="'+s.capacity+'" aria-pressed="'+chosen+'">'+
+  '<span class="eh21-label">'+s.capacity+' kWh <small>bruikbaar '+ehFmt(s.usableCapacity,1)+' kWh</small></span>'+
+  '<span class="eh21-fill" role="img" aria-label="Piekvulling '+ehFmt(pct,0)+' procent"><span style="width:'+pct.toFixed(1)+'%"></span></span>'+
+  '<span class="eh21-detail">Piek: '+ehFmt(s.peakSoc,1)+' kWh ('+ehFmt(pct,0)+'%)</span>'+
+  '<span class="eh21-detail">Zon gemist door volle accu: '+ehFmt(s.pvLimitedCapacity,1)+' kWh</span>'+
+  '<span class="eh21-detail">Netafname vermeden: '+ehFmt(s.served,1)+' kWh</span>'+
+  '</button>';
+ }).join('')+'</div>':'';
+ const currentProfile=profiles.find(p=>p.capacity===cap);
+ const profileNote=canShow?'<p class="eh20-meta"><strong>'+cap+' kWh gekozen</strong> · bruikbare opslag '+ehFmt(selected.usableCapacity,1)+' kWh · laadlimiet '+ehFmt(selected.chargeKw,1)+' kW · ontlaadlimiet '+ehFmt(selected.dischargeKw,1)+' kW.</p>'+
+  '<p class="eh20-meta">Van de theoretische teruglevering niet opgeslagen: '+ehFmt(selected.pvNotStored,1)+' kWh, waarvan '+ehFmt(selected.pvLimitedCapacity,1)+' kWh door een volle accu en '+ehFmt(selected.pvLimitedPower,1)+' kWh door beperkt laadvermogen.</p>':'';
+ const essentiallyEqual=canShow&&Math.abs(results[2].served-results[0].served)<.05&&Math.abs(results[2].pvLimitedCapacity-results[0].pvLimitedCapacity)<.05;
+ const equalityNote=essentiallyEqual?'<p class="eh20-notice">De capaciteiten geven in deze periode bijna dezelfde uitkomst. Het zonne-overschot, ontlaadmoment of laadvermogen kan de beperkende factor zijn; verschillen worden niet verzonnen.</p>':'';
  const blocks=canShow?'<div class="eh20-kpis"><div><small>Vermeden netafname</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
   '<div><small>Opgeslagen zonne-energie (ingang)</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
   '<div><small>Netladen (ingang)</small><strong>'+ehFmt(selected.gridCharge,1)+' kWh</strong></div>'+
@@ -2639,7 +2655,7 @@ function eh20BatteryView(card,h,c){
  const hourDetail=canShow?'<div class="eh20-hour-detail" aria-live="polite"><span>'+ehEsc(new Date(rows[picked].t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))+'</span>'+
   '<strong>Accu: '+(point?.soc===null?'Geen uurgegevens':ehFmt(point.soc,2)+' kWh')+'</strong>'+
   '<small>Netafname '+ehEnergy(point?.import)+' · Teruglevering '+ehEnergy(point?.export)+'</small>'+
-  '<small>PV-lading '+ehEnergy(point?.chargedSolar)+' · Netlading '+ehEnergy(point?.chargedGrid)+' · Ontladen '+ehEnergy(point?.discharged)+'</small>'+
+  '<small>PV-lading '+ehEnergy(point?.chargedSolar)+' · Netlading '+ehEnergy(point?.chargedGrid)+' · Ontladen '+ehEnergy(point?.discharged)+'</small>'+ '<small>Niet opgeslagen wegens vol '+ehEnergy(point?.fullRejected)+' · wegens laadlimiet '+ehEnergy(point?.powerRejected)+'</small>'+
   '<small>Historisch uurtarief '+(Number.isFinite(point?.price)?ehEuro2(point.price)+'/kWh':'niet beschikbaar')+'</small></div>':'';
  const hourPicker=canShow?'<label class="eh20-hour-picker"><span>Bekijk een uur op de grafiek</span><input type="range" data-eh20-hour="1" min="0" max="'+(rows.length-1)+'" step="1" value="'+picked+'" aria-label="Kies historisch batterij-uur"/></label>'+hourDetail:'';
  const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
@@ -2647,9 +2663,9 @@ function eh20BatteryView(card,h,c){
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
   '<h3>'+ehIcon('battery')+' Batterij Simulator 3.0 · historische uurvergelijking</h3>'+
   '<p class="eh20-meta">Uitsluitend simulatie · laatste 7 volledige dagen · '+ehEsc(coverageText)+'</p>'+
-  modes+blocks+hourPicker+
+  modes+batteryChoices+profileNote+equalityNote+blocks+hourPicker+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
-  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
+  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
   '<p class="subtle">'+ehEsc(priceText)+' Dit zijn scenarioresultaten voor beschikbare uren, geen maandprognoses of gerealiseerde eurobesparingen. Zonneplan is voor deze installatie pas vanaf 1 november 2026 leverancier.</p>'+baseNote+
   '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement, '+ehFmt(power,1)+' kW maximaal batterijvermogen, '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
