@@ -1,6 +1,10 @@
 # Energiehuis v1.10.0 RC — sessieherkenning en voorbereide live laadbediening
 
-**Status: concept / draft pull request. Niet mergen of in HACS installeren voordat CI, Home Assistant-entiteiten en veiligheid zijn gecontroleerd.**
+**Status: concept / draft pull request. Nog geen HACS-release. Scripts en fysieke Alfen-bediening zijn niet gevalideerd; handmatige start/pauze blijft standaard uitgeschakeld.**
+
+## Integratie met v1.9.1
+- De code is bijgewerkt op de huidige v1.9.1-mainbasis. De batterijcapaciteitsvergelijking en bijbehorende regressietests blijven aanwezig.
+- Interne versie: `1.10.0-rc.1` tot definitieve release.
 
 ## Cupra laadgeschiedenis
 - Bekijk maximaal 30 dagen detailhistorie (configureerbaar: charge_history_days 1–30).
@@ -16,7 +20,7 @@
 - Knoppen **Nu laden** en **Pauzeren** op Slim laden, met tweestapsbevestiging.
 - Standaard **uitgeschakeld**. Simulatieknoppen starten geen laadactie.
 - Alleen via twee expliciet gekoppelde Home Assistant-scripts, aan te roepen met script.turn_on.
-- Start vereist beschikbaar script, HA-verbinding en recente P1- en Alfen-vermogensmetingen (maximaal 15 minuten).
+- Start vereist beschikbaar script, HA-verbinding en recente P1- en Alfen-vermogensmetingen (maximaal 60 seconden).
 - Pauze kan ook bij stale P1-meting, mits HA en het pauzescript beschikbaar zijn.
 - Een ontvangen script-opdracht is geen bewijs dat de auto werkelijk is gestart of gestopt.
 - Geen wijzigingen aan Alfen-registers, laadstroom, load balancing of Cupra-instellingen vanuit frontend.
