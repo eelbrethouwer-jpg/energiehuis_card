@@ -1,8 +1,8 @@
-/* Energiehuis v1.11.0 — Batterij Simulator 3.0 en laadgeschiedenis.
+/* Energiehuis v1.12.0 RC — drie afzonderlijke batterijprofielen.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.11.0';
+const EH_VERSION = '1.12.0-rc.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1596,7 +1596,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.11.0',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.12.0 RC',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2516,55 +2516,78 @@ function eh20Percentile(values,q){
  const arr=values.slice().sort((a,b)=>a-b);
  return arr[Math.floor(Math.max(0,Math.min(1,q))*(arr.length-1))];
 }
-function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell){
- const chargeEff=Math.sqrt(roundtrip),dischargeEff=Math.sqrt(roundtrip);
- const valid=rows.filter(r=>r.import!==null&&r.export!==null);
- const priceComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
- if(mode==='smart'&&!priceComplete)return null;
- const threshold=priceComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
+function eh21BatteryProfile(cap,config={}){
+ const size=[5,10,15].includes(Number(cap))?Number(cap):10;
+ const defaultPower=eh17N(config.battery_sim_power_kw);
+ const power=defaultPower!==null&&defaultPower>0?defaultPower:3;
+ const option=(key,def,min,max)=>{
+  const n=eh17N(config['battery_'+size+'_'+key]);
+  return n!==null&&n>=min&&n<=max?n:def;
+ };
+ const usablePct=option('usable_pct',100,1,100);
+ return {capacity:size,usablePct,usableCapacity:size*usablePct/100,
+  chargeKw:option('charge_kw',power,.1,20),
+  dischargeKw:option('discharge_kw',power,.1,20)};
+}
+function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
+ const p=profile&&profile.capacity===cap?profile:eh21BatteryProfile(cap,{battery_sim_power_kw:power});
+ const usable=Math.max(.01,Math.min(cap,p.usableCapacity));
+ const chargeKw=p.chargeKw>0?p.chargeKw:3,dischargeKw=p.dischargeKw>0?p.dischargeKw:3;
+ const eta=Number.isFinite(roundtrip)&&roundtrip>0&&roundtrip<=1?roundtrip:.88;
+ const chargeEff=Math.sqrt(eta),dischargeEff=Math.sqrt(eta);
+ const valid=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)&&r.import>=0&&r.export>=0);
+ const pricesComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
+ if(mode==='smart'&&!pricesComplete)return null;
+ const threshold=pricesComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
  let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,lastEnd=null;
+ let pvNotStored=0,pvLimitedCapacity=0,pvLimitedPower=0,fullHours=0,peakSoc=0,energyAtGaps=0;
  const points=[];
- for(let i=0;i<rows.length;i++){
-  const r=rows[i];
-  if(r.import===null||r.export===null){
-   soc=0;lastEnd=null;points.push({t:r.t,soc:null});continue;
+ for(const r of rows){
+  if(!Number.isFinite(r.import)||!Number.isFinite(r.export)||r.import<0||r.export<0){
+   energyAtGaps+=soc;soc=0;lastEnd=null;points.push({t:r.t,soc:null});continue;
   }
-  // Do not carry unobservable state across gaps in Recorder.
-  if(lastEnd!==null&&lastEnd!==r.t)soc=0;
+  if(lastEnd!==null&&lastEnd!==r.t){energyAtGaps+=soc;soc=0;}
   lastEnd=r.end;
   const hours=Math.max(0,Math.min(1.1,(r.end-r.t)/3600000));
-  const maxEnergy=power*hours;
-  const price=priceComplete?r.price:buy;
-  let chargedSolar=0,chargedGrid=0,used=0;
+  const maxCharge=chargeKw*hours,maxDischarge=dischargeKw*hours;
+  const price=pricesComplete?r.price:buy;
+  let chargedSolar=0,chargedGrid=0,used=0,fullRejected=0,powerRejected=0;
   if(r.export>0){
-   chargedSolar=Math.max(0,Math.min(r.export,maxEnergy,(cap-soc)/chargeEff));
+   const space=Math.max(0,(usable-soc)/chargeEff);
+   chargedSolar=Math.max(0,Math.min(r.export,maxCharge,space));
    soc+=chargedSolar*chargeEff;
    lostExport+=chargedSolar*sell;
+   powerRejected=Math.max(0,r.export-Math.min(r.export,maxCharge));
+   fullRejected=Math.max(0,Math.min(r.export,maxCharge)-chargedSolar);
+   pvLimitedPower+=powerRejected;
+   pvLimitedCapacity+=fullRejected;
+   pvNotStored+=Math.max(0,r.export-chargedSolar);
+   if(fullRejected>1e-7)fullHours++;
   }
-  // No same-hour solar charge/discharge or grid charge/discharge: P1 hourly
-  // aggregation cannot establish within-hour event ordering.
+  // An hour with export cannot also discharge: hourly P1 samples lack event order.
   if(r.export===0&&mode==='smart'&&price<=threshold){
    const future=valid.filter(v=>v.t>r.t&&v.t<r.t+24*3600000);
-   const futureMax=future.length?Math.max(...future.map(v=>v.price)):null;
-   if(futureMax!==null&&futureMax*roundtrip>price+0.015){
-    chargedGrid=Math.max(0,Math.min(maxEnergy,(cap-soc)/chargeEff));
+   const high=future.length?Math.max(...future.map(v=>v.price)):null;
+   if(high!==null&&high*eta>price+.015){
+    chargedGrid=Math.max(0,Math.min(maxCharge,(usable-soc)/chargeEff));
     soc+=chargedGrid*chargeEff;
     gridCharge+=chargedGrid;
     benefit-=chargedGrid*price;
    }
   }
   if(r.export===0&&chargedGrid===0&&r.import>0){
-   used=Math.max(0,Math.min(r.import,maxEnergy,soc*dischargeEff));
-   soc-=used/dischargeEff;
-   served+=used;
-   benefit+=used*price;
+   used=Math.max(0,Math.min(r.import,maxDischarge,soc*dischargeEff));
+   soc-=used/dischargeEff;served+=used;benefit+=used*price;
   }
+  soc=Math.max(0,Math.min(usable,soc));peakSoc=Math.max(peakSoc,soc);
   pvCharge+=chargedSolar;
-  points.push({t:r.t,soc:Math.max(0,Math.min(cap,soc)),chargedSolar,chargedGrid,discharged:used,import:r.import,export:r.export,price:r.price});
+  points.push({t:r.t,soc,chargedSolar,chargedGrid,discharged:used,
+   import:r.import,export:r.export,price:r.price,fullRejected,powerRejected});
  }
- return {capacity:cap,mode,points,pvCharge,gridCharge,served,endingSoc:soc,
-  savings:benefit-lostExport,
-  assumedPrices:!priceComplete,priceComplete,
+ return {capacity:cap,usableCapacity:usable,usablePct:usable/cap*100,chargeKw,dischargeKw,
+  mode,points,pvCharge,gridCharge,served,endingSoc:soc,peakSoc,pvNotStored,
+  pvLimitedCapacity,pvLimitedPower,fullHours,unobservedResetKwh:energyAtGaps,
+  savings:benefit-lostExport,assumedPrices:!pricesComplete,priceComplete:pricesComplete,
   hours:valid.length,missingHours:rows.length-valid.length};
 }
 function eh20Chart(result,pickedIndex){
