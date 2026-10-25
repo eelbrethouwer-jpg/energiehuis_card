@@ -1,10 +1,14 @@
 # Energiehuis — Home Assistant dashboardkaart
 
-## In ontwikkeling: v1.11.0-rc.1 — Batterij Simulator 3.0
+## In ontwikkeling: v1.11.0-rc.1 – Batterij Simulator 3.0
 
-**Draft pull request #15** bouwt een chronologisch batterij-uurmodel voor 5, 10 en 15 kWh uit Home Assistant Recorder. Nieuwe SOC-grafiek (met aanklikbaar/verschuifbaar uur), P1-import/export per uur, vergelijking van zonneladen met optioneel slim netladen wanneer alle historische prijsuren beschikbaar zijn. De resultaten zijn **hypothetische scenario's**: geen echte besparing en geen actief batterij-/Alfen-commando.
+Op basis van de gepubliceerde **v1.10.0** met behoud van de verbeterde Alfen-laadgeschiedenis en de standaard **uitgeschakelde** optionele scriptbediening. De nieuwe batterijpagina leest maximaal zeven volledige dagen P1-uurgegevens en toont een interactieve SOC-uurcurve, capaciteit 5/10/15 kWh, zonneladen en (alleen bij complete historische prijzen) theoretisch goedkoop netladen. Historische euroresultaten blijven **scenario's**, geen gerealiseerde besparingen.
 
-Home Assistant: **nog geen YAML nodig**, mits `sensor.p1_meter_energie_import` en `sensor.p1_meter_energie_export` langetermijn-uurstatistieken hebben. Controleer de [gegevenshandleiding](BATTERY_SIMULATOR_3_DATA.md) en [v1.11.0 release notes](RELEASE_NOTES_v1.11.0_RC.md). PR #14 voor v1.10.0 laadsessies staat los en moet vóór het samenvoegen worden afgestemd.
+Lees [v1.11.0 release notes](RELEASE_NOTES_v1.11.0_RC.md) en [Home Assistant-datacontrole](BATTERY_SIMULATOR_3_DATA.md). Geen extra YAML nodig als bestaande P1-uurstatistieken beschikbaar zijn. De nieuwe functies staan nog in [draft PR #15](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/15), niet in een HACS-release.
+
+## In ontwikkeling: v1.10.0-rc.1 – Alfen-laadsessies en optionele scriptbediening
+
+Meer nauwkeurige Alfen-laadgeschiedenis en voorbereid, **standaard uitgeschakeld** bedieningspaneel. Eerste acceptatie: verbeterde meetdiagnose en veilige standaardstand zonder fysieke aansturing. Vóór activeren is een aparte Home Assistant-script-/Active-Load-Balancing-controle verplicht. Zie [v1.10.0 RC release notes](RELEASE_NOTES_v1.10.0_RC.md). Deze uitbreiding behoudt de bestaande v1.9.1-batterijvergelijking.
 
 ## In voorbereiding: v1.9.1 — Batterijcapaciteit vergelijken
 
@@ -30,7 +34,7 @@ De virtuele-batterijcapaciteit (5, 10 of 15 kWh) is weer aanklikbaar. De keuze p
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis blijft voor laadsturing **alleen-lezen**. Cupra Insights analyseert bestaande Home Assistant-, Cupra- en Alfen-data en verstuurt geen laadcommando's. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend.
+> Energiehuis blijft standaard **alleen-lezen**. In v1.10.0 is de apart configureerbare Home Assistant-scriptbediening standaard uitgeschakeld en mag deze uitsluitend na een geverifieerde backendveiligheidscontrole worden ingeschakeld. De simulatorknoppen verzenden nooit laadopdrachten. Alfen Active Load Balancing en de 1×40A-netaansluiting blijven leidend. Zie [veiligheidsvereisten](RELEASE_NOTES_v1.10.0_RC.md).
 
 ## Nieuw in v1.7.1 — Gas & Water hotfix
 
