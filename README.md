@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: Energiehuis v1.12.0 – drie afzonderlijke batterijen (RC)
+
+Nieuwe capaciteitsvergelijking [concept-PR #17](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/17): afzonderlijke 5/10/15-kWh SOC, optioneel per capaciteit instelbare laad-/ontlaadvermogens, bruikbare opslag en theoretische niet opgeslagen zonne-energie door volle batterij of laadlimiet. **Geen Home Assistant-YAML nodig**, geen laadbesturing. Zie [release notes](RELEASE_NOTES_v1.12.0_RC.md) en [testinstructies](BATTERY_PROFILES_V112.md). Niet gepubliceerd in HACS.
+
 ## v1.11.0 – Batterij Simulator 3.0 (versiecorrectie in voorbereiding)
 
 Op basis van de gepubliceerde **v1.10.0** met behoud van de verbeterde Alfen-laadgeschiedenis en de standaard **uitgeschakelde** optionele scriptbediening. De nieuwe batterijpagina leest maximaal zeven volledige dagen P1-uurgegevens en toont een interactieve SOC-uurcurve, capaciteit 5/10/15 kWh, zonneladen en (alleen bij complete historische prijzen) theoretisch goedkoop netladen. Historische euroresultaten blijven **scenario's**, geen gerealiseerde besparingen.

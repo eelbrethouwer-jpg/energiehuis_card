@@ -1,8 +1,8 @@
-/* Energiehuis v1.11.0 — Batterij Simulator 3.0 en laadgeschiedenis.
+/* Energiehuis v1.12.0 RC — drie afzonderlijke batterijprofielen.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.11.0';
+const EH_VERSION = '1.12.0-rc.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1596,7 +1596,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.11.0',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.12.0 RC',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2516,55 +2516,78 @@ function eh20Percentile(values,q){
  const arr=values.slice().sort((a,b)=>a-b);
  return arr[Math.floor(Math.max(0,Math.min(1,q))*(arr.length-1))];
 }
-function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell){
- const chargeEff=Math.sqrt(roundtrip),dischargeEff=Math.sqrt(roundtrip);
- const valid=rows.filter(r=>r.import!==null&&r.export!==null);
- const priceComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
- if(mode==='smart'&&!priceComplete)return null;
- const threshold=priceComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
+function eh21BatteryProfile(cap,config={}){
+ const size=[5,10,15].includes(Number(cap))?Number(cap):10;
+ const defaultPower=eh17N(config.battery_sim_power_kw);
+ const power=defaultPower!==null&&defaultPower>0?defaultPower:3;
+ const option=(key,def,min,max)=>{
+  const n=eh17N(config['battery_'+size+'_'+key]);
+  return n!==null&&n>=min&&n<=max?n:def;
+ };
+ const usablePct=option('usable_pct',100,1,100);
+ return {capacity:size,usablePct,usableCapacity:size*usablePct/100,
+  chargeKw:option('charge_kw',power,.1,20),
+  dischargeKw:option('discharge_kw',power,.1,20)};
+}
+function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
+ const p=profile&&profile.capacity===cap?profile:eh21BatteryProfile(cap,{battery_sim_power_kw:power});
+ const usable=Math.max(.01,Math.min(cap,p.usableCapacity));
+ const chargeKw=p.chargeKw>0?p.chargeKw:3,dischargeKw=p.dischargeKw>0?p.dischargeKw:3;
+ const eta=Number.isFinite(roundtrip)&&roundtrip>0&&roundtrip<=1?roundtrip:.88;
+ const chargeEff=Math.sqrt(eta),dischargeEff=Math.sqrt(eta);
+ const valid=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)&&r.import>=0&&r.export>=0);
+ const pricesComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
+ if(mode==='smart'&&!pricesComplete)return null;
+ const threshold=pricesComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
  let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,lastEnd=null;
+ let pvNotStored=0,pvLimitedCapacity=0,pvLimitedPower=0,fullHours=0,peakSoc=0,energyAtGaps=0;
  const points=[];
- for(let i=0;i<rows.length;i++){
-  const r=rows[i];
-  if(r.import===null||r.export===null){
-   soc=0;lastEnd=null;points.push({t:r.t,soc:null});continue;
+ for(const r of rows){
+  if(!Number.isFinite(r.import)||!Number.isFinite(r.export)||r.import<0||r.export<0){
+   energyAtGaps+=soc;soc=0;lastEnd=null;points.push({t:r.t,soc:null});continue;
   }
-  // Do not carry unobservable state across gaps in Recorder.
-  if(lastEnd!==null&&lastEnd!==r.t)soc=0;
+  if(lastEnd!==null&&lastEnd!==r.t){energyAtGaps+=soc;soc=0;}
   lastEnd=r.end;
   const hours=Math.max(0,Math.min(1.1,(r.end-r.t)/3600000));
-  const maxEnergy=power*hours;
-  const price=priceComplete?r.price:buy;
-  let chargedSolar=0,chargedGrid=0,used=0;
+  const maxCharge=chargeKw*hours,maxDischarge=dischargeKw*hours;
+  const price=pricesComplete?r.price:buy;
+  let chargedSolar=0,chargedGrid=0,used=0,fullRejected=0,powerRejected=0;
   if(r.export>0){
-   chargedSolar=Math.max(0,Math.min(r.export,maxEnergy,(cap-soc)/chargeEff));
+   const space=Math.max(0,(usable-soc)/chargeEff);
+   chargedSolar=Math.max(0,Math.min(r.export,maxCharge,space));
    soc+=chargedSolar*chargeEff;
    lostExport+=chargedSolar*sell;
+   powerRejected=Math.max(0,r.export-Math.min(r.export,maxCharge));
+   fullRejected=Math.max(0,Math.min(r.export,maxCharge)-chargedSolar);
+   pvLimitedPower+=powerRejected;
+   pvLimitedCapacity+=fullRejected;
+   pvNotStored+=Math.max(0,r.export-chargedSolar);
+   if(fullRejected>1e-7)fullHours++;
   }
-  // No same-hour solar charge/discharge or grid charge/discharge: P1 hourly
-  // aggregation cannot establish within-hour event ordering.
+  // An hour with export cannot also discharge: hourly P1 samples lack event order.
   if(r.export===0&&mode==='smart'&&price<=threshold){
    const future=valid.filter(v=>v.t>r.t&&v.t<r.t+24*3600000);
-   const futureMax=future.length?Math.max(...future.map(v=>v.price)):null;
-   if(futureMax!==null&&futureMax*roundtrip>price+0.015){
-    chargedGrid=Math.max(0,Math.min(maxEnergy,(cap-soc)/chargeEff));
+   const high=future.length?Math.max(...future.map(v=>v.price)):null;
+   if(high!==null&&high*eta>price+.015){
+    chargedGrid=Math.max(0,Math.min(maxCharge,(usable-soc)/chargeEff));
     soc+=chargedGrid*chargeEff;
     gridCharge+=chargedGrid;
     benefit-=chargedGrid*price;
    }
   }
   if(r.export===0&&chargedGrid===0&&r.import>0){
-   used=Math.max(0,Math.min(r.import,maxEnergy,soc*dischargeEff));
-   soc-=used/dischargeEff;
-   served+=used;
-   benefit+=used*price;
+   used=Math.max(0,Math.min(r.import,maxDischarge,soc*dischargeEff));
+   soc-=used/dischargeEff;served+=used;benefit+=used*price;
   }
+  soc=Math.max(0,Math.min(usable,soc));peakSoc=Math.max(peakSoc,soc);
   pvCharge+=chargedSolar;
-  points.push({t:r.t,soc:Math.max(0,Math.min(cap,soc)),chargedSolar,chargedGrid,discharged:used,import:r.import,export:r.export,price:r.price});
+  points.push({t:r.t,soc,chargedSolar,chargedGrid,discharged:used,
+   import:r.import,export:r.export,price:r.price,fullRejected,powerRejected});
  }
- return {capacity:cap,mode,points,pvCharge,gridCharge,served,endingSoc:soc,
-  savings:benefit-lostExport,
-  assumedPrices:!priceComplete,priceComplete,
+ return {capacity:cap,usableCapacity:usable,usablePct:usable/cap*100,chargeKw,dischargeKw,
+  mode,points,pvCharge,gridCharge,served,endingSoc:soc,peakSoc,pvNotStored,
+  pvLimitedCapacity,pvLimitedPower,fullHours,unobservedResetKwh:energyAtGaps,
+  savings:benefit-lostExport,assumedPrices:!pricesComplete,priceComplete:pricesComplete,
   hours:valid.length,missingHours:rows.length-valid.length};
 }
 function eh20Chart(result,pickedIndex){
@@ -2574,16 +2597,16 @@ function eh20Chart(result,pickedIndex){
  for(let i=0;i<points.length;i++){
   const p=points[i];
   if(p.soc===null){if(current.length)segments.push(current);current=[];continue;}
-  current.push(((i/Math.max(1,points.length-1))*640).toFixed(1)+','+(117-(p.soc/result.capacity)*100).toFixed(1));
+  current.push(((i/Math.max(1,points.length-1))*640).toFixed(1)+','+(117-(p.soc/(result.usableCapacity||result.capacity))*100).toFixed(1));
  }
  if(current.length)segments.push(current);
  const lines=segments.map(s=>'<polyline fill="none" stroke="#54e8b7" stroke-width="3" stroke-linejoin="round" points="'+s.join(' ')+'"/>').join('');
  const selected=points[Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))];
- const marker=selected?.soc!==null?'<circle cx="'+((Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))/Math.max(1,points.length-1))*640).toFixed(1)+'" cy="'+(117-(selected.soc/result.capacity)*100).toFixed(1)+'" r="6" fill="#ffcc65" stroke="#fff" stroke-width="2"/>':'';
- return '<svg class="eh20-soc-chart" viewBox="0 0 640 144" role="img" aria-label="Historische berekende batterijvulling per uur, 0 tot '+result.capacity+' kWh">'+
+ const marker=selected?.soc!==null?'<circle cx="'+((Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))/Math.max(1,points.length-1))*640).toFixed(1)+'" cy="'+(117-(selected.soc/(result.usableCapacity||result.capacity))*100).toFixed(1)+'" r="6" fill="#ffcc65" stroke="#fff" stroke-width="2"/>':'';
+ return '<svg class="eh20-soc-chart" viewBox="0 0 640 144" role="img" aria-label="Historische berekende batterijvulling per uur, 0 tot '+(result.usableCapacity||result.capacity)+' kWh">'+
   '<line x1="0" y1="117" x2="640" y2="117" stroke="#849cab" stroke-width="1"/>'+
   '<line x1="0" y1="17" x2="640" y2="17" stroke="#849cab" stroke-width="1" stroke-dasharray="5 5"/>'+
-  '<text x="3" y="13" fill="#bdd5e4" font-size="11">'+result.capacity+' kWh</text>'+
+  '<text x="3" y="13" fill="#bdd5e4" font-size="11"'+(result.usableCapacity||result.capacity)+' kWh</text>'+
   '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
 }
 function eh20BatteryView(card,h,c){
@@ -2594,16 +2617,31 @@ function eh20BatteryView(card,h,c){
  if(!data)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
  if(data.error)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p>'+baseNote+'</section>';
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
- const rows=data.rows,coverage=rows.filter(r=>r.import!==null).length;
+ const rows=data.rows,coverage=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
  if(mode==='smart'&&!ratesGood)mode='solar';
- const results=[5,10,15].map(size=>eh20Simulate(rows,size,eff,power,mode,buy,sell));
+ const profiles=[5,10,15].map(size=>eh21BatteryProfile(size,c));
+ const results=profiles.map(p=>eh20Simulate(rows,p.capacity,eff,power,mode,buy,sell,p));
  const selected=results.find(r=>r?.capacity===cap),canShow=coverage>=48&&selected;
- const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell);
- const table=results.map((r,i)=>'<tr class="'+([5,10,15][i]===cap?'eh20-active':'')+'"><th scope="row">'+[5,10,15][i]+' kWh</th><td>'+(!r||coverage<48?'—':ehFmt(r.served,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehEuro2(r.savings))+'</td></tr>').join('');
+ const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell,eh21BatteryProfile(cap,c));
+ const table=results.map((r,i)=>'<tr class="'+([5,10,15][i]===cap?'eh20-active':'')+'"><th scope="row"><button type="button" data-eh17-cap="'+[5,10,15][i]+'" aria-pressed="'+(cap===[5,10,15][i])+'">'+[5,10,15][i]+' kWh</button></th><td>'+(!r||coverage<48?'—':ehFmt(r.served,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehFmt(r.pvLimitedCapacity,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehEuro2(r.savings))+'</td></tr>').join('');
  const modes='<div class="eh20-modes" role="group" aria-label="Batterijlaadstrategie">'+
   '<button type="button" data-eh20-mode="solar" aria-pressed="'+(mode==='solar')+'" class="'+(mode==='solar'?'chosen':'')+'">Alleen zonne-overschot</button>'+
   '<button type="button" data-eh20-mode="smart" aria-pressed="'+(mode==='smart')+'" class="'+(mode==='smart'?'chosen':'')+'" '+(!ratesGood?'disabled title="Geen volledige historische uurprijzen"':'')+'>Zon + goedkoop netladen</button></div>';
+ const batteryChoices=coverage>=48?'<div class="eh21-scenarios" aria-label="Batterijprofielen vergelijken">'+results.map(s=>{
+  const chosen=s.capacity===cap,pct=Math.max(0,Math.min(100,s.peakSoc/s.usableCapacity*100));
+  return '<button type="button" class="eh21-scenario '+(chosen?'chosen':'')+'" data-eh17-cap="'+s.capacity+'" aria-pressed="'+chosen+'">'+
+  '<span class="eh21-label">'+s.capacity+' kWh <small>bruikbaar '+ehFmt(s.usableCapacity,1)+' kWh</small></span>'+
+  '<span class="eh21-fill" role="img" aria-label="Piekvulling '+ehFmt(pct,0)+' procent"><span style="width:'+pct.toFixed(1)+'%"></span></span>'+
+  '<span class="eh21-detail">Piek: '+ehFmt(s.peakSoc,1)+' kWh ('+ehFmt(pct,0)+'%)</span>'+
+  '<span class="eh21-detail">Zon gemist door volle accu: '+ehFmt(s.pvLimitedCapacity,1)+' kWh</span>'+
+  '<span class="eh21-detail">Netafname vermeden: '+ehFmt(s.served,1)+' kWh</span>'+
+  '</button>';
+ }).join('')+'</div>':'';
+ const profileNote=canShow?'<p class="eh20-meta"><strong>'+cap+' kWh gekozen</strong> · bruikbare opslag '+ehFmt(selected.usableCapacity,1)+' kWh · laadlimiet '+ehFmt(selected.chargeKw,1)+' kW · ontlaadlimiet '+ehFmt(selected.dischargeKw,1)+' kW.</p>'+
+  '<p class="eh20-meta">Van de theoretische teruglevering niet opgeslagen: '+ehFmt(selected.pvNotStored,1)+' kWh, waarvan '+ehFmt(selected.pvLimitedCapacity,1)+' kWh door een volle accu en '+ehFmt(selected.pvLimitedPower,1)+' kWh door beperkt laadvermogen.</p>':'';
+ const essentiallyEqual=canShow&&Math.abs(results[2].served-results[0].served)<.05&&Math.abs(results[2].pvLimitedCapacity-results[0].pvLimitedCapacity)<.05;
+ const equalityNote=essentiallyEqual?'<p class="eh20-notice">De capaciteiten geven in deze periode bijna dezelfde uitkomst. Het zonne-overschot, ontlaadmoment of laadvermogen kan de beperkende factor zijn; verschillen worden niet verzonnen.</p>':'';
  const blocks=canShow?'<div class="eh20-kpis"><div><small>Vermeden netafname</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
   '<div><small>Opgeslagen zonne-energie (ingang)</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
   '<div><small>Netladen (ingang)</small><strong>'+ehFmt(selected.gridCharge,1)+' kWh</strong></div>'+
@@ -2616,7 +2654,7 @@ function eh20BatteryView(card,h,c){
  const hourDetail=canShow?'<div class="eh20-hour-detail" aria-live="polite"><span>'+ehEsc(new Date(rows[picked].t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))+'</span>'+
   '<strong>Accu: '+(point?.soc===null?'Geen uurgegevens':ehFmt(point.soc,2)+' kWh')+'</strong>'+
   '<small>Netafname '+ehEnergy(point?.import)+' · Teruglevering '+ehEnergy(point?.export)+'</small>'+
-  '<small>PV-lading '+ehEnergy(point?.chargedSolar)+' · Netlading '+ehEnergy(point?.chargedGrid)+' · Ontladen '+ehEnergy(point?.discharged)+'</small>'+
+  '<small>PV-lading '+ehEnergy(point?.chargedSolar)+' · Netlading '+ehEnergy(point?.chargedGrid)+' · Ontladen '+ehEnergy(point?.discharged)+'</small>'+ '<small>Niet opgeslagen wegens vol '+ehEnergy(point?.fullRejected)+' · wegens laadlimiet '+ehEnergy(point?.powerRejected)+'</small>'+
   '<small>Historisch uurtarief '+(Number.isFinite(point?.price)?ehEuro2(point.price)+'/kWh':'niet beschikbaar')+'</small></div>':'';
  const hourPicker=canShow?'<label class="eh20-hour-picker"><span>Bekijk een uur op de grafiek</span><input type="range" data-eh20-hour="1" min="0" max="'+(rows.length-1)+'" step="1" value="'+picked+'" aria-label="Kies historisch batterij-uur"/></label>'+hourDetail:'';
  const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
@@ -2624,15 +2662,15 @@ function eh20BatteryView(card,h,c){
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
   '<h3>'+ehIcon('battery')+' Batterij Simulator 3.0 · historische uurvergelijking</h3>'+
   '<p class="eh20-meta">Uitsluitend simulatie · laatste 7 volledige dagen · '+ehEsc(coverageText)+'</p>'+
-  modes+blocks+hourPicker+
+  modes+batteryChoices+profileNote+equalityNote+blocks+hourPicker+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
-  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
+  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
   '<p class="subtle">'+ehEsc(priceText)+' Dit zijn scenarioresultaten voor beschikbare uren, geen maandprognoses of gerealiseerde eurobesparingen. Zonneplan is voor deze installatie pas vanaf 1 november 2026 leverancier.</p>'+baseNote+
-  '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement, '+ehFmt(power,1)+' kW maximaal batterijvermogen, '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
+  '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; per batterij een afzonderlijke laad-/ontlaadlimiet (standaard '+ehFmt(power,1)+' kW) en standaard 100% bruikbare nominale capaciteit. Alle limieten zijn simulatie-instellingen, geen productspecificaties. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
 }
 function eh20Css(){
- return '.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
+ return '.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
 }
 (function eh20Install(){
  const P=EnergiehuisCard.prototype,originalBattery=P._batteryHtml,originalRender=P._render,originalConfig=P.setConfig;
