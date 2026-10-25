@@ -39,7 +39,7 @@ function fakeCard(connected=false) {
  return {card,root,style,classes,listeners,insertions};
 }
 test('v1.9.1 releasekandidaat houdt de volledige HACS kaart intact',()=>{
- assert.match(source,/const EH_VERSION = '1\.10\.0-rc\.1'/);
+ assert.match(source,/const EH_VERSION = '1\.11\.0-rc\.1'/);
  assert.equal(typeof registry.get('energiehuis-card'),'function');
  assert.doesNotMatch(source,/serviceWorker\.register\s*\(/);
 });
