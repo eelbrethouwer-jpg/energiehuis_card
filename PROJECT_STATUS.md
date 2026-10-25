@@ -1,5 +1,7 @@
 # PROJECT_STATUS — Energiehuis
 
+> **v1.12.0 RC / 25 oktober 2026:** [PR #17](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/17) voegt drie onafhankelijke batterijsimulatieprofielen 5/10/15 kWh toe met eigen SOC, bruikbare capaciteit, laad-/ontlaadvermogen en inzicht in gemiste PV door volle batterij of laadlimiet. De bestaande vaste 10-kWh-Home Assistant-sensoren en Alfen-besturing blijven onaangetast. Nog niet gepubliceerd in HACS; CI en praktijkcontrole vereisen bevestiging. Zie [release notes](RELEASE_NOTES_v1.12.0_RC.md) en [datavalidatie](BATTERY_PROFILES_V112.md).
+
 > **Status 25 oktober 2026:** [PR #15](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/15) met Batterij Simulator 3.0 is samengevoegd met `main`. Release-tag `v1.11.0` is nog niet gepubliceerd. De recentste tag is `v1.10.1` (de bijbehorende releasebeschrijving noemt verwarrend v1.11.0). Een aparte versiecorrectie maakt de interne codeversie en de Lovelace-kaartnaam `1.11.0`, zonder laadbediening te activeren. Batterijsimulatie blijft hypothetisch; Home Assistant-/iPhone-praktijkvalidatie vereist. Zie [release notes](RELEASE_NOTES_v1.11.0_RC.md) en [datacontrole](BATTERY_SIMULATOR_3_DATA.md).
 
 > **Momentopname:** 24 oktober 2026. Bij een volgende chat opnieuw actuele GitHub main, releases, PR's en CI controleren. HACS-installatiestatus en iPhone-weergave zijn niet uit GitHub af te leiden.
