@@ -2466,7 +2466,8 @@ function eh20Chart(result,pickedIndex){
   '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
 }
 function eh20BatteryView(card,h,c){
- const data=card._eh20Battery,mode=card._eh20Mode==='smart'?'smart':'solar',cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
+ const data=card._eh20Battery,cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
+ let mode=card._eh20Mode==='smart'?'smart':'solar';
  if(card.isConnected&&!card._eh20Loading&&(!data||Date.now()-data.at>30*60000))card._eh20LoadBattery();
  const baseNote='<p class="subtle">Afzonderlijk chronologisch uurmodel. Start met een lege batterij; bij ontbrekende uren wordt de SOC niet over dat gat doorgetrokken. Uurafname/-teruglevering bepalen geen exacte volgorde binnen het uur. Geen fysieke batterij en geen laadcommando’s.</p>';
  if(!data)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
@@ -2474,6 +2475,7 @@ function eh20BatteryView(card,h,c){
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
  const rows=data.rows,coverage=rows.filter(r=>r.import!==null).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
+ if(mode==='smart'&&!ratesGood)mode='solar';
  const results=[5,10,15].map(size=>eh20Simulate(rows,size,eff,power,mode,buy,sell));
  const selected=results.find(r=>r?.capacity===cap),canShow=coverage>=48&&selected;
  const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell);
