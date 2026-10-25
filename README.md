@@ -1,10 +1,10 @@
 # Energiehuis — Home Assistant dashboardkaart
 
-## In ontwikkeling: v1.11.0-rc.1 – Batterij Simulator 3.0
+## v1.11.0 – Batterij Simulator 3.0 (versiecorrectie in voorbereiding)
 
 Op basis van de gepubliceerde **v1.10.0** met behoud van de verbeterde Alfen-laadgeschiedenis en de standaard **uitgeschakelde** optionele scriptbediening. De nieuwe batterijpagina leest maximaal zeven volledige dagen P1-uurgegevens en toont een interactieve SOC-uurcurve, capaciteit 5/10/15 kWh, zonneladen en (alleen bij complete historische prijzen) theoretisch goedkoop netladen. Historische euroresultaten blijven **scenario's**, geen gerealiseerde besparingen.
 
-Lees [v1.11.0 release notes](RELEASE_NOTES_v1.11.0_RC.md) en [Home Assistant-datacontrole](BATTERY_SIMULATOR_3_DATA.md). Geen extra YAML nodig als bestaande P1-uurstatistieken beschikbaar zijn. De nieuwe functies staan nog in [draft PR #15](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/15), niet in een HACS-release.
+Lees [v1.11.0 release notes](RELEASE_NOTES_v1.11.0_RC.md) en [Home Assistant-datacontrole](BATTERY_SIMULATOR_3_DATA.md). Geen extra YAML nodig als bestaande P1-uurstatistieken beschikbaar zijn. De functies zijn via [PR #15](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/15) samengevoegd; de officiële tag `v1.11.0` is nog niet gepubliceerd. De bestaande `v1.10.1`-release heeft onjuist een v1.11.0-beschrijving.
 
 ## In ontwikkeling: v1.10.0-rc.1 – Alfen-laadsessies en optionele scriptbediening
 
