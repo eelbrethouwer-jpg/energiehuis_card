@@ -1,5 +1,16 @@
 # PROJECT_STATUS — Energiehuis
 
+> **Momentopname 25 oktober 2026:** op een nieuwe chat altijd eerst live GitHub-status controleren. De volgende wijzigingen staan nog niet op `main` en zijn niet in HACS geïnstalleerd.
+
+## Nieuw: Batterij Simulator 3.0 (concept)
+- **Draft PR #15:** [Energiehuis v1.11.0 RC — Historische batterij-uurvergelijking](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/15).
+- Branch: `feature/v1.11.0-batterij-simulator-3`, gebaseerd op `main` (v1.9.1).
+- Functies: 7 volle historische dagen P1-uurstatistieken, 5/10/15-kWh-modellen, SOC-uurcurve en interactieve selectie, zonneladen, optioneel prijsgestuurd netladen bij volledige prijsdekking, kostenschattingen met duidelijke aannames.
+- Geen nieuwe Home Assistant-YAML, geen actieve laadcommando's en geen wijziging aan bestaande 10-kWh-batterijhelpers.
+- CI/resultaten: GitHub Actions voor PR #15 controleren; praktijkcontrole op telefoon en in echte HA/Recorder nog vereist.
+- Bronnen & beperkingen: [gegevenscontract](BATTERY_SIMULATOR_3_DATA.md), [release notes RC](RELEASE_NOTES_v1.11.0_RC.md). Niet publiceren vóór testen.
+- Let op parallelle **draft PR #14 (v1.10.0)** voor Cupra/laadbediening. Bij de merge volgorde, conflicten en versienummers verifiëren; PR #15 mag bestaande ontwikkelingen niet overschrijven.
+
 > **Momentopname:** 24 oktober 2026. Bij een volgende chat opnieuw actuele GitHub main, releases, PR's en CI controleren. HACS-installatiestatus en iPhone-weergave zijn niet uit GitHub af te leiden.
 
 ## Gecontroleerde productiestatus
