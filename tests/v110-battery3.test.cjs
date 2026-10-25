@@ -115,3 +115,21 @@ test('geen servicecommando of softwarematige Alfen-regeling toegevoegd',()=>{
  assert.doesNotMatch(code,/callService\s*\(\s*['"](?:alfen|cupra|switch|number)/);
  assert.match(code,/1×40 A/);
 });
+
+
+test('uurinspectie toont gekozen uur, historische P1 en SOC in de simulator',()=>{
+ const card=Object.create(EnergiehuisCard.prototype);
+ card._eh20Loading=true;card._eh17Capacity=5;card._eh20Mode='solar';card.isConnected=false;
+ const rows=[];
+ for(let i=0;i<60;i++)rows.push(bin(i,i%2?3:0,i%2?0:6,.25));
+ card._eh20Battery={rows,at:Date.now(),error:null};
+ card._eh20Selected=1;
+ const html=eh20BatteryView(card,meter,{...EH_DEFAULTS,battery_sim_power_kw:3});
+ assert.match(html,/data-eh20-hour="1"/);
+ assert.match(html,/value="1"/);
+ assert.match(html,/Bekijk een uur op de grafiek/);
+ assert.match(html,/Historisch uurtarief/);
+ assert.match(html,/Netafname/);
+ assert.match(html,/Vermeden netafname/);
+ assert.match(html,/circle/);
+});
