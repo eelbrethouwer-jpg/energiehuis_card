@@ -5,7 +5,7 @@
 ## Nieuw
 - Batterij Simulator 3.0 op de bestaande Batterijpagina, zonder de bestaande Home Assistant-batterijsensoren te veranderen.
 - Vergelijk 5, 10 en 15 kWh op basis van maximaal zeven volledige dagen historische P1-netafname en -teruglevering **per uur**.
-- Chronologische SOC-grafiek; het model start leeg, telt laad- en ontlaadverliezen, past een gekozen vermogenslimiet toe en vult gaten niet met fictieve waarden.
+- Chronologische SOC-grafiek met schuifbare uurinspectie (tijdstip, SOC, P1-afname/teruglevering, PV-netlading, ontlading, eventueel tarief). Het model start leeg, rekent laad- en ontlaadverliezen, past een gekozen vermogenslimiet toe en vult gaten niet met fictieve waarden.
 - Twee scenario's: **alleen zonne-overschot** en **zon + goedkoop netladen**. Het tweede scenario is alleen beschikbaar bij volledige historische uurprijsdekking.
 - Detailkaarten: vermeden netafname, opgeslagen zonne-energie, goedkoop netladen, indicatieve kostendifferentie en tabel per capaciteit.
 - Vermogensbegrenzing standaard 3 kW als **rekenaanname**, geen veilige of fysieke laadpaalinstelling.
