@@ -63,6 +63,19 @@ test('prijsdekking: alleen uurstatistiek of waarneming vlak bij uurstart',()=>{
  assert.equal(prices.get(hour(1)),.12);
  assert.equal(prices.has(hour(2)),false); // a late update cannot be invented as the entire hour
 });
+test('Home Assistant gegroepeerde history-resultaten bevatten de echte prijssensor',()=>{
+ const haResult=[[{entity_id:'sensor.price',state:'0.13',last_changed:new Date(hour(0)).toISOString()},
+   {entity_id:'sensor.price',state:'0.15',last_changed:new Date(hour(1)).toISOString()}]];
+ const prices=eh20HourlyPrices(null,haResult,[{t:hour(0),end:hour(1)},{t:hour(1),end:hour(2)}],'sensor.price',meter);
+ assert.equal(prices.get(hour(0)),.13);
+ assert.equal(prices.get(hour(1)),.15);
+});
+test('v1.10 sessies en veilige standaard-uitgeschakelde bediening blijven aanwezig',()=>{
+ assert.match(code,/function eh17SessionsFromHistory/);
+ assert.match(code,/function eh20ControlStatus/);
+ assert.match(code,/charge_control_enabled: false/);
+ assert.match(code,/EH_VERSION = '1\.11\.0-rc\.1'/);
+});
 test('alleen zonneladen: energiebegrenzing, verliezen en latere ontlading',()=>{
  const data=[bin(0,0,8),bin(1,5,0),bin(2,5,0)];
  const s=eh20Simulate(data,5,.81,3,'solar',.25,.08);
