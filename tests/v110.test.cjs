@@ -65,9 +65,12 @@ test('beide scripts en verse P1/Alfen-data vereist; pauze toegestaan bij stale s
  const fake={states,connection:{connected:true},callService:async()=>{}};
  assert.equal(eh20ControlStatus(fake,configured,'start',now).ready,true);
  assert.equal(eh20ControlStatus(fake,configured,'pause',now).ready,true);
- states[configured.net].last_updated=new Date(now-20*60000).toISOString();
+ states[configured.net].last_updated=new Date(now-90000).toISOString();
  assert.equal(eh20ControlStatus(fake,configured,'start',now).ready,false);
  assert.equal(eh20ControlStatus(fake,configured,'pause',now).ready,true);
+ states[configured.net].last_updated=new Date(now).toISOString();
+ states[configured.laden].last_updated=new Date(now-90000).toISOString();
+ assert.equal(eh20ControlStatus(fake,configured,'start',now).ready,false);
 });
 test('twee afzonderlijke bevestigingsstappen: zonder pending geen laadcommando',async()=>{
  const now=Date.now(),configured={...EH_DEFAULTS,charge_control_enabled:true,charge_start_script:'script.energiehuis_start',charge_pause_script:'script.energiehuis_pause'};
@@ -96,4 +99,18 @@ test('start- en pauzeknoppen in UI geblokkeerd zolang sturing niet is geconfigur
  assert.match(html,/data-eh20-action="start" disabled/);
  assert.match(html,/data-eh20-action="pause" disabled/);
  assert.match(html,/laadplan worden niet automatisch uitgevoerd/);
+});
+
+
+test('bekendste batteryfix v1.9.1 blijft onderdeel van de code na integratie',()=>{
+ assert.match(src,/function eh191BatteryScenario/);
+ assert.match(src,/Vaste 10-kWh-simulatie uit Home Assistant/);
+ assert.match(src,/EH_VERSION = '1\.10\.0-rc\.1'/);
+});
+test('voordat scripts zijn gekoppeld worden geen echte servicecalls aangeboden',()=>{
+ assert.equal(EH_DEFAULTS.charge_control_enabled,false);
+ assert.equal(EH_DEFAULTS.charge_start_script,'');
+ assert.equal(EH_DEFAULTS.charge_pause_script,'');
+ const fake={states:{},connection:{connected:true},callService:()=>{}};
+ assert.equal(eh20ControlStatus(fake,EH_DEFAULTS,'start').ready,false);
 });
