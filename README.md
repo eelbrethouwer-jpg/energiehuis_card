@@ -1,5 +1,13 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: v1.10.0-rc.1 – Alfen-laadsessies en optionele scriptbediening
+
+Meer nauwkeurige Alfen-laadgeschiedenis en voorbereid, **standaard uitgeschakeld** bedieningspaneel. Eerste acceptatie: verbeterde meetdiagnose en veilige standaardstand zonder fysieke aansturing. Vóór activeren is een aparte Home Assistant-script-/Active-Load-Balancing-controle verplicht. Zie [v1.10.0 RC release notes](RELEASE_NOTES_v1.10.0_RC.md). Deze uitbreiding behoudt de bestaande v1.9.1-batterijvergelijking.
+
+## In voorbereiding: v1.9.1 — Batterijcapaciteit vergelijken
+
+Releasekandidaat: duidelijke 5/10/15-kWh-capaciteitsvergelijking, uitleg bij identieke scenario-uitkomsten, weergave van onvolledige meetdagen en expliciete scheiding van de **vaste 10-kWh-simulatie** bovenaan. Zie [v1.9.1 release notes](RELEASE_NOTES_v1.9.1_RC.md). Nog niet gepubliceerd.
+
 ## In ontwikkeling: v1.9.0-rc.1 – Mobiele App Experience
 
 Er is een aparte releasekandidaat met een mobiele werkbalk, compacte/ruime weergave, veilige offline-indicatie en een zichtbaarheidsgestuurde vaste onderste navigatie. **Nog geen zelfstandige installeerbare PWA**; de HACS-kaart blijft de ondersteunde basis. Bekijk [RC release notes](RELEASE_NOTES_v1.9.0_RC1.md) en [PWA-verkenning](PWA_SPIKE_v1.9.0.md).
@@ -20,7 +28,7 @@ De virtuele-batterijcapaciteit (5, 10 of 15 kWh) is weer aanklikbaar. De keuze p
 
 Energiehuis is een eigen, mobielvriendelijke Home Assistant-interface voor energie-inzicht. De kaart combineert P1, GoodWe, Alfen, Cupra, Zonneplan, de virtuele thuisbatterij en optioneel gas/water in één HomeWizard-achtige omgeving.
 
-> Energiehuis is **standaard alleen-lezen**. In de v1.10.0-draft kan na aparte Home Assistant- en veiligheidscontrole optioneel een bedieningspaneel worden ingeschakeld dat uitsluitend twee vooraf gekoppelde HA-scripts aanroept. Cupra Insights en de uurplanner blijven uitlezen en simuleren. Alfen Active Load Balancing en de bestaande Home Assistant-backend blijven leidend. Zie [ontwerp en veiligheidsstappen](RELEASE_NOTES_v1.10.0_RC.md).
+> Energiehuis blijft standaard **alleen-lezen**. In v1.10.0 is de apart configureerbare Home Assistant-scriptbediening standaard uitgeschakeld en mag deze uitsluitend na een geverifieerde backendveiligheidscontrole worden ingeschakeld. De simulatorknoppen verzenden nooit laadopdrachten. Alfen Active Load Balancing en de 1×40A-netaansluiting blijven leidend. Zie [veiligheidsvereisten](RELEASE_NOTES_v1.10.0_RC.md).
 
 ## Nieuw in v1.7.1 — Gas & Water hotfix
 
