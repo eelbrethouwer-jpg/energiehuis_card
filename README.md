@@ -1,5 +1,11 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: v1.11.0-rc.1 — Batterij Simulator 3.0
+
+**Draft pull request #15** bouwt een chronologisch batterij-uurmodel voor 5, 10 en 15 kWh uit Home Assistant Recorder. Nieuwe SOC-grafiek (met aanklikbaar/verschuifbaar uur), P1-import/export per uur, vergelijking van zonneladen met optioneel slim netladen wanneer alle historische prijsuren beschikbaar zijn. De resultaten zijn **hypothetische scenario's**: geen echte besparing en geen actief batterij-/Alfen-commando.
+
+Home Assistant: **nog geen YAML nodig**, mits `sensor.p1_meter_energie_import` en `sensor.p1_meter_energie_export` langetermijn-uurstatistieken hebben. Controleer de [gegevenshandleiding](BATTERY_SIMULATOR_3_DATA.md) en [v1.11.0 release notes](RELEASE_NOTES_v1.11.0_RC.md). PR #14 voor v1.10.0 laadsessies staat los en moet vóór het samenvoegen worden afgestemd.
+
 ## In voorbereiding: v1.9.1 — Batterijcapaciteit vergelijken
 
 Releasekandidaat: duidelijke 5/10/15-kWh-capaciteitsvergelijking, uitleg bij identieke scenario-uitkomsten, weergave van onvolledige meetdagen en expliciete scheiding van de **vaste 10-kWh-simulatie** bovenaan. Zie [v1.9.1 release notes](RELEASE_NOTES_v1.9.1_RC.md). Nog niet gepubliceerd.
