@@ -1,8 +1,8 @@
-/* Energiehuis v1.12.1 — drie afzonderlijke batterijprofielen.
+/* Energiehuis v1.13.0-rc.1 — afzonderlijke stroomvergelijker.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.12.1';
+const EH_VERSION = '1.13.0-rc.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1596,7 +1596,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.12.1',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.13.0-rc.1',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2724,6 +2724,202 @@ function eh20Css(){
    if(!btn||btn.disabled)return;
    const mode=btn.dataset.eh20Mode;
    if(mode==='solar'||mode==='smart'){this._eh20Mode=mode;this._schedule();}
+  });
+ };
+})();
+
+/* Stroomvergelijker — isolated scenario engine; never writes HA states or existing cost history. */
+const ehCompareDateKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const EH_COMPARE_STORAGE='energiehuis.electricity-contracts.v1';
+function ehCompareNumber(v){return typeof v==='number'&&Number.isFinite(v)?v:null;}
+function ehCompareContract(raw){
+ if(!raw||typeof raw!=='object')throw new Error('Ongeldig contract.');
+ const c={id:String(raw.id||'').slice(0,80),name:String(raw.name||'').trim().slice(0,80),type:raw.type,
+  priceEntity:String(raw.priceEntity||'').trim(),settlement:raw.settlement,from:String(raw.from||''),to:String(raw.to||''),
+  buy:ehCompareNumber(raw.buy),sell:ehCompareNumber(raw.sell),daily:ehCompareNumber(raw.daily),exportFee:ehCompareNumber(raw.exportFee),reference:raw.reference===true};
+ if(!c.id||!c.name||!['fixed','dynamic'].includes(c.type)||!['separate','net'].includes(c.settlement))throw new Error('Vul naam, contracttype en verrekenmethode in.');
+ if(c.type==='dynamic'&&(!/^sensor\.[a-z0-9_]+$/.test(c.priceEntity)||c.settlement!=='separate'))throw new Error('Dynamisch vereist een prijssensor en afzonderlijke afname/teruglevering.');
+ if(c.type==='fixed'&&(c.buy===null||c.buy<0||c.buy>10))throw new Error('Vul een vast afnametarief in tussen 0 en 10 €/kWh.');
+ if(c.sell===null||Math.abs(c.sell)>10||c.daily===null||c.daily<0||c.daily>100||c.exportFee===null||c.exportFee<0||c.exportFee>10)throw new Error('Vul alle kosten in; gebruik expliciet 0 als kosten niet gelden.');
+ for(const d of [c.from,c.to])if(d&&(!/^\d{4}-\d{2}-\d{2}$/.test(d)||Number.isNaN(Date.parse(d))||new Date(d).toISOString().slice(0,10)!==d))throw new Error('Ongeldige geldigheidsdatum.');
+ if(c.from&&c.to&&c.from>c.to)throw new Error('Einddatum ligt vóór begindatum.');
+ return c;
+}
+function ehCompareList(raw){
+ if(!Array.isArray(raw)||raw.length>30)throw new Error('Maximaal 30 contracten toegestaan.');
+ const list=raw.map(ehCompareContract);
+ if(new Set(list.map(c=>c.id)).size!==list.length)throw new Error('Contract-ID komt dubbel voor.');
+ if(list.filter(c=>c.reference).length>1)throw new Error('Kies één Zonneplan-referentie.');
+ return list;
+}
+function ehCompareDates(period,start,end,now=new Date()){
+ const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ let from=period==='year'?new Date(today.getFullYear(),0,1):new Date(today.getFullYear(),today.getMonth(),1),to=today;
+ if(period==='custom'){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start||'')||!/^\d{4}-\d{2}-\d{2}$/.test(end||''))throw new Error('Kies een begin- en einddatum.');
+  from=new Date(start+'T00:00:00');to=new Date(end+'T00:00:00');
+  if(ehCompareDateKey(from)!==start||ehCompareDateKey(to)!==end)throw new Error('Ongeldige periode.');
+  to.setDate(to.getDate()+1);
+ }
+ if(!(from<to)||to>today||(to-from)>367*86400000)throw new Error('Kies 1 tot 366 afgeronde dagen, uiterlijk gisteren.');
+ let days=0;for(let d=new Date(from);d<to;d.setDate(d.getDate()+1))days++;
+ return {from,to,days};
+}
+function ehCompareRows(stats,config,h,limits){
+ const map=id=>{
+  const factor=eh20EnergyUnit(h,id),out=new Map();
+  if(factor===null)return out;
+  let prior=null;
+  for(const s of (stats?.[id]||[]).slice().sort((a,b)=>eh20PriceTime(a.start)-eh20PriceTime(b.start))){
+   const t=eh20PriceTime(s.start),sum=ehNum(s.sum),change=ehNum(s.change);
+   // A difference is valid only between adjacent hours. Never distribute a gap over a later hour.
+   const value=change!==null?change:prior&&t-prior.t===3600000&&sum!==null&&prior.sum!==null?sum-prior.sum:null;
+   if(Number.isFinite(t)&&value!==null&&value>=0)out.set(t,value*factor);
+   prior={t,sum};
+  }
+  return out;
+ };
+ const im=map(config.import),ex=map(config.export),rows=[];
+ for(let t=+limits.from;t<+limits.to;t+=3600000)rows.push({t,import:im.get(t)??null,export:ex.get(t)??null});
+ return rows;
+}
+function ehCompareCalculate(contracts,rows,prices,limits){
+ const expected=(limits.to-limits.from)/3600000;
+ const valid=rows.filter(r=>Number.isFinite(r.import)&&r.import>=0&&Number.isFinite(r.export)&&r.export>=0);
+ const complete=rows.length===expected&&valid.length===expected&&new Set(rows.map(r=>r.t)).size===expected&&rows.every((r,i)=>r.t===+limits.from+i*3600000);
+ const imported=valid.reduce((s,r)=>s+r.import,0),exported=valid.reduce((s,r)=>s+r.export,0);
+ const last=new Date(+limits.to-1),firstKey=ehCompareDateKey(limits.from),lastKey=ehCompareDateKey(last);
+ const results=contracts.map(c=>{
+  let reason=!complete?'Onvolledige P1-uurhistorie':c.from&&c.from>firstKey||c.to&&c.to<lastKey?'Contract niet geldig over de hele periode':null;
+  const p=prices[c.priceEntity]||new Map();
+  if(!reason&&c.type==='dynamic'&&rows.some(r=>!Number.isFinite(p.get(r.t))))reason='Prijshistorie ontbreekt voor één of meer uren';
+  if(reason)return {contract:c,reason,total:null};
+  const net=c.settlement==='net';
+  const purchase=c.type==='dynamic'?rows.reduce((s,r)=>s+r.import*p.get(r.t),0):(net?Math.max(0,imported-exported):imported)*c.buy;
+  const credit=(net?Math.max(0,exported-imported):exported)*c.sell;
+  const fixed=limits.days*c.daily,exportCost=exported*c.exportFee;
+  return {contract:c,reason:null,total:purchase-credit+fixed+exportCost,purchase,credit,fixed,exportCost};
+ });
+ const reference=results.find(r=>r.contract.reference);
+ results.sort((a,b)=>(a.total===null?Infinity:a.total)-(b.total===null?Infinity:b.total));
+ return {results,reference,imported,exported,coverage:expected?valid.length/expected:0,complete};
+}
+function ehCompareField(name,label,value='',type='number'){
+ return `<label>${ehEsc(label)}<input name="${name}" type="${type}" ${type==='number'?'step="any" inputmode="decimal"':''} value="${ehEsc(value??'')}" ${['name','sell','daily','exportFee'].includes(name)?'required':''}></label>`;
+}
+function ehCompareForm(c){
+ return `<form data-ehcmp-form><h3>${c.id?'Contract bewerken':'Contract toevoegen'}</h3><input type="hidden" name="id" value="${ehEsc(c.id||'')}"><div class="ehcmp-fields">
+ ${ehCompareField('name','Naam',c.name,'text')}<label>Contracttype<select name="type"><option value="fixed" ${c.type!=='dynamic'?'selected':''}>Vast tarief</option><option value="dynamic" ${c.type==='dynamic'?'selected':''}>Dynamisch · historische uurprijzen</option></select></label>
+ ${ehCompareField('buy','Vaste afnameprijs (€/kWh)',c.buy)}${ehCompareField('priceEntity','Dynamische afnameprijssensor',c.priceEntity,'text')}
+ ${ehCompareField('sell','Terugleververgoeding (€/kWh)',c.sell)}${ehCompareField('exportFee','Terugleverkosten (€/kWh)',c.exportFee)}${ehCompareField('daily','Vaste leverancierskosten (€/dag)',c.daily)}
+ <label>Verrekenmethode<select name="settlement"><option value="separate" ${c.settlement!=='net'?'selected':''}>Afname en teruglevering apart</option><option value="net" ${c.settlement==='net'?'selected':''}>Saldo over gekozen periode (vast tarief)</option></select></label>
+ ${ehCompareField('from','Geldig vanaf (optioneel)',c.from,'date')}${ehCompareField('to','Geldig t/m (optioneel)',c.to,'date')}</div>
+ <label class="ehcmp-check"><input type="checkbox" name="reference" ${c.reference?'checked':''}>Dit is mijn Zonneplan-referentie</label>
+ <p class="subtle">Gebruik tarieven inclusief btw en energiebelasting waar van toepassing. Dynamische prijssensor: volledige afnameprijs, geen kale beursprijs. Teruglevering gebruikt hier een vast tarief. Saldo is een scenario over de gekozen periode, geen jaarafrekening. Welkomstkortingen, staffels, dynamische terugleverprijzen en wijzigingen binnen de periode worden nog niet berekend.</p>
+ <div class="ehcmp-actions"><button type="submit">Contract opslaan</button><button type="button" data-ehcmp-action="cancel">Annuleren</button></div></form>`;
+}
+function ehCompareHtml(card){
+ const list=card._ehcmpContracts||[],data=card._ehcmpData;
+ let limits,error='';try{limits=ehCompareDates(card._ehcmpPeriod||'month',card._ehcmpStart,card._ehcmpEnd);}catch(e){error=e.message;}
+ const result=data&&limits&&data.key===`${+limits.from}|${+limits.to}`&&!data.error?ehCompareCalculate(list,data.rows,data.prices,limits):null;
+ const ready=result?.results.filter(r=>r.total!==null)||[];
+ const min=Math.min(0,...ready.map(r=>r.total)),max=Math.max(0,...ready.map(r=>r.total)),span=max-min||1,zero=-min/span*100;
+ const bars=result?result.results.map(r=>{
+  const c=r.contract,delta=result.reference?.total!==null&&result.reference?.total!==undefined&&r.total!==null?r.total-result.reference.total:null;
+  const value=r.total===null?'—':ehEuro2(r.total);
+  const start=r.total===null?zero:Math.min(0,r.total)-min;
+  const bar=r.total===null?'':`<span class="ehcmp-track"><i class="ehcmp-zero" style="left:${zero}%"></i><i class="ehcmp-bar" style="left:${start/span*100}%;width:${Math.abs(r.total)/span*100}%"></i></span>`;
+  return `<details class="ehcmp-result"><summary><span><b>${ehEsc(c.name)}</b>${c.reference?' · Zonneplan':''}</span><strong>${value}</strong>${bar}<small>${r.reason?ehEsc(r.reason):c.reference?'Referentie':delta===null?'Geen complete Zonneplan-referentie':Math.abs(delta)<.005?'Gelijk aan Zonneplan':ehEuro2(Math.abs(delta))+(delta<0?' goedkoper':' duurder')+' dan Zonneplan'}</small></summary>${r.total===null?'':`<div class="subrows"><div><span>Afname</span><strong>${ehEuro2(r.purchase)}</strong></div><div><span>Terugleververgoeding (aftrek)</span><strong>${ehEuro2(r.credit)}</strong></div><div><span>Terugleverkosten</span><strong>${ehEuro2(r.exportCost)}</strong></div><div><span>Vaste leverancierskosten</span><strong>${ehEuro2(r.fixed)}</strong></div></div>`}<div class="ehcmp-actions"><button type="button" data-ehcmp-edit="${ehEsc(c.id)}">Bewerken</button><button type="button" data-ehcmp-delete="${ehEsc(c.id)}">Verwijderen</button></div></details>`;
+ }).join(''):'';
+ const manage=!result?list.map(c=>`<div class="ehcmp-actions"><span>${ehEsc(c.name)}</span><button type="button" data-ehcmp-edit="${ehEsc(c.id)}">Bewerken</button><button type="button" data-ehcmp-delete="${ehEsc(c.id)}">Verwijderen</button></div>`).join(''):'';
+ return `<main class="subpage ehcmp"><button type="button" data-ehcmp-action="back">← Kosten & besparing</button><div class="subpage-head"><div><div class="eyebrow">Alleen stroom</div><h2>Stroomvergelijker</h2><p>Jouw gemeten verbruik, meerdere contracten.</p></div></div>
+ <div class="ehcmp-actions">${[['month','Deze maand'],['year','Dit jaar'],['custom','Eigen periode']].map(([p,n])=>`<button type="button" data-ehcmp-period="${p}" ${card._ehcmpEditing?'disabled':''} aria-pressed="${(card._ehcmpPeriod||'month')===p}">${n}</button>`).join('')}</div>
+ ${(card._ehcmpPeriod==='custom')?`<div class="ehcmp-fields"><label>Van<input data-ehcmp-date="start" ${card._ehcmpEditing?'disabled':''} type="date" value="${ehEsc(card._ehcmpStart||'')}"></label><label>Tot en met<input data-ehcmp-date="end" ${card._ehcmpEditing?'disabled':''} type="date" value="${ehEsc(card._ehcmpEnd||'')}"></label></div>`:''}
+ <p class="subtle">Afgeronde dagen, in de tijdzone van dit apparaat (${ehEsc(Intl.DateTimeFormat().resolvedOptions().timeZone)}). ${limits?ehEsc(limits.from.toLocaleDateString('nl-NL'))+' t/m '+ehEsc(new Date(+limits.to-1).toLocaleDateString('nl-NL')):''}</p>
+ <p class="plan-warning">Indicatieve leverancierskosten, geen volledige energienota. Uurprijzen kunnen afwijken van kwartierafrekening. Netbeheer, belastingvermindering, kortingen en niet ingevoerde kosten zijn uitgesloten. Controleer de verrekenmethode van elk contract.</p>
+ ${card._ehcmpMessage?`<p role="status">${ehEsc(card._ehcmpMessage)}</p>`:''}
+ ${card._ehcmpEditing?ehCompareForm(card._ehcmpEditing):`<div class="ehcmp-actions"><button type="button" data-ehcmp-action="add">+ Contract toevoegen</button>${!list.some(c=>c.reference)?'<button type="button" data-ehcmp-action="zonneplan">Zonneplan instellen</button>':''}<button type="button" data-ehcmp-action="refresh">Vernieuwen</button><button type="button" data-ehcmp-action="transfer">Export / import</button></div>`}
+ ${card._ehcmpTransfer?`<label>Contracten als JSON (geen meetgegevens)<textarea data-ehcmp-json rows="6">${ehEsc(JSON.stringify({version:1,contracts:list},null,2))}</textarea></label><div class="ehcmp-actions"><button type="button" data-ehcmp-action="download">Download JSON</button><button type="button" data-ehcmp-action="import">JSON toevoegen / bijwerken</button></div>`:''}
+ ${error?`<p class="plan-warning">${ehEsc(error)}</p>`:card._ehcmpLoading?'<p role="status">P1- en prijshistorie ophalen…</p>':data?.error?`<p class="plan-warning">${ehEsc(data.error)}</p>`:''}
+ ${result?`<p class="subtle">Meetdekking: ${ehFmt(result.coverage*100,1)}% · Afname ${ehFmt(result.imported,1)} kWh · Teruglevering ${ehFmt(result.exported,1)} kWh${result.complete?'':' (onvolledig)'}. ${ready.length===list.length&&ready.length>1?'Laagste berekende kosten van de ingevoerde contracten: '+ehEsc(ready[0].contract.name)+'.':'Geen volledige ranglijst zolang gegevens ontbreken.'}</p>`:''}
+ ${bars}${manage}${!list.length?'<div class="subsection"><h3>Voeg je eerste contract toe</h3><p>Neem tarieven over uit je aanbod. Stel daarna Zonneplan in als referentie. De bestaande Vattenfall-grafieken blijven apart beschikbaar.</p></div>':''}
+ <p class="subtle">Contracten blijven alleen in deze browser / app op dit apparaat. Exporteer een back-up voor andere apparaten. Geen meetgeschiedenis of inloggegevens opgeslagen.</p></main>`;
+}
+function ehCompareCss(){return `.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{font:inherit;min-height:44px;border:1px solid #64899b;border-radius:10px;background:#123345;color:#ecf9ff;padding:9px 12px;cursor:pointer}.ehcmp button[aria-pressed="true"]{background:#17523f;border-color:#62dfb5}.ehcmp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ehcmp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ehcmp label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.ehcmp input,.ehcmp select,.ehcmp textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid #64899b;background:#092535;color:#ecf9ff}.ehcmp .ehcmp-check{flex-direction:row;align-items:center;margin:14px 0}.ehcmp-check input{width:auto}.ehcmp-result{border:1px solid #64899b55;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere}.ehcmp-result summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer;min-height:44px}.ehcmp-result summary small,.ehcmp-track{grid-column:1/-1}.ehcmp-track{display:block;position:relative;height:16px;background:#081e2c;border-radius:4px}.ehcmp-bar{position:absolute;height:12px;top:2px;background:#53dbae;border-radius:3px}.ehcmp-zero{position:absolute;top:0;height:100%;width:1px;background:#d7eaff}.ehcmp button:focus-visible,.ehcmp summary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ehcmp-entry{width:100%;margin:8px 0 12px;text-align:left}@media(max-width:520px){.ehcmp-fields{grid-template-columns:1fr}}`;}
+(function ehCompareInstall(){
+ const P=EnergiehuisCard.prototype,oldCosts=P._costsHtml,oldRender=P._render,oldConfig=P.setConfig;
+ P.setConfig=function(config){this._ehcmpRequest=(this._ehcmpRequest||0)+1;this._ehcmpData=null;this._ehcmpLoading=false;return oldConfig.call(this,config);};
+ P._ehcmpInit=function(){
+  if(this._ehcmpContracts)return;
+  try{const stored=window.localStorage?.getItem(EH_COMPARE_STORAGE);this._ehcmpContracts=stored?ehCompareList(JSON.parse(stored).contracts):[];}
+  catch(_){this._ehcmpContracts=[];this._ehcmpMessage='Contractopslag kon niet worden gelezen. Exporteer je gegevens voordat je opnieuw opslaat.';}
+ };
+ P._ehcmpSave=function(list){
+  const checked=ehCompareList(list);
+  if(!window.localStorage)throw new Error('Browseropslag is niet beschikbaar. Contract niet opgeslagen.');
+  window.localStorage.setItem(EH_COMPARE_STORAGE,JSON.stringify({version:1,contracts:checked}));
+  this._ehcmpContracts=checked;this._ehcmpEditing=null;this._ehcmpMessage='Contracten opgeslagen op dit apparaat.';this._ehcmpLoad();this._schedule();
+ };
+ P._ehcmpLoad=async function(){
+  const request=this._ehcmpRequest=(this._ehcmpRequest||0)+1;
+  this._ehcmpLoading=false;this._ehcmpData=null;
+  let limits;try{limits=ehCompareDates(this._ehcmpPeriod||'month',this._ehcmpStart,this._ehcmpEnd);}catch(_){this._schedule();return;}
+  const key=`${+limits.from}|${+limits.to}`,h=this._hass,c=this.config;
+  if(!h?.callWS||!c?.import||!c?.export){this._ehcmpData={key,error:'P1-sensoren of Home Assistant-verbinding ontbreken.'};this._schedule();return;}
+  this._ehcmpLoading=true;this._schedule();
+  const ids=[...new Set((this._ehcmpContracts||[]).filter(c=>c.type==='dynamic').map(c=>c.priceEntity))];
+  try{
+   const calls=[h.callWS({type:'recorder/statistics_during_period',start_time:new Date(+limits.from-3600000).toISOString(),end_time:limits.to.toISOString(),statistic_ids:[c.import,c.export],period:'hour',types:['change','sum']})];
+   for(const id of ids)calls.push(h.callWS({type:'recorder/statistics_during_period',start_time:limits.from.toISOString(),end_time:limits.to.toISOString(),statistic_ids:[id],period:'hour',types:['mean']}));
+   const responses=await Promise.allSettled(calls);
+   if(request!==this._ehcmpRequest)return;
+   if(responses[0].status!=='fulfilled')throw new Error('P1-statistieken konden niet worden opgehaald. Controleer Recorder.');
+   const prices={};
+   ids.forEach((id,i)=>{const factor=eh20PriceUnit(h,id),map=new Map();prices[id]=map;if(factor===null||responses[i+1].status!=='fulfilled')return;for(const row of responses[i+1].value?.[id]||[]){const t=eh20PriceTime(row.start),p=ehNum(row.mean);if(Number.isFinite(t)&&p!==null)map.set(t,p*factor);}});
+   this._ehcmpData={key,limits,rows:ehCompareRows(responses[0].value,c,h,limits),prices};
+  }catch(e){if(request===this._ehcmpRequest)this._ehcmpData={key,error:e.message||'Historie niet beschikbaar.'};}
+  finally{if(request===this._ehcmpRequest){this._ehcmpLoading=false;this._schedule();}}
+ };
+ P._costsHtml=function(h,c){
+  if(this._ehcmpOpen){this._ehcmpInit();return ehCompareHtml(this);}
+  return oldCosts.call(this,h,c).replace('<main class="subpage">','<main class="subpage"><button type="button" class="ehcmp-entry" data-ehcmp-action="open">Stroomvergelijker →<br><small>Vergelijk extra contracten op jouw stroomverbruik</small></button>');
+ };
+ P._render=function(){
+  // Keep unfinished forms and transfers stable when HA delivers live state updates.
+  if(this._view==='costs'&&this._ehcmpOpen&&(this._ehcmpEditing||this._ehcmpTransfer)&&this.shadowRoot?.querySelector?.('.ehcmp')&&!this._ehcmpForce)return;
+  this._ehcmpForce=false;oldRender.call(this);
+  const root=this.shadowRoot,style=root?.querySelector?.('style');if(style)style.textContent+='\n'+ehCompareCss();
+  if(!root||this._ehcmpEvents)return;this._ehcmpEvents=true;
+  const update=()=>{this._ehcmpForce=true;this._schedule();};
+  root.addEventListener('submit',e=>{
+   if(!e.target?.matches?.('[data-ehcmp-form]'))return;e.preventDefault();
+   const form=e.target,d=new FormData(form),num=n=>d.get(n)?.trim()===''?null:Number(d.get(n));
+   try{
+    const c=ehCompareContract({id:d.get('id')||'contract-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),name:d.get('name'),type:d.get('type'),priceEntity:d.get('priceEntity'),buy:num('buy'),sell:num('sell'),daily:num('daily'),exportFee:num('exportFee'),settlement:d.get('settlement'),from:d.get('from'),to:d.get('to'),reference:d.has('reference')});
+    this._ehcmpSave([...(this._ehcmpContracts||[]).filter(x=>x.id!==c.id).map(x=>c.reference?{...x,reference:false}:x),c]);update();
+   }catch(err){let alert=form.querySelector('[role="alert"]');if(!alert){alert=document.createElement('p');alert.setAttribute('role','alert');form.prepend(alert);}alert.textContent=err.message;}
+  });
+  root.addEventListener('change',e=>{const key=e.target?.dataset?.ehcmpDate;if(!key)return;if(key==='start')this._ehcmpStart=e.target.value;else this._ehcmpEnd=e.target.value;this._ehcmpLoad();update();});
+  root.addEventListener('click',e=>{
+   const target=e.target?.closest?.('[data-ehcmp-action],[data-ehcmp-period],[data-ehcmp-edit],[data-ehcmp-delete]');if(!target)return;
+   this._ehcmpInit();const d=target.dataset;
+   try{
+    if(d.ehcmpPeriod){this._ehcmpPeriod=d.ehcmpPeriod;this._ehcmpLoad();}
+    if(d.ehcmpEdit){this._ehcmpTransfer=false;this._ehcmpEditing={...this._ehcmpContracts.find(c=>c.id===d.ehcmpEdit)};}
+    if(d.ehcmpDelete){if(window.confirm('Dit contract uit de stroomvergelijker verwijderen?'))this._ehcmpSave(this._ehcmpContracts.filter(c=>c.id!==d.ehcmpDelete));}
+    switch(d.ehcmpAction){
+     case 'open':this._ehcmpOpen=true;this._ehcmpLoad();break;
+     case 'back':this._ehcmpOpen=false;this._ehcmpEditing=null;this._ehcmpTransfer=false;break;
+     case 'cancel':this._ehcmpEditing=null;break;
+     case 'add':this._ehcmpTransfer=false;this._ehcmpEditing={type:'fixed',settlement:'separate'};break;
+     case 'zonneplan':this._ehcmpTransfer=false;this._ehcmpEditing={name:'Zonneplan',type:'dynamic',settlement:'separate',priceEntity:this.config.prijs,reference:true};break;
+     case 'refresh':this._ehcmpLoad();break;
+     case 'transfer':this._ehcmpTransfer=!this._ehcmpTransfer;break;
+     case 'download':{const blob=new Blob([JSON.stringify({version:1,contracts:this._ehcmpContracts},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='energiehuis-stroomcontracten.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);break;}
+     case 'import':{const text=root.querySelector('[data-ehcmp-json]').value;if(text.length>100000)throw new Error('Import is te groot.');const parsed=JSON.parse(text);if(parsed.version!==1)throw new Error('Onbekende exportversie.');const incoming=ehCompareList(parsed.contracts),merged=new Map(this._ehcmpContracts.map(c=>[c.id,c]));for(const c of incoming)merged.set(c.id,c);this._ehcmpSave([...merged.values()]);this._ehcmpTransfer=false;break;}
+    }
+   }catch(err){this._ehcmpMessage=err.message;}
+   update();
   });
  };
 })();
