@@ -74,7 +74,7 @@ test('v1.10 sessies en veilige standaard-uitgeschakelde bediening blijven aanwez
  assert.match(code,/function eh17SessionsFromHistory/);
  assert.match(code,/function eh20ControlStatus/);
  assert.match(code,/charge_control_enabled: false/);
- assert.match(code,/EH_VERSION = '1\.13\.0-rc\.1'/);
+ assert.match(code,/EH_VERSION = '1\.13\.0-rc\.2'/);
 });
 test('alleen zonneladen: energiebegrenzing, verliezen en latere ontlading',()=>{
  const data=[bin(0,0,8),bin(1,5,0),bin(2,5,0)];
