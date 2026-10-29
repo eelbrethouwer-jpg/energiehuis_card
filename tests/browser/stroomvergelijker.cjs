@@ -1,11 +1,12 @@
 // Run with Node + Playwright installed; fixture values are fictional.
-const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
+const {chromium}=require(require.resolve('playwright',{paths:[process.env.EH_PLAYWRIGHT_MODULES||process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const source=fs.readFileSync(path.join(__dirname,'../../energiehuis-card.js'),'utf8');
-const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/card.js'?'text/javascript':'text/html');res.end(req.url==='/card.js'?source:'<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;background:#061722}energiehuis-card{display:block;max-width:900px;margin:auto}</style><script src="/card.js"></script><energiehuis-card></energiehuis-card>');});
+const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/card.js'?'text/javascript; charset=utf-8':'text/html; charset=utf-8');res.end(req.url==='/card.js'?source:'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;background:#061722}energiehuis-card{display:block;max-width:900px;margin:auto}</style><script src="/card.js"></script><energiehuis-card></energiehuis-card>');});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'Europe/Amsterdam'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'Europe/Amsterdam',locale:'nl-NL'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.clock.install({time:new Date('2026-10-29T12:00:00Z')});
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.evaluate(()=>{
   const card=document.querySelector('energiehuis-card');window.serviceCalls=0;
@@ -26,7 +27,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-ehcmp-action="zonneplan"]').click();await fill('sell','.08');await fill('exportFee','.01');await fill('daily','.2');await page.locator('[data-ehcmp-form] button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length===2&&!document.querySelector('energiehuis-card')._ehcmpLoading);
  await page.locator('[data-ehcmp-period="custom"]').click();await page.locator('[data-ehcmp-date="start"]').fill('2026-10-01');await page.locator('[data-ehcmp-date="end"]').fill('2026-10-01');
- await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.textContent.includes('€ 11,36'));
+ await page.locator('[data-ehcmp-date="end"]').blur();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.textContent.includes('€ 11,36')).catch(async e=>{console.log(await page.locator('.ehcmp').innerText());console.log(await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {start:c._ehcmpStart,end:c._ehcmpEnd,data:c._ehcmpData?.key,contracts:c._ehcmpContracts};}));await page.screenshot({path:'/tmp/energiehuis-stroomvergelijker.png',fullPage:true});throw e;});
  assert.match(await page.locator('.ehcmp').innerText(),/2,40 duurder/);
  await page.locator('.ehcmp-result summary').first().click();assert.match(await page.locator('.ehcmp-result').first().innerText(),/Terugleverkosten/);
  await page.locator('.ehcmp-result').first().locator('[data-ehcmp-edit]').click();await fill('daily','.3');await page.locator('[data-ehcmp-form] button[type=submit]').click();
@@ -38,7 +40,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   const overflow=await page.locator('.ehcmp').evaluate(el=>el.scrollWidth>el.clientWidth+1);assert.equal(overflow,false,'overflow '+width);
  }
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/energiehuis-stroomvergelijker.png',fullPage:true});
- await page.locator('[data-ehcmp-action="back"]').click();assert.match(await page.locator('.subpage').innerText(),/Vattenfall 1 jaar/);
+ await page.locator('[data-ehcmp-action="back"]').click();await page.locator('[data-ehcmp-action="open"]').waitFor();assert.match(await page.locator('.subpage').innerText(),/Vattenfall 1 jaar/);
  await page.locator('[data-ehcmp-action="open"]').click();page.once('dialog',d=>d.accept());await page.locator('.ehcmp-result').first().locator('summary').click();await page.locator('.ehcmp-result').first().locator('[data-ehcmp-delete]').click();
  assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);

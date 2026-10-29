@@ -28,8 +28,8 @@ Contracten staan in browseropslag op dezelfde Home Assistant-origin; ze zijn nie
 - 79 bestaande tests als baseline geslaagd.
 - 94 tests inclusief nieuwe reken-/regressietests geslaagd in Node, tijdzone Europe/Amsterdam.
 - JavaScript-syntaxcontrole geslaagd.
-- Browserworkflow toegevoegd: toevoegen/bewerken/verwijderen, Zonneplan, perioden, export/import, live formulierbehoud, terugkeer Vattenfall, 320/390/768/1280 px, nul HA-servicecalls.
-- Lokale browseruitvoering geblokkeerd doordat Chromium niet geïnstalleerd is en de download een ongeldig archief retourneert. GitHub-browserstatus moet afzonderlijk worden gecontroleerd.
+- Lokale Chromium-browsertest geslaagd (fictieve meetdata): toevoegen/bewerken/verwijderen, Zonneplan, perioden, export/import, live formulierbehoud, terugkeer Vattenfall, 320/390/768/1280 px, nul HA-servicecalls.
+- Chromium via alternatieve downloadbron beschikbaar gemaakt. Mobiele screenshot visueel gecontroleerd; geen horizontale overflow op 320/390/768/1280 px. GitHub-workflow gebruikt Ubuntu 24.04.
 - Echte Home Assistant-installatie, beschikbare tariefhistorie en iPhone Companion nog niet praktisch geverifieerd.
 
 ## Release
