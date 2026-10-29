@@ -3018,7 +3018,7 @@ function ehCompareCss(){return `.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{fo
    const [dynamic,fixed]=await Promise.all([get('leveranciers.json'),get('vaste-contracten.json')]);
    this._ehcatEntries=ehTariffCatalogue(dynamic,fixed);
   }catch(_){this._ehcatError='Tarieven konden niet worden opgehaald of het bronformaat is gewijzigd. Je opgeslagen contracten blijven beschikbaar.';}
-  finally{clearTimeout(timer);this._ehcatLoading=false;this._ehcmpForce=true;this._schedule();}
+  finally{clearTimeout(timer);this._ehcatLoading=false;if(this._ehcatOpen)this._ehcmpForce=true;this._schedule();}
  };
  P._render=function(){
   render.call(this);const root=this.shadowRoot;if(!root||this._ehcatEvents)return;this._ehcatEvents=true;

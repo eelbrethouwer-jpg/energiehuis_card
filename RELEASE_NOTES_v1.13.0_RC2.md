@@ -25,10 +25,10 @@ Alleen GET-verzoeken naar twee vaste raw-GitHub-bestanden, zonder credentials. G
 
 ## Validatie
 - 94 bestaande tests als baseline groen.
-- 107 tests groen, inclusief prijscomponenten, bronvalidatie, ontbrekende gegevens, negatieve marktprijzen/terugleveropbrengsten, maandkosten en netwerkfouten.
+- 108 tests groen, inclusief prijscomponenten, bronvalidatie, ontbrekende gegevens, negatieve marktprijzen/terugleveropbrengsten, maandkosten en netwerkfouten.
 - Chromium met fictieve meet-/tariefdata: oorspronkelijke bediening, catalogus ophalen/filteren, vast/dynamisch concept, verplichte bevestiging, opslaan, terugkeer, export/import, netwerkfout en formulierbreedtes 320/390/768/1280 px geslaagd. Geen HA-servicecalls.
 - Adapter gecontroleerd tegen de daadwerkelijk gelezen externe bestanden; ontbrekende datums/kosten zichtbaar.
-- Lokale directe browserfetch naar raw GitHub geblokkeerd door de uitvoeromgeving; aparte live-endpoint/CORS-test in GitHub-workflow toegevoegd. Uiteindelijke CI-status controleren.
+- Lokale directe browserfetch naar raw GitHub geblokkeerd door de uitvoeromgeving; GitHub-live-endpoint/CORS-test geslaagd met 42 aanbiedingen. HACS-, regressie- en browserworkflow groen op de eerste kandidaatcommit; laatste correctie krijgt opnieuw CI.
 - Eigen HA-/iPhone-praktijktest, beschikbare kale beursprijssensor en bijbehorende meetdekking nog open.
 
 Releasekandidaat op basis van main na merge van PR #19. Geen publicatie of installatie uitgevoerd.

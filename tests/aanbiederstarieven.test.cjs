@@ -64,3 +64,10 @@ test('netwerkfout bewaart opgehaalde lijst en opgeslagen contracten',async()=>{
 test('catalogus ophalen is alleen GET naar vaste endpoints zonder credentials of offerteverzoek',async()=>{
  const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};const f=fixture(),calls=[];context.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,text:async()=>JSON.stringify(url.endsWith('leveranciers.json')?f.dynamic:f.fixed)};};await c._ehcatLoad();assert.equal(c._ehcatEntries.length,2);assert.equal(calls.length,2);assert.ok(calls.every(x=>x.options.credentials==='omit'&&x.options.body===undefined&&x.url.startsWith('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/')));
 });
+test('late catalogusrespons forceert geen vervanging van een inmiddels geopend formulier',async()=>{
+ const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};c._ehcatOpen=true;
+ const f=fixture(),pending=[];context.fetch=()=>new Promise(resolve=>pending.push(resolve));
+ const task=c._ehcatLoad();c._ehcatOpen=false;c._ehcmpEditing={name:'Mijn invoer'};c._ehcmpForce=false;
+ pending[0]({ok:true,text:async()=>JSON.stringify(f.dynamic)});pending[1]({ok:true,text:async()=>JSON.stringify(f.fixed)});await task;
+ assert.equal(c._ehcmpForce,false);assert.equal(c._ehcmpEditing.name,'Mijn invoer');
+});
