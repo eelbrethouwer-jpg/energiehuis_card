@@ -265,3 +265,12 @@ De batterij-businesscase en het contractvoordeel worden bewust gescheiden.
 ## Ontwikkelrichting
 
 Na Energiehuis v1.7.0 volgen verdere modularisering, instellingen vanuit Energiehuis zelf, uitgebreidere water/gas-grafieken en verdere verfijning van de persoonlijke energie- en mobiliteitsanalyse.
+
+
+## Stroomvergelijker (v1.13.0 releasekandidaat)
+
+Open **Kosten → Stroomvergelijker**. Voeg een contract toe en vul alle tarieven in (expliciet 0 als kosten niet gelden). Met **Zonneplan instellen** kies je de historische afnameprijssensor; tarieven worden niet vooraf ingevuld. De huidige Vattenfall-grafieken blijven op de bestaande kostenpagina.
+
+De nieuwe vergelijking gebruikt dezelfde afgeronde P1-meeturen voor alle contracten. Kies maand, jaar of eigen periode en klik een kostenbalk open voor details. Onvolledige P1-/prijshistorie levert geen schijnbaar compleet totaal op. Gebruik **Export / import** voor een back-up of overdracht naar een ander apparaat. Contracten blijven lokaal in deze browser; er worden geen HA-helpers aangemaakt.
+
+De uitkomst betreft **indicatieve leverancierskosten**. Uurmiddelden zijn geen exacte kwartierafrekening; teruglevering gebruikt een vast ingevoerd tarief. Geen automatisch bijgewerkte aanbiedingen, staffels, welkomstkortingen, netbeheer, belastingvermindering of dynamische terugleverprijzen. Saldo over de geselecteerde periode is slechts een expliciet gekozen scenario, geen vastgestelde jaarafrekening. Zie de [volledige grenzen en teststatus](RELEASE_NOTES_v1.13.0_RC.md).

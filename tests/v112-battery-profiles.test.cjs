@@ -96,5 +96,5 @@ test('bestaande 10kWh-Home Assistant-batterij blijft apart; geen scriptactivatie
  assert.equal(EH_DEFAULTS.charge_control_enabled,false);
  assert.match(source,/function eh17BatteryHtml/);
  assert.match(source,/vaste 10-kWh-simulatie/i);
- assert.match(source,/const EH_VERSION = '1\.12\.1'/);
+ assert.match(source,/const EH_VERSION = '1\.13\.0-rc\.1'/);
 });
