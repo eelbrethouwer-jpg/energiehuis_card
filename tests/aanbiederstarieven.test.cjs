@@ -3,11 +3,13 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const source=fs.readFileSync(require('node:path').join(__dirname,'..','energiehuis-card.js'),'utf8');
 const registry=new Map();class Element{attachShadow(){return {addEventListener(){}};}}
 const context={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,Intl,URL,window:{customCards:[]},HTMLElement:Element,customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},AbortController,setTimeout,clearTimeout};
-vm.runInNewContext(source+'\n;globalThis.T={ehTariffCatalogue,ehTariffSource,ehTariffSourceHtml,ehTariffStatus,ehTariffUrl,ehTariffFixedCost,ehCompareContract,ehCompareCalculate,ehCompareForm,EnergiehuisCard};',context);
+vm.runInNewContext(source+'\n;globalThis.T={ehTariffCatalogue,ehTariffSource,ehTariffSourceHtml,ehTariffStatus,ehTariffUrl,ehTariffFixedCost,ehTariffYearTax,ehTariffQuickContract,ehCompareList,ehCompareContract,ehCompareCalculate,ehCompareForm,EnergiehuisCard};',context);
 const T=context.T;
 const field=(n,unit='EUR/kWh',over={})=>({bedragInclBtw:n,eenheid:unit,laatstGecontroleerd:'2026-10-25',bronUrl:'https://example.org/tarieven',geverifieerd:true,...over});
 const fixture=()=>({dynamic:{versie:1,valuta:'EUR',leveranciers:[{id:'test',naam:'Test dynamisch',producten:{stroom:true},tariefUrl:'https://example.org',tarieven:{stroomVastPerMaand:field(6,'EUR/maand'),stroomInkoopopslag:field(.02),terugleverCorrectie:field(-.03)}}]},fixed:{valuta:'EUR',inclBtw:true,contracten:[{id:'vast',leverancier:'Test',naam:'Vast',tarieven:{stroomLeveringPerKwh:field(.2),stroomVastPerMaand:field(10,'EUR/maand'),terugleververgoedingPerKwh:field(.08),terugleverkostenPerKwh:field(.01)}}]}});
 const entries=()=>{const f=fixture();return T.ehTariffCatalogue(f.dynamic,f.fixed);};
+const taxes=()=>({versie:1,valuta:'EUR',jaren:{2026:{geverifieerd:true,stroomPerKwh:{bedragInclBtw:.110848}}}});
+
 const lim={from:new Date(2026,9,1),to:new Date(2026,9,2),days:1};
 const rows=Array.from({length:24},(_,i)=>({t:+lim.from+i*3600000,import:2,export:.5}));
 const prices={'sensor.market':new Map(rows.map(r=>[r.t,.1]))};
@@ -62,12 +64,49 @@ test('netwerkfout bewaart opgehaalde lijst en opgeslagen contracten',async()=>{
  const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};const list=entries();c._ehcatEntries=list;c._ehcmpContracts=[{id:'keep'}];context.fetch=async()=>{throw new Error('offline');};await c._ehcatLoad();assert.equal(c._ehcatEntries,list);assert.equal(c._ehcmpContracts[0].id,'keep');assert.match(c._ehcatError,/niet worden opgehaald/);assert.equal(c._ehcatLoading,false);
 });
 test('catalogus ophalen is alleen GET naar vaste endpoints zonder credentials of offerteverzoek',async()=>{
- const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};const f=fixture(),calls=[];context.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,text:async()=>JSON.stringify(url.endsWith('leveranciers.json')?f.dynamic:f.fixed)};};await c._ehcatLoad();assert.equal(c._ehcatEntries.length,2);assert.equal(calls.length,2);assert.ok(calls.every(x=>x.options.credentials==='omit'&&x.options.body===undefined&&x.url.startsWith('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/')));
+ const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};const f=fixture(),calls=[];context.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,text:async()=>JSON.stringify(url.endsWith('leveranciers.json')?f.dynamic:url.endsWith('energiebelasting.json')?taxes():f.fixed)};};await c._ehcatLoad();assert.equal(c._ehcatEntries.length,2);assert.equal(calls.length,3);assert.equal(c._ehcatTaxes.jaren[2026].stroomPerKwh.bedragInclBtw,.110848);assert.ok(calls.every(x=>x.options.credentials==='omit'&&x.options.body===undefined&&x.url.startsWith('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/')));
 });
 test('late catalogusrespons forceert geen vervanging van een inmiddels geopend formulier',async()=>{
  const c=Object.create(T.EnergiehuisCard.prototype);c._schedule=()=>{};c._ehcatOpen=true;
  const f=fixture(),pending=[];context.fetch=()=>new Promise(resolve=>pending.push(resolve));
  const task=c._ehcatLoad();c._ehcatOpen=false;c._ehcmpEditing={name:'Mijn invoer'};c._ehcmpForce=false;
- pending[0]({ok:true,text:async()=>JSON.stringify(f.dynamic)});pending[1]({ok:true,text:async()=>JSON.stringify(f.fixed)});await task;
+ pending[0]({ok:true,text:async()=>JSON.stringify(f.dynamic)});pending[1]({ok:true,text:async()=>JSON.stringify(f.fixed)});pending[2]({ok:true,text:async()=>JSON.stringify(taxes())});await task;
  assert.equal(c._ehcmpForce,false);assert.equal(c._ehcmpEditing.name,'Mijn invoer');
+});
+
+test('snelle vaste contractkeuze neemt bronbedragen en geverifieerde 2026-belasting over',()=>{
+ const c=T.ehTariffQuickContract(entries()[1],taxes(),2026);
+ assert.equal(c.pending,undefined);assert.equal(c.id,'catalog-fixed-vast');
+ assert.ok(Math.abs(c.buy-.310848)<1e-9);assert.equal(c.delivery,.2);
+ assert.equal(c.tax,.110848);assert.equal(c.sourceConfirmed,true);assert.equal(c.reference,false);
+ assert.equal(c.from,'2026-01-01');assert.equal(c.to,'2026-12-31');
+ const calc=T.ehCompareCalculate([c],rows,{},lim).results[0];assert.ok(calc.total!==null);
+});
+test('geen belastingbron of onvolledige brontarieven geeft opgeslagen maar niet-berekenbare selectie',()=>{
+ const f=fixture();delete f.fixed.contracten[0].tarieven.terugleverkostenPerKwh;
+ const incomplete=T.ehTariffQuickContract(T.ehTariffCatalogue(f.dynamic,f.fixed)[1],taxes(),2026);
+ const noTax=T.ehTariffQuickContract(entries()[1],null,2026);
+ for(const item of [incomplete,noTax]){
+  assert.equal(item.pending,true);
+  const saved=JSON.parse(JSON.stringify(T.ehCompareList([item])))[0];
+  assert.equal(saved.pending,true);assert.equal(T.ehCompareCalculate([saved],rows,{},lim).results[0].total,null);
+ }
+ assert.equal(T.ehTariffYearTax(taxes(),2026),.110848);
+ assert.equal(T.ehTariffYearTax(taxes(),2025),null);
+ assert.equal(T.ehTariffYearTax({...taxes(),jaren:{2026:{geverifieerd:false,stroomPerKwh:{bedragInclBtw:.110848}}}},2026),null);
+});
+test('dynamisch kan zonder sensoraanpassingen worden opgeslagen, maar toont geen misleidend totaal',()=>{
+ const pending=T.ehTariffQuickContract(entries()[0],taxes(),2026,[]);
+ assert.equal(pending.pending,true);assert.match(pending.pendingReason,/prijssensor/i);
+ const output=T.ehCompareCalculate([pending],rows,prices,lim).results[0];assert.equal(output.total,null);
+ const known=T.ehCompareContract(draft());
+ const ready=T.ehTariffQuickContract(entries()[0],taxes(),2026,[known]);
+ assert.equal(ready.pending,undefined);assert.equal(ready.priceEntity,'sensor.market');
+ assert.ok(T.ehCompareCalculate([ready],rows,prices,lim).results[0].total!==null);
+});
+test('oude contractopslag blijft strikt en kan niet met voorlopige flags omzeild worden',()=>{
+ assert.throws(()=>T.ehCompareList([{...entries()[1].draft,pending:true}]));
+ const valid=T.ehTariffQuickContract(entries()[1],taxes(),2026);
+ const list=T.ehCompareList([valid]);assert.equal(list[0].id,valid.id);
+ assert.throws(()=>T.ehCompareContract({...valid,id:'custom-malformed',pending:true}));
 });
