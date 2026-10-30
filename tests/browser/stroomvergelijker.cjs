@@ -62,15 +62,16 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  // Fictitious catalogue fixtures isolate the UI tests from changing third-party prices.
  const rate=(value,unit='EUR/kWh')=>({bedragInclBtw:value,eenheid:unit,laatstGecontroleerd:'2026-10-25',bronUrl:'https://example.org/tarief'});
+ const taxFixture={versie:1,valuta:'EUR',jaren:{2026:{geverifieerd:true,stroomPerKwh:{bedragInclBtw:.110848}}}};
  const catalogue={dynamic:{versie:1,valuta:'EUR',leveranciers:[{id:'voorbeeld',naam:'Voorbeeld dynamisch',producten:{stroom:true},tariefUrl:'https://example.org',tarieven:{stroomVastPerMaand:rate(6,'EUR/maand'),stroomInkoopopslag:rate(.02),terugleverCorrectie:rate(-.03)}}]},fixed:{valuta:'EUR',inclBtw:true,contracten:[{id:'voorbeeld-vast',leverancier:'Voorbeeld',naam:'Vast',tarieven:{stroomVastPerMaand:rate(8,'EUR/maand'),stroomLeveringPerKwh:rate(.2),terugleververgoedingPerKwh:rate(.08),terugleverkostenPerKwh:rate(.01)}}]}};
  let offline=false;
- await page.route('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**',route=>offline?route.abort():route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(route.request().url().endsWith('/leveranciers.json')?catalogue.dynamic:catalogue.fixed)}));
- await page.locator('[data-ehcat-action="open"]').click();await page.locator('[data-ehcat-add]').first().waitFor();assert.equal(await page.locator('[data-ehcat-add]').count(),2);
+ await page.route('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**',route=>offline?route.abort():route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(route.request().url().endsWith('/leveranciers.json')?catalogue.dynamic:route.request().url().endsWith('/energiebelasting.json')?taxFixture:catalogue.fixed)}));
+ await page.locator('[data-ehcat-action="open"]').click();await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-ehcat-add]').length===2);assert.equal(await page.locator('[data-ehcat-add]').count(),2);
  await page.locator('[data-ehcat-filter]').selectOption('fixed');await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-ehcat-add]').length===1);assert.equal(await page.locator('[data-ehcat-add]').count(),1);
- await page.locator('[data-ehcat-add]').click();await fill('tax','.12');await page.locator('[data-ehcmp-form] button[type=submit]').click();assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
+ await page.locator('[data-ehcat-advanced] summary').click();await page.locator('[data-ehcat-add]').click();await fill('tax','.12');await page.locator('[data-ehcmp-form] button[type=submit]').click();assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
  await page.locator('[name="sourceConfirmed"]').check();await page.locator('[data-ehcmp-form] button[type=submit]').click();await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length===2);
  const saved=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.source));assert.equal(saved.buy,.32);assert.equal(saved.monthly,8);assert.equal(saved.source.fields.length,4);
- await page.locator('[data-ehcat-action="open"]').click();await page.locator('[data-ehcat-filter]').selectOption('dynamic');await page.locator('[data-ehcat-add^="dynamic-"]').click();await fill('tax','.12');await fill('priceEntity','sensor.market');
+ await page.locator('[data-ehcat-action="open"]').click();await page.locator('[data-ehcat-filter]').selectOption('dynamic');await page.locator('[data-ehcat-advanced] summary').click();await page.locator('[data-ehcat-add^="dynamic-"]').click();await fill('tax','.12');await fill('priceEntity','sensor.market');
  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');c._hass.states['sensor.market']={state:'.25',attributes:{unit_of_measurement:'€/kWh'}};});
  await page.locator('[name="sourceConfirmed"]').check();
  for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.locator('.ehcmp').evaluate(el=>el.scrollWidth>el.clientWidth+1),false,'catalogue form overflow '+width);}
@@ -78,7 +79,23 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-ehcat-action="open"]').click();offline=true;await page.locator('[data-ehcat-action="refresh"]').click();await page.locator('.ehcat [role="alert"]').waitFor();assert.equal(await page.locator('[data-ehcat-add]').count(),1);assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),3);
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven.png',fullPage:true});
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
- if(process.env.EH_TEST_LIVE_TARIFFS==='1'){await page.unroute('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**');await page.locator('[data-ehcat-action="refresh"]').click();await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._ehcatLoading);const live=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {error:c._ehcatError,count:c._ehcatEntries?.length};});assert.equal(live.error,'');assert.ok(live.count>0);console.log('Live tariff endpoints + CORS + schema OK: '+live.count+' offers');await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven-live.png',fullPage:true});}
+ // Nieuw standaardpad: selecteer contract en klik uitsluitend op opslaan, zonder formulieren.
+ await page.locator('[data-ehcat-filter]').selectOption('fixed');
+ await page.locator('[data-ehcat-select]').selectOption('fixed-voorbeeld-vast');
+ await page.waitForFunction(()=>!document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehcat-action="save-selected"]')?.disabled);
+ await page.locator('[data-ehcat-action="save-selected"]').click();
+ const fastFixed=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.id==='catalog-fixed-voorbeeld-vast'));
+ assert.ok(fastFixed);assert.equal(fastFixed.pending,undefined);
+ assert.ok(Math.abs(fastFixed.buy-.310848)<1e-9);
+ await page.locator('[data-ehcat-action="open"]').click();
+ await page.locator('[data-ehcat-filter]').selectOption('dynamic');
+ await page.locator('[data-ehcat-select]').selectOption('dynamic-voorbeeld');
+ await page.locator('[data-ehcat-action="save-selected"]').click();
+ const fastDynamic=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.id==='catalog-dynamic-voorbeeld'));
+ assert.equal(fastDynamic.priceEntity,'sensor.market');
+ assert.equal(fastDynamic.pending,undefined);
+ assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
+ if(process.env.EH_TEST_LIVE_TARIFFS==='1'){await page.locator('[data-ehcat-action="open"]').click();await page.unroute('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**');await page.locator('[data-ehcat-action="refresh"]').click();await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._ehcatLoading);const live=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {error:c._ehcatError,count:c._ehcatEntries?.length};});assert.equal(live.error,'');assert.ok(live.count>0);console.log('Live tariff endpoints + CORS + schema OK: '+live.count+' offers');await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven-live.png',fullPage:true});}
  // Persistence must survive a real page reload, independently of Recorder data.
  const beforeReload=await page.evaluate(()=>JSON.stringify(document.querySelector('energiehuis-card')._ehcmpContracts));
  await page.reload();
