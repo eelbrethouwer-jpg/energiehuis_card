@@ -81,6 +81,9 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  // Nieuw standaardpad: selecteer contract en klik uitsluitend op opslaan, zonder formulieren.
  await page.locator('[data-ehcat-filter]').selectOption('fixed');
+ // No selection must fail explicitly; never save the previously cached contract.
+ await page.locator('[data-ehcat-action="save-selected"]').click();
+ assert.match(await page.locator('.ehcat [role="alert"]').innerText(),/Kies eerst/);
  // Regression: the native selected value is set, but WebKit may delay the change event.
  await page.locator('[data-ehcat-select]').evaluate(el=>{el.value='fixed-voorbeeld-vast';});
  assert.equal(await page.locator('[data-ehcat-action="save-selected"]').isEnabled(),true);
