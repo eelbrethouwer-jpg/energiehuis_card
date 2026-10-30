@@ -19,7 +19,23 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  });
  await page.locator('[data-ehcmp-action="open"]').click();await page.locator('[data-ehcmp-action="add"]').click();
  const fill=async(name,value)=>page.locator('[data-ehcmp-form] [name="'+name+'"]').fill(value);
- await fill('name','Test vast');await fill('buy','.3');await fill('sell','.08');await fill('exportFee','.01');await fill('daily','.2');
+ // Empty required input must reach our handler and show actionable feedback, including in shadow DOM.
+ await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ await page.locator('[data-ehcmp-error]').waitFor({state:'visible'});
+ assert.match(await page.locator('[data-ehcmp-error]').innerText(),/Naam/);
+ assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),0);
+ await fill('name','Test vast');await fill('buy','0,3');await fill('sell','0,08');await fill('daily','0,2');
+ await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ assert.match(await page.locator('[data-ehcmp-error]').innerText(),/Extra terugleverkosten/);
+ assert.equal(await page.locator('[name="name"]').inputValue(),'Test vast');
+ await fill('exportFee','0,01');
+ // A storage failure must remain visible and leave the draft available for retry.
+ await page.evaluate(()=>{window.originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Storage full','QuotaExceededError');};});
+ await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ await page.locator('[data-ehcmp-error]').waitFor({state:'visible'});
+ assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),0);
+ assert.equal(await page.locator('[name="buy"]').inputValue(),'0,3');
+ await page.evaluate(()=>{Storage.prototype.setItem=window.originalSetItem;});
  // State update must not destroy an unfinished form or the input focus.
  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');c.hass=c._hass;});
  assert.equal(await page.locator('[name="name"]').inputValue(),'Test vast');
@@ -63,5 +79,10 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven.png',fullPage:true});
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  if(process.env.EH_TEST_LIVE_TARIFFS==='1'){await page.unroute('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**');await page.locator('[data-ehcat-action="refresh"]').click();await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._ehcatLoading);const live=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {error:c._ehcatError,count:c._ehcatEntries?.length};});assert.equal(live.error,'');assert.ok(live.count>0);console.log('Live tariff endpoints + CORS + schema OK: '+live.count+' offers');await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven-live.png',fullPage:true});}
+ // Persistence must survive a real page reload, independently of Recorder data.
+ const beforeReload=await page.evaluate(()=>JSON.stringify(document.querySelector('energiehuis-card')._ehcmpContracts));
+ await page.reload();
+ await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpInit());
+ assert.equal(await page.evaluate(()=>JSON.stringify(document.querySelector('energiehuis-card')._ehcmpContracts)),beforeReload);
  await browser.close();server.close();console.log('Browser OK: add/edit/delete, reference, period, live updates, export/import, return to Vattenfall, 320/390/768/1280px, no HA service calls; catalogue fetch/filter, fixed and dynamic draft, source confirmation, monthly fees, network failure and form widths.');
 })().catch(e=>{console.error(e);server.close();process.exit(1);});

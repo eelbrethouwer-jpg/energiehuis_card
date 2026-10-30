@@ -7,7 +7,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'..','energiehu
 const registry=new Map();
 class FakeElement{attachShadow(){return {addEventListener(){}};}}
 const context={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,Intl,window:{customCards:[]},customElements:{get:k=>registry.get(k),define:(k,v)=>registry.set(k,v)},HTMLElement:FakeElement};
-vm.runInNewContext(source+'\n;globalThis.C={ehCompareContract,ehCompareList,ehCompareDates,ehCompareRows,ehCompareCalculate,ehCompareHtml,EnergiehuisCard,EH_DEFAULTS};',context);
+vm.runInNewContext(source+'\n;globalThis.C={ehCompareInputNumber,ehCompareValidateForm,ehCompareForm,ehCompareContract,ehCompareList,ehCompareDates,ehCompareRows,ehCompareCalculate,ehCompareHtml,EnergiehuisCard,EH_DEFAULTS};',context);
 const C=context.C;
 const from=new Date(2026,9,1),to=new Date(2026,9,2),limits={from,to,days:1};
 const rows=Array.from({length:24},(_,i)=>({t:+from+i*3600000,import:2,export:.5}));
@@ -92,4 +92,34 @@ test('zomer-/wintertijd verandert meeturen maar niet het aantal vaste-kostendage
  assert.equal(data.length,(lim.to-lim.from)/3600000);assert.equal(lim.days,1);
  const clean=data.map(r=>({...r,import:0,export:0}));
  assert.equal(C.ehCompareCalculate([fixed()],clean,{},lim).results[0].fixed,.2);
+});
+
+test('contractbedragen accepteren komma en punt zonder lege invoer als nul te bewaren',()=>{
+ assert.equal(C.ehCompareInputNumber('0,25'),.25);
+ assert.equal(C.ehCompareInputNumber(' 0.25 '),.25);
+ assert.equal(C.ehCompareInputNumber('-0,035'),-.035);
+ assert.equal(C.ehCompareInputNumber('0'),0);
+ assert.equal(C.ehCompareInputNumber(''),null);
+ for(const value of ['0,2,5','1.234,56','EUR 2','Infinity','0x10'])assert.ok(Number.isNaN(C.ehCompareInputNumber(value)));
+});
+const input=(name,value,extra={})=>({name,value,required:true,validity:{valid:true},getAttribute:()=>name,hasAttribute:()=>false,setAttribute(k,v){this[k]=v;},...extra});
+const formFor=fields=>({querySelectorAll:s=>s==='[aria-invalid]'?[]:fields});
+test('leeg verplicht veld geeft een gerichte fout met het te focussen veld',()=>{
+ const field=input('exportFee','');
+ assert.throws(()=>C.ehCompareValidateForm(formFor([field])),e=>e.field===field&&/exportFee/.test(e.message));
+ assert.equal(field['aria-invalid'],'true');
+});
+test('bronbevestiging en ongeldige bedragen blokkeren opslaan expliciet',()=>{
+ const consent=input('sourceConfirmed','on',{checked:false});
+ assert.throws(()=>C.ehCompareValidateForm(formFor([consent])),/brongegevens/);
+ const amount=input('buy','0,2,5',{hasAttribute:()=>true});
+ assert.throws(()=>C.ehCompareValidateForm(formFor([amount])),/geldig bedrag/);
+ assert.doesNotThrow(()=>C.ehCompareValidateForm(formFor([input('buy','0,25',{hasAttribute:()=>true})])));
+});
+test('formulier gebruikt zichtbare appvalidatie en behoudt een decimaal toetsenbord',()=>{
+ const html=C.ehCompareForm({type:'fixed'});
+ assert.match(html,/data-ehcmp-form novalidate/);
+ assert.match(html,/data-ehcmp-error role="alert" tabindex="-1" hidden/);
+ assert.match(html,/data-ehcmp-number inputmode="decimal"/);
+ assert.ok(html.indexOf('data-ehcmp-error')<html.indexOf('Contract opslaan'));
 });
