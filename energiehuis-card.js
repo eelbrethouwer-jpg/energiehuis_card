@@ -2863,13 +2863,36 @@ function ehCompareCalculate(contracts,rows,prices,limits){
  results.sort((a,b)=>(a.total===null?Infinity:a.total)-(b.total===null?Infinity:b.total));
  return {results,reference,imported,exported,coverage:expected?valid.length/expected:0,complete};
 }
+function ehCompareInputNumber(value){
+ const text=String(value??'').trim();
+ if(!text)return null;
+ return /^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(text)?Number(text.replace(',','.')):NaN;
+}
 function ehCompareField(name,label,value='',type='number'){
- return `<label>${ehEsc(label)}<input name="${name}" type="${type}" ${type==='number'?'step="any" inputmode="decimal"':''} value="${ehEsc(value??'')}" ${['name','exportFee'].includes(name)?'required':''}></label>`;
+ const numeric=type==='number';
+ return `<label>${ehEsc(label)}<input name="${name}" aria-label="${ehEsc(label)}" type="${numeric?'text':type}" ${numeric?'data-ehcmp-number inputmode="decimal"':''} value="${ehEsc(value??'')}" ${numeric||['name','priceEntity'].includes(name)?'required':''}></label>`;
+}
+function ehCompareValidateForm(form){
+ for(const field of form.querySelectorAll('[aria-invalid]'))field.removeAttribute('aria-invalid');
+ for(const field of form.querySelectorAll('input,select')){
+  const label=field.getAttribute('aria-label')||field.name;
+  let message='';
+  if(field.name==='sourceConfirmed'&&!field.checked)message='Bevestig dat je de brongegevens hebt gecontroleerd.';
+  else if(field.required&&!String(field.value||'').trim())message='Vul '+label+' in. Gebruik bij kosten expliciet 0 als ze niet gelden.';
+  else if(field.hasAttribute('data-ehcmp-number')&&!Number.isFinite(ehCompareInputNumber(field.value)))message='Vul bij '+label+' een geldig bedrag in, bijvoorbeeld 0,25 of 0.25.';
+  else if(!field.validity.valid)message='Controleer '+label+': '+field.validationMessage;
+  if(message){field.setAttribute('aria-invalid','true');const error=new Error(message);error.field=field;throw error;}
+ }
+}
+function ehCompareShowFormError(form,error){
+ const alert=form.querySelector('[data-ehcmp-error]');
+ if(alert){alert.textContent=error.message||'Opslaan is niet gelukt. Je invoer blijft behouden.';alert.hidden=false;alert.scrollIntoView({block:'center'});alert.focus({preventScroll:true});}
+ if(error.field){error.field.focus({preventScroll:true});error.field.scrollIntoView({block:'center'});}
 }
 function ehCompareForm(c){
  const dynamic=c.type==='dynamic',basis=c.priceBasis||'retail',market=basis==='market',components=basis==='components';
  const monthly=c.fixedPeriod==='monthly',exportMarket=c.exportMode==='market';
- return `<form data-ehcmp-form><h3>${c.id?'Contract bewerken':'Contract toevoegen'}</h3><input type="hidden" name="id" value="${ehEsc(c.id||'')}">
+ return `<form data-ehcmp-form novalidate><h3>${c.id?'Contract bewerken':'Contract toevoegen'}</h3><input type="hidden" name="id" value="${ehEsc(c.id||'')}">
  ${c.source?`<details class="ehcmp-info" open><summary>Brongegevens controleren</summary>${ehTariffSourceHtml(c.source,true)}</details>`:''}
  <div class="ehcmp-fields">${ehCompareField('name','Naam',c.name,'text')}
  <label>Contracttype<select name="type" data-ehcmp-form-select><option value="fixed" ${!dynamic?'selected':''}>Vast tarief</option><option value="dynamic" ${dynamic?'selected':''}>Dynamisch · historische uurprijzen</option></select></label>
@@ -2887,10 +2910,10 @@ function ehCompareForm(c){
  <label class="ehcmp-check"><input type="checkbox" name="reference" ${c.reference?'checked':''}>Dit is mijn Zonneplan-referentie</label>
  ${c.source?`<label class="ehcmp-check"><input type="checkbox" name="sourceConfirmed" required ${c.sourceConfirmed?'checked':''}>Ik heb bronbedragen, ontbrekende kosten, belasting, verrekenmethode en toepasselijke periode gecontroleerd.</label>`:''}
  <p class="subtle">Tarieven inclusief btw waar van toepassing. Uurprijzen leveren een indicatie. Saldo is een scenario over de gekozen periode, geen jaarafrekening. Welkomstkortingen, staffels en wijzigingen binnen de periode worden niet berekend. Maandkosten worden per kalenderdag naar rato verdeeld.</p>
- <div class="ehcmp-actions"><button type="submit">Contract opslaan</button><button type="button" data-ehcmp-action="cancel">Annuleren</button></div></form>`;
+ <p data-ehcmp-error role="alert" tabindex="-1" hidden></p><div class="ehcmp-actions"><button type="submit">Contract opslaan</button><button type="button" data-ehcmp-action="cancel">Annuleren</button></div></form>`;
 }
 function ehCompareDraft(form,previous={}){
- const data=new FormData(form),num=name=>{const value=data.get(name);return value===null||String(value).trim()===''?null:Number(value);};
+ const data=new FormData(form),num=name=>ehCompareInputNumber(data.get(name));
  const result={...previous};
  for(const key of ['id','name','type','priceBasis','priceEntity','exportMode','fixedPeriod','settlement','from','to'])if(data.has(key))result[key]=String(data.get(key));
  for(const key of ['buy','sell','exportFee','daily','monthly','delivery','tax','markup','exportAdjustment'])if(data.has(key))result[key]=num(key);
@@ -2925,7 +2948,7 @@ function ehCompareHtml(card){
  ${bars}${manage}${!list.length?'<div class="subsection"><h3>Voeg je eerste contract toe</h3><p>Neem tarieven over uit je aanbod. Stel daarna Zonneplan in als referentie. De bestaande Vattenfall-grafieken blijven apart beschikbaar.</p></div>':''}
  <p class="subtle">Contracten blijven alleen in deze browser / app op dit apparaat. Exporteer een back-up voor andere apparaten. Geen meetgeschiedenis of inloggegevens opgeslagen.</p></main>`;
 }
-function ehCompareCss(){return `.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{font:inherit;min-height:44px;border:1px solid #64899b;border-radius:10px;background:#123345;color:#ecf9ff;padding:9px 12px;cursor:pointer}.ehcmp button[aria-pressed="true"]{background:#17523f;border-color:#62dfb5}.ehcmp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ehcmp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ehcmp label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.ehcmp input,.ehcmp select,.ehcmp textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid #64899b;background:#092535;color:#ecf9ff}.ehcmp .ehcmp-check{flex-direction:row;align-items:center;margin:14px 0}.ehcmp-check input{width:auto}.ehcmp-result{border:1px solid #64899b55;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere}.ehcmp-result summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer;min-height:44px}.ehcmp-result summary small,.ehcmp-track{grid-column:1/-1}.ehcmp-track{display:block;position:relative;height:16px;background:#081e2c;border-radius:4px}.ehcmp-bar{position:absolute;height:12px;top:2px;background:#53dbae;border-radius:3px}.ehcmp-zero{position:absolute;top:0;height:100%;width:1px;background:#d7eaff}.ehcmp button:focus-visible,.ehcmp summary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ehcmp-info{font-size:12px;color:#ffdcaa;margin:10px 0}.ehcmp-info summary{cursor:pointer;min-height:32px;display:flex;align-items:center}.ehcmp-info summary:before{content:"▸";margin-right:6px}.ehcmp-info[open] summary:before{content:"▾"}.ehcmp-info p{line-height:1.5;margin-top:0}.ehcat h3{margin:0}.ehcat-list{max-height:360px;overflow:auto;overscroll-behavior:contain;margin:12px 0}.ehcat-list article{border-bottom:1px solid #64899b66;padding:12px 0;display:flex;flex-direction:column;gap:8px}.ehcat-source{font-size:12px;color:#aecbd8;line-height:1.5;margin:8px 0;overflow-wrap:anywhere}.ehcmp a{color:#8fdcc6}.ehcmp-info li{margin:8px 0}.ehcmp-entry{width:100%;margin:8px 0 12px;text-align:left}@media(max-width:520px){.ehcmp-fields{grid-template-columns:1fr}.ehcmp-fields.ehcmp-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}`;}
+function ehCompareCss(){return `.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{font:inherit;min-height:44px;border:1px solid #64899b;border-radius:10px;background:#123345;color:#ecf9ff;padding:9px 12px;cursor:pointer}.ehcmp button[aria-pressed="true"]{background:#17523f;border-color:#62dfb5}.ehcmp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ehcmp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ehcmp label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.ehcmp [data-ehcmp-error]{padding:12px;border:1px solid #ffb5a7;border-radius:8px;color:#ffddd5;background:#402323}.ehcmp [aria-invalid="true"]{border-color:#ffb5a7;outline:2px solid #ffb5a7}.ehcmp input,.ehcmp select,.ehcmp textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid #64899b;background:#092535;color:#ecf9ff}.ehcmp .ehcmp-check{flex-direction:row;align-items:center;margin:14px 0}.ehcmp-check input{width:auto}.ehcmp-result{border:1px solid #64899b55;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere}.ehcmp-result summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer;min-height:44px}.ehcmp-result summary small,.ehcmp-track{grid-column:1/-1}.ehcmp-track{display:block;position:relative;height:16px;background:#081e2c;border-radius:4px}.ehcmp-bar{position:absolute;height:12px;top:2px;background:#53dbae;border-radius:3px}.ehcmp-zero{position:absolute;top:0;height:100%;width:1px;background:#d7eaff}.ehcmp button:focus-visible,.ehcmp summary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ehcmp-info{font-size:12px;color:#ffdcaa;margin:10px 0}.ehcmp-info summary{cursor:pointer;min-height:32px;display:flex;align-items:center}.ehcmp-info summary:before{content:"▸";margin-right:6px}.ehcmp-info[open] summary:before{content:"▾"}.ehcmp-info p{line-height:1.5;margin-top:0}.ehcat h3{margin:0}.ehcat-list{max-height:360px;overflow:auto;overscroll-behavior:contain;margin:12px 0}.ehcat-list article{border-bottom:1px solid #64899b66;padding:12px 0;display:flex;flex-direction:column;gap:8px}.ehcat-source{font-size:12px;color:#aecbd8;line-height:1.5;margin:8px 0;overflow-wrap:anywhere}.ehcmp a{color:#8fdcc6}.ehcmp-info li{margin:8px 0}.ehcmp-entry{width:100%;margin:8px 0 12px;text-align:left}@media(max-width:520px){.ehcmp-fields{grid-template-columns:1fr}.ehcmp-fields.ehcmp-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}`;}
 (function ehCompareInstall(){
  const P=EnergiehuisCard.prototype,oldCosts=P._costsHtml,oldRender=P._render,oldConfig=P.setConfig;
  P.setConfig=function(config){this._ehcmpRequest=(this._ehcmpRequest||0)+1;this._ehcmpData=null;this._ehcmpLoading=false;return oldConfig.call(this,config);};
@@ -2975,10 +2998,11 @@ function ehCompareCss(){return `.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{fo
    if(!e.target?.matches?.('[data-ehcmp-form]'))return;e.preventDefault();
    const form=e.target;
    try{
+    ehCompareValidateForm(form);
     const draft=ehCompareDraft(form,this._ehcmpEditing||{});draft.id=draft.id||'contract-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
     const c=ehCompareContract(draft);
     this._ehcmpSave([...(this._ehcmpContracts||[]).filter(x=>x.id!==c.id).map(x=>c.reference?{...x,reference:false}:x),c]);update();
-   }catch(err){let alert=form.querySelector('[role="alert"]');if(!alert){alert=document.createElement('p');alert.setAttribute('role','alert');form.prepend(alert);}alert.textContent=err.message;}
+   }catch(err){ehCompareShowFormError(form,err);}
   });
   root.addEventListener('change',e=>{
    if(e.target?.matches?.('[data-ehcmp-form-select]')){const draft=ehCompareDraft(e.target.closest('form'),this._ehcmpEditing||{});if(e.target.name==='type'){draft.priceBasis='retail';draft.exportMode='fixed';draft.settlement='separate';}if(draft.priceBasis!=='market')draft.exportMode='fixed';this._ehcmpEditing=draft;update();return;}
