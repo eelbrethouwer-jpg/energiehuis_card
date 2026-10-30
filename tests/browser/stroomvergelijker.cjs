@@ -82,7 +82,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  // Nieuw standaardpad: selecteer contract en klik uitsluitend op opslaan, zonder formulieren.
  await page.locator('[data-ehcat-filter]').selectOption('fixed');
  await page.locator('[data-ehcat-select]').selectOption('fixed-voorbeeld-vast');
- assert.equal(await page.locator('[data-ehcat-action="save-selected"]').isEnabled(),true);
+ await page.waitForFunction(()=>!document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehcat-action="save-selected"]')?.disabled);
  await page.locator('[data-ehcat-action="save-selected"]').click();
  const fastFixed=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.id==='catalog-fixed-voorbeeld-vast'));
  assert.ok(fastFixed);assert.equal(fastFixed.pending,undefined);
@@ -95,7 +95,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(fastDynamic.priceEntity,'sensor.market');
  assert.equal(fastDynamic.pending,undefined);
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
- if(process.env.EH_TEST_LIVE_TARIFFS==='1'){await page.unroute('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**');await page.locator('[data-ehcat-action="refresh"]').click();await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._ehcatLoading);const live=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {error:c._ehcatError,count:c._ehcatEntries?.length};});assert.equal(live.error,'');assert.ok(live.count>0);console.log('Live tariff endpoints + CORS + schema OK: '+live.count+' offers');await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven-live.png',fullPage:true});}
+ if(process.env.EH_TEST_LIVE_TARIFFS==='1'){await page.locator('[data-ehcat-action="open"]').click();await page.unroute('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**');await page.locator('[data-ehcat-action="refresh"]').click();await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._ehcatLoading);const live=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {error:c._ehcatError,count:c._ehcatEntries?.length};});assert.equal(live.error,'');assert.ok(live.count>0);console.log('Live tariff endpoints + CORS + schema OK: '+live.count+' offers');await page.screenshot({path:'/tmp/energiehuis-aanbiederstarieven-live.png',fullPage:true});}
  // Persistence must survive a real page reload, independently of Recorder data.
  const beforeReload=await page.evaluate(()=>JSON.stringify(document.querySelector('energiehuis-card')._ehcmpContracts));
  await page.reload();
