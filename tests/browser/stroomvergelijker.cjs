@@ -83,6 +83,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-ehcat-filter]').selectOption('fixed');
  // No selection must fail explicitly; never save the previously cached contract.
  await page.locator('[data-ehcat-action="save-selected"]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehcatError?.includes('Kies eerst'));
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehcat [role="alert"]')?.textContent.includes('Kies eerst'));
  assert.match(await page.locator('.ehcat [role="alert"]').innerText(),/Kies eerst/);
  // Regression: the native selected value is set, but WebKit may delay the change event.
  await page.locator('[data-ehcat-select]').evaluate(el=>{el.value='fixed-voorbeeld-vast';});
