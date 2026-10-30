@@ -3098,7 +3098,7 @@ function ehCompareCss(){return `.ehcat-picker{display:grid;grid-template-columns
    switch(button.dataset.ehcatAction){
     case 'save-selected':{
      // Do not depend on a prior change event (Safari/Companion may delay it).
-     const selectedId=root.querySelector?.('[data-ehcat-select]')?.value||this._ehcatSelected;
+     const selectedId=root.querySelector?.('[data-ehcat-select]')?.value??this._ehcatSelected;
      const entry=this._ehcatEntries?.find(x=>x.id===selectedId);
      if(!entry){this._ehcatError='Kies eerst een geldig contract uit de lijst.';break;}
      try{
