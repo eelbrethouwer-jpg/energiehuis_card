@@ -1,8 +1,8 @@
-/* Energiehuis v1.13.0-rc.2 — afzonderlijke stroomvergelijker.
+/* Energiehuis v1.13.2 — robuuste contractselectie en persistente opslag.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.13.1';
+const EH_VERSION = '1.13.2';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1596,7 +1596,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.13.0-rc.2',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.13.2',description:'Slim laden 2.0, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2806,7 +2806,7 @@ function ehTariffCatalogueHtml(card){
  <div class="ehcat-picker"><label>Soort contract<select data-ehcat-filter><option value="">Alle</option><option value="dynamic" ${card._ehcatFilter==='dynamic'?'selected':''}>Dynamisch</option><option value="fixed" ${card._ehcatFilter==='fixed'?'selected':''}>Vast</option></select></label>
  <label>Aanbieder en contract<select data-ehcat-select><option value="">Kies een contract…</option>${options}</select></label></div>
  ${summary}
- <div class="ehcmp-actions"><button type="button" data-ehcat-action="save-selected" ${chosen?'':'disabled'}>Contract opslaan</button></div>
+ <div class="ehcmp-actions"><button type="button" data-ehcat-action="save-selected" ${entries.length?'':'disabled'}>Contract opslaan</button></div>
  <details class="ehcmp-info" data-ehcat-advanced><summary>Geavanceerd: brongegevens en tarieven zelf aanpassen</summary>
  <div class="ehcat-list">${entries.map(e=>`<article><strong>${ehEsc(e.title)}</strong><small>${e.type==='dynamic'?'Dynamisch':'Vast'}${e.onlyModel?' · uitsluitend modelcontract':''}</small>${ehTariffSourceHtml(e.source)}<button type="button" data-ehcat-add="${ehEsc(e.id)}">Controleren & toevoegen</button></article>`).join('')}</div></details>
  <small>Bron: <a href="${EH_TARIFF_ATTRIBUTION}" target="_blank" rel="noopener noreferrer">energieprijzen-nl</a> · CC BY 4.0. Contracten blijven alleen op dit apparaat bewaard. Bronvelden en controledatums blijven inzichtelijk.</small></section>`;
@@ -2998,8 +2998,12 @@ function ehCompareCss(){return `.ehcat-picker{display:grid;grid-template-columns
  };
  P._ehcmpSave=function(list){
   const checked=ehCompareList(list);
-  if(!window.localStorage)throw new Error('Browseropslag is niet beschikbaar. Contract niet opgeslagen.');
-  window.localStorage.setItem(EH_COMPARE_STORAGE,JSON.stringify({version:1,contracts:checked}));
+  // Read back the value before reporting success: embedded browsers can deny or silently discard storage.
+  let storage;try{storage=window.localStorage;}catch(_){throw new Error('Browseropslag is geblokkeerd. Contract niet opgeslagen.');}
+  if(!storage)throw new Error('Browseropslag is niet beschikbaar. Contract niet opgeslagen.');
+  const payload=JSON.stringify({version:1,contracts:checked});
+  try{storage.setItem(EH_COMPARE_STORAGE,payload);if(storage.getItem(EH_COMPARE_STORAGE)!==payload)throw new Error('Leescontrole mislukt.');}
+  catch(e){throw new Error('Contract niet opgeslagen in de browser. Controleer opslagrechten of vrije ruimte ('+(e?.message||'onbekende fout')+').');}
   this._ehcmpContracts=checked;this._ehcmpEditing=null;this._ehcmpMessage='Contracten opgeslagen op dit apparaat.';this._ehcmpLoad();this._schedule();
  };
  P._ehcmpLoad=async function(){
@@ -3093,12 +3097,14 @@ function ehCompareCss(){return `.ehcat-picker{display:grid;grid-template-columns
    if(button.dataset.ehcatAdd){const entry=this._ehcatEntries?.find(x=>x.id===button.dataset.ehcatAdd);if(entry){this._ehcmpEditing={...entry.draft,source:ehTariffSource(entry.source)};this._ehcatOpen=false;this._ehcmpTransfer=false;this._ehcmpMessage='Concept uit tarievenlijst. Controleer de bedragen en voorwaarden vóór opslaan.';}}
    switch(button.dataset.ehcatAction){
     case 'save-selected':{
-     const entry=this._ehcatEntries?.find(x=>x.id===this._ehcatSelected);
-     if(!entry){this._ehcatError='Kies eerst een geldig contract.';break;}
+     // Do not depend on a prior change event (Safari/Companion may delay it).
+     const selectedId=root.querySelector?.('[data-ehcat-select]')?.value??this._ehcatSelected;
+     const entry=this._ehcatEntries?.find(x=>x.id===selectedId);
+     if(!entry){this._ehcatError='Kies eerst een geldig contract uit de lijst.';break;}
      try{
       const contract=ehTariffQuickContract(entry,this._ehcatTaxes,new Date().getFullYear(),this._ehcmpContracts||[]);
       this._ehcmpSave([...(this._ehcmpContracts||[]).filter(x=>x.id!==contract.id),contract]);
-      this._ehcatOpen=false;this._ehcatSelected='';
+      this._ehcatOpen=false;this._ehcatSelected='';this._ehcatError='';
       this._ehcmpMessage=contract.pending?'Contract opgeslagen. Nog niet berekenbaar: '+contract.pendingReason:'Contract opgeslagen als indicatief stroomscenario.';
      }catch(error){this._ehcatError='Opslaan mislukt: '+(error.message||'onbekende fout');}
      break;

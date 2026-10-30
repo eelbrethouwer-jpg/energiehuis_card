@@ -81,11 +81,18 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  // Nieuw standaardpad: selecteer contract en klik uitsluitend op opslaan, zonder formulieren.
  await page.locator('[data-ehcat-filter]').selectOption('fixed');
- await page.locator('[data-ehcat-select]').selectOption('fixed-voorbeeld-vast');
- await page.waitForFunction(()=>!document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehcat-action="save-selected"]')?.disabled);
+ // No selection must fail explicitly; never save the previously cached contract.
+ await page.locator('[data-ehcat-action="save-selected"]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehcatError?.includes('Kies eerst'));
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehcat [role="alert"]')?.textContent.includes('Kies eerst'));
+ assert.match(await page.locator('.ehcat [role="alert"]').innerText(),/Kies eerst/);
+ // Regression: the native selected value is set, but WebKit may delay the change event.
+ await page.locator('[data-ehcat-select]').evaluate(el=>{el.value='fixed-voorbeeld-vast';});
+ assert.equal(await page.locator('[data-ehcat-action="save-selected"]').isEnabled(),true);
  await page.locator('[data-ehcat-action="save-selected"]').click();
  const fastFixed=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.id==='catalog-fixed-voorbeeld-vast'));
  assert.ok(fastFixed);assert.equal(fastFixed.pending,undefined);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('energiehuis.electricity-contracts.v1')).contracts.some(c=>c.id==='catalog-fixed-voorbeeld-vast')),true);
  assert.ok(Math.abs(fastFixed.buy-.310848)<1e-9);
  await page.locator('[data-ehcat-action="open"]').click();
  await page.locator('[data-ehcat-filter]').selectOption('dynamic');
