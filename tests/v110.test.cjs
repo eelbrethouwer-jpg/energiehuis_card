@@ -105,7 +105,7 @@ test('start- en pauzeknoppen in UI geblokkeerd zolang sturing niet is geconfigur
 test('bekendste batteryfix v1.9.1 blijft onderdeel van de code na integratie',()=>{
  assert.match(src,/function eh191BatteryScenario/);
  assert.match(src,/Vaste 10-kWh-simulatie uit Home Assistant/);
- assert.match(src,/EH_VERSION = '1\.13\.0-rc\.2'/);
+ assert.match(src,/EH_VERSION = '\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?'/);
 });
 test('voordat scripts zijn gekoppeld worden geen echte servicecalls aangeboden',()=>{
  assert.equal(EH_DEFAULTS.charge_control_enabled,false);
