@@ -274,3 +274,12 @@ Open **Kosten → Stroomvergelijker**. Voeg een contract toe en vul alle tarieve
 De nieuwe vergelijking gebruikt dezelfde afgeronde P1-meeturen voor alle contracten. Kies maand, jaar of eigen periode en klik een kostenbalk open voor details. Onvolledige P1-/prijshistorie levert geen schijnbaar compleet totaal op. Gebruik **Export / import** voor een back-up of overdracht naar een ander apparaat. Contracten blijven lokaal in deze browser; er worden geen HA-helpers aangemaakt.
 
 De uitkomst betreft **indicatieve leverancierskosten**. Uurmiddelden zijn geen exacte kwartierafrekening; teruglevering gebruikt een vast ingevoerd tarief. Geen automatisch bijgewerkte aanbiedingen, staffels, welkomstkortingen, netbeheer, belastingvermindering of dynamische terugleverprijzen. Saldo over de geselecteerde periode is slechts een expliciet gekozen scenario, geen vastgestelde jaarafrekening. Zie de [volledige grenzen en teststatus](RELEASE_NOTES_v1.13.0_RC.md).
+
+
+### Aanbieders uit tarievenlijst (v1.13.0-rc.2)
+
+Via **Aanbieder uit tarievenlijst** haal je openbare aanbiedingen op van [energieprijzen-nl](https://github.com/zhinees/energieprijzen-nl) (CC BY 4.0). Kies vast/dynamisch, open een concept en controleer bronbedragen, controledatums, opmerkingen en periode. Bevestiging is verplicht vóór opslaan; ontbrekende kosten en energiebelasting vul je zelf in. Opgeslagen contracten worden bij vernieuwen niet overschreven.
+
+Voor dynamische lijstcontracten heb je een HA-prijssensor nodig met **kale beursprijs inclusief btw, zonder energiebelasting of leveranciersopslag**. Deze release maakt die sensor niet aan. Koppel geen volledige Zonneplan-prijs als kale beursprijs. Teruglevering kan dezelfde marktprijs plus een getekende correctie gebruiken. Oude handmatige contracten blijven werken.
+
+Maandkosten worden naar rato van kalenderdagen verdeeld. De uitkomst blijft indicatief: geen automatische staffels, actieprijzen, salderingsregels of historische tariefwijzigingen. Zie [RC2-notes](RELEASE_NOTES_v1.13.0_RC2.md) en [bronvermelding](THIRD_PARTY_TARIFF_DATA.md).

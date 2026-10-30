@@ -20,8 +20,12 @@ jobs:
       - run: npm install --no-save --package-lock=false playwright@1.56.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/browser/stroomvergelijker.cjs
+        env:
+          EH_TEST_LIVE_TARIFFS: '1'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: stroomvergelijker-preview
-          path: /tmp/energiehuis-stroomvergelijker.png
+          path: |
+            /tmp/energiehuis-stroomvergelijker.png
+            /tmp/energiehuis-aanbiederstarieven*.png
