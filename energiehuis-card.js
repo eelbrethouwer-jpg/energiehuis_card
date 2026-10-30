@@ -2823,14 +2823,15 @@ function ehCompareContract(raw){
   buy:ehCompareNumber(raw.buy),sell:ehCompareNumber(raw.sell),daily:ehCompareNumber(raw.daily),exportFee:ehCompareNumber(raw.exportFee),reference:raw.reference===true,
   priceBasis:raw.priceBasis||'retail',delivery:ehCompareNumber(raw.delivery),tax:ehCompareNumber(raw.tax),markup:ehCompareNumber(raw.markup),exportMode:raw.exportMode||'fixed',exportAdjustment:ehCompareNumber(raw.exportAdjustment),fixedPeriod:raw.fixedPeriod||'daily',monthly:ehCompareNumber(raw.monthly),source:ehTariffSource(raw.source),sourceConfirmed:raw.sourceConfirmed===true};
  if(!c.id||!c.name||!['fixed','dynamic'].includes(c.type)||!['separate','net'].includes(c.settlement))throw new Error('Vul naam, contracttype en verrekenmethode in.');
- if(c.type==='dynamic'&&(!/^sensor\.[a-z0-9_]+$/.test(c.priceEntity)||c.settlement!=='separate'))throw new Error('Dynamisch vereist een prijssensor en afzonderlijke afname/teruglevering.');
- if(!['retail','components','market'].includes(c.priceBasis)||!['fixed','market'].includes(c.exportMode)||!['daily','monthly'].includes(c.fixedPeriod))throw new Error('Onbekende prijsgrondslag.');
- if(c.source&&!c.sourceConfirmed)throw new Error('Controleer en bevestig eerst de brongegevens.');
  if(raw.pending===true){
-  if(!/^catalog-(fixed|dynamic)-[a-z0-9-]+$/.test(c.id)||!c.source?.catalogueId||!c.name||!['fixed','dynamic'].includes(c.type))throw new Error('Ongeldige voorlopige catalogusselectie.');
+  if(!/^catalog-(fixed|dynamic)-[a-z0-9-]+$/.test(c.id)||!c.source?.catalogueId||!c.sourceConfirmed||!c.name||!['fixed','dynamic'].includes(c.type))throw new Error('Ongeldige voorlopige catalogusselectie.');
   c.pending=true;c.pendingReason=String(raw.pendingReason||'Benodigde tariefgegevens ontbreken.').slice(0,220);
   return c;
  }
+ if(c.type==='dynamic'&&(!/^sensor\.[a-z0-9_]+$/.test(c.priceEntity)||c.settlement!=='separate'))throw new Error('Dynamisch vereist een prijssensor en afzonderlijke afname/teruglevering.');
+ if(!['retail','components','market'].includes(c.priceBasis)||!['fixed','market'].includes(c.exportMode)||!['daily','monthly'].includes(c.fixedPeriod))throw new Error('Onbekende prijsgrondslag.');
+ if(c.source&&!c.sourceConfirmed)throw new Error('Controleer en bevestig eerst de brongegevens.');
+
  if(c.priceBasis==='components'){if(c.type!=='fixed'||c.delivery===null||c.delivery<0||c.tax===null||c.tax<0||c.tax>2)throw new Error('Vul levering en energiebelasting inclusief btw in.');c.buy=c.delivery+c.tax;}
  if(c.priceBasis==='market'&&(c.type!=='dynamic'||c.tax===null||c.tax<0||c.tax>2||c.markup===null||Math.abs(c.markup)>2))throw new Error('Vul energiebelasting en leveranciersopslag inclusief btw in.');
  if(c.exportMode==='market'&&(c.priceBasis!=='market'||c.exportAdjustment===null||Math.abs(c.exportAdjustment)>2))throw new Error('Markt-teruglevering vereist dezelfde kale beursprijssensor en een correctie.');
