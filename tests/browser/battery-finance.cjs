@@ -39,10 +39,14 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
  await page.locator('[data-eh22-invest="10"]').fill('3500');
  await page.locator('[data-eh22-invest="10"]').blur();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Investments?.[10]===3500);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card'),root=c.shadowRoot;
+  return c._eh22Investments?.[10]===3500&&root.querySelector('[data-eh22-invest="10"]')?.value==='3500'
+   &&root.querySelector('.eh22-payback')?.textContent.includes('slijtagekost');
+ });
  await page.locator('[data-eh22-wear]').fill('0.02');
- await page.locator('[data-eh22-wear]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Wear===.02);
+ await page.locator('[data-eh22-wear]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh22-payback')?.textContent.includes('terugverdientijd'));
  const state=await page.evaluate(()=>{
   const c=document.querySelector('energiehuis-card');
