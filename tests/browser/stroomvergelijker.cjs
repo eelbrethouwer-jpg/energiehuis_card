@@ -46,8 +46,16 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-ehcmp-date="end"]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.textContent.includes('€ 11,36')).catch(async e=>{console.log(await page.locator('.ehcmp').innerText());console.log(await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {start:c._ehcmpStart,end:c._ehcmpEnd,data:c._ehcmpData?.key,contracts:c._ehcmpContracts};}));await page.screenshot({path:'/tmp/energiehuis-stroomvergelijker.png',fullPage:true});throw e;});
  assert.match(await page.locator('.ehcmp').innerText(),/2,40 duurder/);
+ const savings=page.locator('.ehcmp-savings');
+ assert.match(await savings.innerText(),/Jouw voordeel of nadeel/);
+ assert.match(await savings.innerText(),/Zonneplan: € 11,36/);
+ assert.match(await savings.innerText(),/€ 2,40 voordeliger/);
+ assert.match(await savings.innerText(),/Contract € 13,76/);
  await page.locator('.ehcmp-result summary').first().click();assert.match(await page.locator('.ehcmp-result').first().innerText(),/Terugleverkosten/);
- await page.locator('.ehcmp-result').first().locator('[data-ehcmp-edit]').click();await fill('daily','.3');await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('summary').click();
+ await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('[data-ehcmp-edit]').click();await fill('daily','.3');await fill('buy','.2');await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehcmp-savings')?.textContent.includes('2,30 duurder'));
+ assert.match(await savings.innerText(),/€ 2,30 duurder/);
  await page.locator('[data-ehcmp-action="transfer"]').click();const json=await page.locator('[data-ehcmp-json]').inputValue();assert.equal(JSON.parse(json).contracts.length,2);
  const downloadPromise=page.waitForEvent('download');await page.locator('[data-ehcmp-action="download"]').click();assert.equal((await downloadPromise).suggestedFilename(),'energiehuis-stroomcontracten.json');
  await page.locator('[data-ehcmp-action="import"]').click();
