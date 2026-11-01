@@ -65,7 +65,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.notEqual(previousDay,lastDay);
  const hour=page.locator('[data-eh23-hour]').nth(3);
  const hourIndex=Number(await hour.getAttribute('data-eh23-hour'));
- await hour.click();
+ await page.locator('[data-eh23-hour="'+hourIndex+'"]').click();
+ await page.waitForFunction(index=>document.querySelector('energiehuis-card')._eh20Selected===index,hourIndex);
  const picked=await page.evaluate(()=>document.querySelector('energiehuis-card')._eh20Selected);
  assert.equal(picked,hourIndex);
  const range=await page.locator('[data-eh20-hour]').inputValue();
