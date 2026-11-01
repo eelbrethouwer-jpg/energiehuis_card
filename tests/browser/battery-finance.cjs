@@ -125,6 +125,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('.eh23-advanced summary').click();
  // Read-only Recorder quality check: only explicit click, never automated on render.
  assert.equal(await page.locator('.eh25-audit').count(),1);
+ await page.locator('[data-eh26-tab="returns"]').click();
+ await page.locator('.eh26-advanced > summary').click();
  await page.locator('.eh25-audit summary').click();
  await page.locator('[data-eh25-probe]').click();
  await page.waitForFunction(()=>{
