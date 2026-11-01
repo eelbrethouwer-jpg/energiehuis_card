@@ -46,6 +46,11 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-eh22-period="30"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
  await page.locator('.eh27-finance-more > summary').click();
+ assert.equal(await page.locator('.eh27-finance-more').evaluate(e=>e.open),true);
+ // Simulate an incoming sensor update: the card rebuilds all Shadow DOM HTML.
+ await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
+ assert.equal(await page.locator('.eh27-finance-more').evaluate(e=>e.open),true,
+  'Expanded finance panel must survive a rerender');
  await page.locator('[data-eh22-invest="10"]').fill('3500');
  await page.locator('[data-eh22-invest="10"]').blur();
  await page.waitForFunction(()=>{
@@ -53,11 +58,19 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   return c._eh22Investments?.[10]===3500&&root.querySelector('[data-eh22-invest="10"]')?.value==='3500'
    &&root.querySelector('.eh22-payback')?.textContent.includes('slijtagekost');
  });
- await page.locator('.eh27-finance-more > summary').click();
+ assert.equal(await page.locator('.eh27-finance-more').evaluate(e=>e.open),true,
+  'Finance panel should remain expanded after saving investment input');
  await page.locator('[data-eh22-wear]').fill('0.02');
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Wear===.02);
  await page.locator('[data-eh22-wear]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh22-payback')?.textContent.includes('terugverdientijd'));
+ assert.equal(await page.locator('.eh27-finance-more').evaluate(e=>e.open),true,
+  'Slijtage-input update must not collapse finance panel');
+ // Native details must also remember an explicit close through an HA refresh.
+ await page.locator('.eh27-finance-more > summary').click();
+ await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
+ assert.equal(await page.locator('.eh27-finance-more').evaluate(e=>e.open),false,
+  'Deliberately closed finance details should stay closed');
  const state=await page.evaluate(()=>{
   const c=document.querySelector('energiehuis-card');
   return {days:c._eh20Battery.days,price:c._eh22Investments?.[10],wear:c._eh22Wear,serviceCalls:window.serviceCalls};
@@ -154,6 +167,24 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow battery '+width);
   assert.equal(await page.locator('.eh23-flow').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow flow '+width);
  }
+ // Cupra's custom expand/collapse uses model state, which must also survive HA rerenders.
+ await page.locator('[data-eh-page="cupra"]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')._view==='cupra');
+ await page.locator('[data-eh-cupra-details]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.vehicle-details')?.classList.contains('open'));
+ assert.match(await page.locator('[data-eh-cupra-details]').innerText(),/Minder details/);
+ await page.evaluate(()=>{
+  const card=document.querySelector('energiehuis-card');
+  card.hass={...card._hass,states:{...card._hass.states}};
+  card._render();
+ });
+ assert.equal(await page.locator('.vehicle-details').evaluate(e=>e.classList.contains('open')),true,
+  'Cupra details must remain expanded after hass data update');
+ await page.locator('[data-eh-cupra-details]').click();
+ await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
+ assert.equal(await page.locator('.vehicle-details').evaluate(e=>e.classList.contains('open')),false,
+  'Cupra details must stay collapsed after being closed by user');
+ assert.equal(await page.evaluate(()=>window.serviceCalls),0);
  assert.deepEqual(errors,[]);
  await browser.close();server.close();
  console.log('Battery 4.0 browser: 7/30-day selection, financial inputs, mobile widths and zero HA service calls OK.');
