@@ -1,8 +1,8 @@
-/* Energiehuis v1.15.0 — leveranciersvergelijking op Kosten-pagina.
+/* Energiehuis v1.16.0 — batterijvergelijking met financieel inzicht.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.15.0';
+const EH_VERSION = '1.16.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -2440,9 +2440,10 @@ function eh20ControlHtml(card,h,c){
  * Bronnen: HA Recorder P1 uurstatistieken en optionele Zonneplan-prijshistorie.
  * Batterijmodel verstuurt geen opdrachten. Scriptbediening uit v1.10.0 staat standaard uit.
  */
-function eh20Limits(now){
+function eh20Limits(now,days=7){
+ const windowDays=days===30?30:7;
  const d=new Date(now.getFullYear(),now.getMonth(),now.getDate());
- return {from:new Date(d.getFullYear(),d.getMonth(),d.getDate()-7),to:d,step:'hour'};
+ return {from:new Date(d.getFullYear(),d.getMonth(),d.getDate()-windowDays),to:d,step:'hour'};
 }
 function eh20EnergyUnit(h,id){
  const unit=String(h?.states?.[id]?.attributes?.unit_of_measurement||'').trim().toLowerCase();
@@ -2518,6 +2519,7 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
  if(mode==='smart'&&!pricesComplete)return null;
  const threshold=pricesComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
  let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,lastEnd=null;
+ let avoidedPurchase=0,gridPurchase=0;
  let pvNotStored=0,pvLimitedCapacity=0,pvLimitedPower=0,fullHours=0,peakSoc=0,energyAtGaps=0;
  const points=[];
  for(const r of rows){
@@ -2551,11 +2553,12 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
     soc+=chargedGrid*chargeEff;
     gridCharge+=chargedGrid;
     benefit-=chargedGrid*price;
+    gridPurchase+=chargedGrid*price;
    }
   }
   if(r.export===0&&chargedGrid===0&&r.import>0){
    used=Math.max(0,Math.min(r.import,maxDischarge,soc*dischargeEff));
-   soc-=used/dischargeEff;served+=used;benefit+=used*price;
+   soc-=used/dischargeEff;served+=used;benefit+=used*price;avoidedPurchase+=used*price;
   }
   soc=Math.max(0,Math.min(usable,soc));peakSoc=Math.max(peakSoc,soc);
   pvCharge+=chargedSolar;
@@ -2565,7 +2568,8 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
  return {capacity:cap,usableCapacity:usable,usablePct:usable/cap*100,chargeKw,dischargeKw,
   mode,points,pvCharge,gridCharge,served,endingSoc:soc,peakSoc,pvNotStored,
   pvLimitedCapacity,pvLimitedPower,fullHours,unobservedResetKwh:energyAtGaps,
-  savings:benefit-lostExport,assumedPrices:!pricesComplete,priceComplete:pricesComplete,
+  savings:benefit-lostExport,avoidedPurchase,gridPurchase,lostExport,
+  assumedPrices:!pricesComplete,priceComplete:pricesComplete,
   hours:valid.length,missingHours:rows.length-valid.length};
 }
 function eh20Chart(result,pickedIndex){
@@ -2587,10 +2591,91 @@ function eh20Chart(result,pickedIndex){
   '<text x="3" y="13" fill="#bdd5e4" font-size="11"'+(result.usableCapacity||result.capacity)+' kWh</text>'+
   '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
 }
+
+/* Battery 4.0: finance is a read-only scenario over exactly the simulated hour rows.
+   Capex is never inferred from a battery capacity or hidden in the savings model. */
+function eh22BatteryCoverage(rows){
+ const hourRows=Array.isArray(rows)?rows:[];
+ const groups=new Map();
+ for(const r of hourRows){
+  if(!Number.isFinite(r?.t))continue;
+  const day=new Date(r.t),key=day.getFullYear()+'-'+(day.getMonth()+1)+'-'+day.getDate();
+  const entry=groups.get(key)||{expected:0,valid:0};
+  entry.expected++;
+  if(Number.isFinite(r.import)&&r.import>=0&&Number.isFinite(r.export)&&r.export>=0)entry.valid++;
+  groups.set(key,entry);
+ }
+ const valid=[...groups.values()].reduce((sum,d)=>sum+d.valid,0);
+ return {hours:hourRows.length,validHours:valid,coverage:hourRows.length?valid/hourRows.length:0,
+  completeDays:[...groups.values()].filter(d=>d.expected>=23&&d.expected<=25&&d.valid===d.expected).length};
+}
+function eh22BatteryFinance(simulation,rows,days,investment,wear){
+ const health=eh22BatteryCoverage(rows);
+ if(!simulation||health.validHours<48)return {available:false,health};
+ const capex=Number.isFinite(investment)&&investment>0&&investment<=100000?investment:null;
+ const wearRate=Number.isFinite(wear)&&wear>=0&&wear<=.5?wear:null;
+ const wearTotal=wearRate===null?null:simulation.served*wearRate;
+ const operating=simulation.savings;
+ const afterWear=wearTotal===null?null:operating-wearTotal;
+ const repeatable=days===30&&health.coverage>=.9&&health.completeDays>=21;
+ const annualIllustration=repeatable?(afterWear===null?operating:afterWear)*365/30:null;
+ const payback=capex!==null&&wearRate!==null&&annualIllustration>0?capex/annualIllustration:null;
+ return {available:true,health,capex,wearRate,wearTotal,operating,afterWear,
+  annualIllustration,payback,cycles:simulation.usableCapacity>0?simulation.served/simulation.usableCapacity:null};
+}
+function eh22BatteryPeriodControls(card){
+ const period=card._eh22Days===30?30:7;
+ return '<div class="eh22-periods" role="group" aria-label="Historische batterijperiode">'+
+  [7,30].map(days=>'<button type="button" data-eh22-period="'+days+'" aria-pressed="'+(days===period)+'" class="'+(days===period?'chosen':'')+'">'+days+' dagen</button>').join('')+
+  '</div>';
+}
+function eh22BatteryFinancialHtml(card,results,rows,selectedCap){
+ const days=card._eh22Days===30?30:7,wear=card._eh22Wear;
+ const investments=card._eh22Investments||{};
+ const value=Number.isFinite(investments[selectedCap])?investments[selectedCap]:null;
+ const finances=(results||[]).map(r=>eh22BatteryFinance(r,rows,days,investments[r?.capacity],wear));
+ const selected=finances[[5,10,15].indexOf(selectedCap)];
+ if(!selected?.available)return '<section class="eh22-finance"><h3>Financiële simulatie</h3><p class="eh20-notice">Niet genoeg betrouwbare P1-uren voor een financiële vergelijking. Er verschijnen geen verzonnen besparingen.</p></section>';
+ const f=selected,quality=f.health,illustration=f.annualIllustration;
+ const display=n=>Number.isFinite(n)?ehEuro2(n):'—';
+ const table=results.map((r,i)=>{
+  const x=finances[i];
+  return '<tr'+(r?.capacity===selectedCap?' class="eh20-active"':'')+'><th scope="row">'+(r?.capacity||[5,10,15][i])+' kWh</th>'+
+   '<td>'+display(x.operating)+'</td><td>'+display(x.afterWear)+'</td>'+
+   '<td>'+(Number.isFinite(x.cycles)?ehFmt(x.cycles,1):'—')+'</td></tr>';
+ }).join('');
+ const note=f.payback!==null?'Illustratieve terugverdientijd bij herhaling van deze periode: '+ehFmt(f.payback,1)+' jaar.':f.capex===null?
+  'Vul een aanschafprijs in om een terugverdientijd te kunnen beoordelen.':f.wearRate===null?
+  'Vul eerst een aangenomen slijtagekost in voor een terugverdientijd na slijtage.':
+  illustration===null?'Een terugverdientijd vereist minimaal 21 complete meetdagen en 90% uurdekking in de 30-dagenperiode.':
+  'Geen positieve terugverdientijd bij deze aannames.';
+ return '<section class="eh22-finance" aria-label="Financiële batterijsimulatie">'+
+  '<h3>'+ehIcon('euro')+' Batterij 4.0 · financiële vergelijking</h3>'+
+  '<p class="eh20-meta">Alleen de gekozen '+days+' volledige kalenderdagen: '+quality.validHours+' / '+quality.hours+' meeturen · '+quality.completeDays+' complete dagen. '+
+  'Dit is geen kalendermaandprognose.</p>'+
+  '<div class="eh22-ledger">'+
+  '<div><small>Vermeden inkoop</small><strong>'+display(results[[5,10,15].indexOf(selectedCap)].avoidedPurchase)+'</strong></div>'+
+  '<div><small>Kosten netladen</small><strong>'+display(results[[5,10,15].indexOf(selectedCap)].gridPurchase)+'</strong></div>'+
+  '<div><small>Gemiste teruglevering</small><strong>'+display(results[[5,10,15].indexOf(selectedCap)].lostExport)+'</strong></div>'+
+  '<div><small>Operationeel voordeel</small><strong>'+display(f.operating)+'</strong></div></div>'+
+  '<div class="eh22-inputs"><label>Aanschaf + installatie '+selectedCap+' kWh (€)<input type="number" data-eh22-invest="'+selectedCap+'" min="1" max="100000" step="10" inputmode="decimal" placeholder="Niet ingevuld" value="'+(value===null?'':value)+'"></label>'+
+  '<label>Slijtagekosten (€/ontladen kWh)<input type="number" data-eh22-wear="1" min="0" max="0.5" step="0.01" inputmode="decimal" placeholder="Niet meegerekend" value="'+(Number.isFinite(wear)?wear:'')+'"></label></div>'+
+  (card._eh22Error?'<p class="eh20-notice" role="alert">'+ehEsc(card._eh22Error)+'</p>':'')+
+  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Alle capaciteiten op dezelfde P1-uurhistorie, exclusief aanschafkosten</caption><thead><tr><th>Accu</th><th>Operationeel</th><th>Na slijtage</th><th>Equivalent cycli*</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
+  '<p class="eh20-meta">* Doorzet: vermeden netafname gedeeld door bruikbare accucapaciteit; vereenvoudigde cyclusindicator.</p>'+
+  '<p class="eh22-payback">'+ehEsc(note)+'</p>'+
+  (illustration===null?'<p class="subtle">Een jaarscenario wordt pas getoond bij voldoende 30-dagenhistorie.</p>':
+   '<p class="subtle">Als deze 30 dagen zich 365 dagen identiek zouden herhalen: '+display(illustration)+' voordeel per jaar'+(f.afterWear!==null?' na slijtage':' zonder slijtagekosten')+'. Dit is een hypothetische extrapolatie, géén jaarprognose: seizoen, zon, tarieven, degradatie en batterijgarantie zijn niet gemodelleerd.</p>')+
+  '<p class="subtle">Prijzen volgen de huidige simulatie: '+(results[[5,10,15].indexOf(selectedCap)].assumedPrices?
+   'historische uurtarieven ontbreken, dus de ingestelde inkoopaanname wordt gebruikt.':
+   'voor inkoop zijn historische uurprijzen gebruikt.')+
+  ' Terugleververgoeding is een vaste aanname; netbeheerkosten, saldering, terugleverkosten, batterijafschrijving en belastingwijzigingen kunnen verschillen. Invoer blijft alleen tijdens deze sessie in de kaart.</p></section>';
+}
 function eh20BatteryView(card,h,c){
  const data=card._eh20Battery,cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
+ const days=card._eh22Days===30?30:7;
  let mode=card._eh20Mode==='smart'?'smart':'solar';
- if(card.isConnected&&!card._eh20Loading&&(!data||Date.now()-data.at>30*60000))card._eh20LoadBattery();
+ if(card.isConnected&&!card._eh20Loading&&(!data||data.days!==days||Date.now()-data.at>30*60000))card._eh20LoadBattery();
  const baseNote='<p class="subtle">Afzonderlijk chronologisch uurmodel. Start met een lege batterij; bij ontbrekende uren wordt de SOC niet over dat gat doorgetrokken. Uurafname/-teruglevering bepalen geen exacte volgorde binnen het uur. Geen fysieke batterij en geen laadcommando’s.</p>';
  if(!data)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
  if(data.error)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p>'+baseNote+'</section>';
@@ -2639,8 +2724,9 @@ function eh20BatteryView(card,h,c){
  const delta=canShow&&mode==='smart'&&solarAlways?ehEuro2(selected.savings-solarAlways.savings):null;
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
   '<h3>'+ehIcon('battery')+' Batterij Simulator 3.0 · historische uurvergelijking</h3>'+
-  '<p class="eh20-meta">Uitsluitend simulatie · laatste 7 volledige dagen · '+ehEsc(coverageText)+'</p>'+
-  modes+batteryChoices+profileNote+equalityNote+blocks+hourPicker+
+  '<p class="eh20-meta">Uitsluitend simulatie · laatste '+days+' volledige dagen · '+ehEsc(coverageText)+'</p>'+
+  eh22BatteryPeriodControls(card)+modes+batteryChoices+profileNote+equalityNote+blocks+hourPicker+
+  eh22BatteryFinancialHtml(card,results,rows,cap)+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
   '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
@@ -2648,20 +2734,23 @@ function eh20BatteryView(card,h,c){
   '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; per batterij een afzonderlijke laad-/ontlaadlimiet (standaard '+ehFmt(power,1)+' kW) en standaard 100% bruikbare nominale capaciteit. Alle limieten zijn simulatie-instellingen, geen productspecificaties. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
 }
 function eh20Css(){
- return '.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
+ return '.eh22-periods{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.eh22-periods button{min-height:40px;border:1px solid #668ea4;background:#102d40;color:#e8f7ff;border-radius:9px;padding:9px 14px;cursor:pointer}.eh22-periods button.chosen{background:#18533e;border-color:#61dfb4}.eh22-finance{margin-top:14px;border-top:1px solid #779ab24b;padding-top:13px}.eh22-finance h3{font-size:16px}.eh22-ledger{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}.eh22-ledger>div{display:flex;flex-direction:column;gap:6px;background:#0a2638;border:1px solid #7cacc02e;border-radius:10px;padding:11px;min-width:0}.eh22-ledger strong{font-size:17px}.eh22-ledger small{font-size:11px;color:#afd0de}.eh22-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.eh22-inputs label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#c3deea}.eh22-inputs input{min-width:0;width:100%;box-sizing:border-box;border:1px solid #779ab2;border-radius:8px;padding:10px;background:#0b293b;color:#fff;font:inherit;font-size:16px}.eh22-payback{border-left:3px solid #54dbb1;padding:9px 12px;font-size:12px;color:#dcf7ec;background:#1e51332b}@media(max-width:460px){.eh22-inputs{grid-template-columns:1fr}.eh22-ledger strong{font-size:15px}}.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
 }
 (function eh20Install(){
  const P=EnergiehuisCard.prototype,originalBattery=P._batteryHtml,originalRender=P._render,originalConfig=P.setConfig;
  P.setConfig=function(config){
   this._eh20Battery=null;
   this._eh20Loading=false;
+  this._eh20Request=(this._eh20Request||0)+1;
   return originalConfig.call(this,config);
  };
  P._eh20LoadBattery=async function(){
   const c=this.config,h=this._hass;
   if(!this.isConnected||!h?.callWS||!c?.import||!c?.export||this._eh20Loading)return;
   this._eh20Loading=true;
-  const lim=eh20Limits(new Date()),ids=[c.import,c.export];
+  const request=this._eh20Request=(this._eh20Request||0)+1;
+  const days=this._eh22Days===30?30:7;
+  const lim=eh20Limits(new Date(),days),ids=[c.import,c.export];
   const priceId=c.prijs;
   try{
    const energy=await h.callWS({type:'recorder/statistics_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),statistic_ids:ids,period:'hour',types:['change','sum']});
@@ -2675,10 +2764,10 @@ function eh20Css(){
    const history=priceResults[1]?.status==='fulfilled'?priceResults[1].value:null;
    const prices=eh20HourlyPrices(priceStats,history,bins,priceId,h);
    const out=eh20HourlyRows(energy,c,h,lim,prices);
-   this._eh20Battery={at:Date.now(),rows:out.rows,error:out.error};
+   if(request===this._eh20Request)this._eh20Battery={at:Date.now(),rows:out.rows,error:out.error,days};
   }catch(_){
-   this._eh20Battery={at:Date.now(),rows:[],error:'Recorder-uurstatistieken ontbreken. Controleer P1-statistieken, entiteiten en toegang tot Recorder.'};
-  }finally{this._eh20Loading=false;if(this.isConnected)this._schedule();}
+   if(request===this._eh20Request)this._eh20Battery={at:Date.now(),rows:[],days,error:'Recorder-uurstatistieken ontbreken. Controleer P1-statistieken, entiteiten en toegang tot Recorder.'};
+  }finally{if(request===this._eh20Request){this._eh20Loading=false;if(this.isConnected)this._schedule();}}
  };
  P._batteryHtml=function(h,c){
   const html=originalBattery.call(this,h,c);
@@ -2692,12 +2781,25 @@ function eh20Css(){
   if(style&&!style.textContent.includes('.eh20-panel{'))style.textContent+='\n'+eh20Css();
   if(this._eh20Events)return;
   this._eh20Events=true;
+  root.addEventListener('change',e=>{
+   const input=e.target;
+   if(input?.matches?.('[data-eh22-invest],[data-eh22-wear]')){
+    const raw=String(input.value??'').trim(),n=raw===''?null:Number(raw);
+    const invest=input.hasAttribute('data-eh22-invest'),cap=Number(input.dataset.eh22Invest);
+    const valid=n===null||(Number.isFinite(n)&&(invest?n>0&&n<=100000:n>=0&&n<=.5));
+    if(!valid){this._eh22Error=invest?'Aanschafkosten moeten tussen €1 en €100.000 liggen.':'Slijtagekosten moeten tussen €0 en €0,50/kWh liggen.';}
+    else{this._eh22Error='';if(invest){if(!this._eh22Investments)this._eh22Investments={};this._eh22Investments[cap]=n;}else this._eh22Wear=n;}
+    this._schedule();
+   }
+  });
   root.addEventListener('input',e=>{
    if(!e.target?.matches?.('[data-eh20-hour]'))return;
    const n=Number(e.target.value);
    if(Number.isInteger(n)&&n>=0){this._eh20Selected=n;this._schedule();}
   });
   root.addEventListener('click',e=>{
+   const period=e.target?.closest?.('[data-eh22-period]');
+   if(period){const days=Number(period.dataset.eh22Period);if((days===7||days===30)&&days!==(this._eh22Days===30?30:7)){this._eh22Days=days;this._eh20Request=(this._eh20Request||0)+1;this._eh20Battery=null;this._eh20Loading=false;this._eh20Selected=null;this._eh20LoadBattery();this._schedule();}return;}
    const btn=e.target?.closest?.('[data-eh20-mode]');
    if(!btn||btn.disabled)return;
    const mode=btn.dataset.eh20Mode;

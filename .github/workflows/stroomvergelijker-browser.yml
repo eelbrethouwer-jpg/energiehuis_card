@@ -22,6 +22,8 @@ jobs:
       - run: node tests/browser/stroomvergelijker.cjs
         env:
           EH_TEST_LIVE_TARIFFS: '1'
+      - name: Test batterij 4.0 browser
+        run: node tests/browser/battery-finance.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
