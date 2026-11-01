@@ -52,7 +52,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.match(await savings.innerText(),/€ 2,40 voordeliger/);
  assert.match(await savings.innerText(),/Contract € 13,76/);
  await page.locator('.ehcmp-result summary').first().click();assert.match(await page.locator('.ehcmp-result').first().innerText(),/Terugleverkosten/);
- await page.locator('.ehcmp-result').first().locator('[data-ehcmp-edit]').click();await fill('daily','.3');await fill('buy','.2');await page.locator('[data-ehcmp-form] button[type=submit]').click();
+ await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('summary').click();
+ await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('[data-ehcmp-edit]').click();await fill('daily','.3');await fill('buy','.2');await page.locator('[data-ehcmp-form] button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehcmp-savings')?.textContent.includes('2,30 duurder'));
  assert.match(await savings.innerText(),/€ 2,30 duurder/);
  await page.locator('[data-ehcmp-action="transfer"]').click();const json=await page.locator('[data-ehcmp-json]').inputValue();assert.equal(JSON.parse(json).contracts.length,2);
