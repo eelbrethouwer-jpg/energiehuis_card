@@ -2478,8 +2478,19 @@ function eh20HourlyPrices(priceStats,history,bins,id,h){
  }
  return mapped;
 }
+/* Battery-only window builder. The shared ehWindows() intentionally caps unrelated charts
+   at 400 buckets; a 30-day battery period requires up to 721 hourly buckets with DST. */
+function eh24BatteryWindows(lim){
+ const bins=[],max=24*31+2;
+ for(let d=new Date(lim.from);d<lim.to&&bins.length<max;d=ehNextBoundary(d,'hour')){
+  const next=ehNextBoundary(d,'hour');
+  if(!(next>d))break;
+  bins.push({t:d.getTime(),end:Math.min(next.getTime(),lim.to.getTime()),key:ehBucketKey(d,'hour')});
+ }
+ return bins;
+}
 function eh20HourlyRows(stats,c,h,lim,prices){
- const bins=ehWindows(lim),fIn=eh20EnergyUnit(h,c.import),fOut=eh20EnergyUnit(h,c.export);
+ const bins=eh24BatteryWindows(lim),fIn=eh20EnergyUnit(h,c.import),fOut=eh20EnergyUnit(h,c.export);
  if(fIn===null||fOut===null)return {rows:[],bins,error:'P1-energiesensoren moeten een bekende eenheid (kWh of Wh) hebben.'};
  const groups=ehCountersByWindow(stats,[c.import,c.export],bins,'hour',h);
  const get=(id,b)=>groups[id]?.totals?.get(b.key);
@@ -2918,7 +2929,7 @@ function eh20Css(){
     h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[priceId],minimal_response:true,no_attributes:true,significant_changes_only:false})
    ]):Promise.resolve([]);
    const priceResults=await taskPrice;
-   const bins=ehWindows(lim);
+   const bins=eh24BatteryWindows(lim);
    const priceStats=priceResults[0]?.status==='fulfilled'?priceResults[0].value:null;
    const history=priceResults[1]?.status==='fulfilled'?priceResults[1].value:null;
    const prices=eh20HourlyPrices(priceStats,history,bins,priceId,h);
