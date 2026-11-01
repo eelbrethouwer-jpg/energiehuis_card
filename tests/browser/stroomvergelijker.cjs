@@ -17,7 +17,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   }};
   card.setConfig({import:'sensor.in',export:'sensor.out',prijs:'sensor.price',mobile_fixed_navigation:false});card.hass=h;card._view='costs';card._render();
  });
- await page.locator('[data-ehcmp-action="open"]').click();await page.locator('[data-ehcmp-action="add"]').click();
+ await page.locator('.ehcmp').waitFor();assert.match(await page.locator('.ehcmp').innerText(),/Leveranciers vergelijken/);await page.locator('[data-ehcmp-action="add"]').click();
  const fill=async(name,value)=>page.locator('[data-ehcmp-form] [name="'+name+'"]').fill(value);
  // Empty required input must reach our handler and show actionable feedback, including in shadow DOM.
  await page.locator('[data-ehcmp-form] button[type=submit]').click();
@@ -64,8 +64,9 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   const overflow=await page.locator('.ehcmp').evaluate(el=>el.scrollWidth>el.clientWidth+1);assert.equal(overflow,false,'overflow '+width);
  }
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/energiehuis-stroomvergelijker.png',fullPage:true});
- await page.locator('[data-ehcmp-action="back"]').click();await page.locator('[data-ehcmp-action="open"]').waitFor();assert.match(await page.locator('.subpage').innerText(),/Vattenfall 1 jaar/);
- await page.locator('[data-ehcmp-action="open"]').click();page.once('dialog',d=>d.accept());await page.locator('.ehcmp-result').first().locator('summary').click();await page.locator('.ehcmp-result').first().locator('[data-ehcmp-delete]').click();
+ assert.match(await page.locator('.subpage').innerText(),/Leveranciers vergelijken/);
+ assert.doesNotMatch(await page.locator('.subpage').innerText(),/Vattenfall 1 jaar deze maand/);
+ assert.ok(await page.locator('.ehcmp-tariff').count()>=2);page.once('dialog',d=>d.accept());await page.locator('.ehcmp-result').first().locator('summary').click();await page.locator('.ehcmp-result').first().locator('[data-ehcmp-delete]').click();
  assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  // Fictitious catalogue fixtures isolate the UI tests from changing third-party prices.
@@ -109,5 +110,5 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.reload();
  await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpInit());
  assert.equal(await page.evaluate(()=>JSON.stringify(document.querySelector('energiehuis-card')._ehcmpContracts)),beforeReload);
- await browser.close();server.close();console.log('Browser OK: add/edit/delete, reference, period, live updates, export/import, return to Vattenfall, 320/390/768/1280px, no HA service calls; catalogue fetch/filter, fixed and dynamic draft, source confirmation, monthly fees, network failure and form widths.');
+ await browser.close();server.close();console.log('Browser OK: add/edit/delete, reference, period, live updates, export/import, inline supplier comparison, 320/390/768/1280px, no HA service calls; catalogue fetch/filter, fixed and dynamic draft, source confirmation, monthly fees, network failure and form widths.');
 })().catch(e=>{console.error(e);server.close();process.exit(1);});

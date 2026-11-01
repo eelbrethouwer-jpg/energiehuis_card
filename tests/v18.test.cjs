@@ -54,7 +54,7 @@ test('kosten geven voor contractstart geen gerealiseerde Zonneplan-kosten aan',(
  const html=eh18Costs(h,EH_DEFAULTS);
  assert.match(html,/Zonneplan begint 1 november 2026|Zonneplan-contractperiode actief/);
  assert.match(html,/Engie/);
- assert.match(html,/Vattenfall/);
+ assert.match(html,/Leveranciersvergelijking/);
 });
 test('Slim laden 2.1 toont haalbaarheid en laat load balancing ongemoeid',()=>{
  const card=Object.create(EnergiehuisCard.prototype);

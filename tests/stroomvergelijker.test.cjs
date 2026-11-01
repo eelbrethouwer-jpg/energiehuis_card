@@ -65,11 +65,25 @@ test('periode is afgerond, begrensd en inclusieve einddatum',()=>{
  assert.throws(()=>C.ehCompareDates('custom','2026-02-30','2026-03-01',now));
  assert.throws(()=>C.ehCompareDates('custom','2024-01-01','2026-01-01',now));
 });
-test('kostenpagina behoudt Vattenfall HTML en krijgt alleen een extra ingang',()=>{
- const card=Object.create(C.EnergiehuisCard.prototype);card._costComparePeriod='month';card._ehcmpContracts=[];
- const old=card._costsHtml({states:{}},C.EH_DEFAULTS);assert.match(old,/Vattenfall 1 jaar/);assert.match(old,/Vattenfall 3 jaar/);assert.match(old,/data-ehcmp-action="open"/);
- card._ehcmpOpen=true;const separate=card._costsHtml({states:{}},C.EH_DEFAULTS);assert.match(separate,/<h2>Stroomvergelijker/);assert.doesNotMatch(separate,/data-eh-cost-period/);
- card._ehcmpOpen=false;assert.equal(card._costsHtml({states:{}},C.EH_DEFAULTS),old);
+test('Kosten toont direct leveranciersvergelijking; Vattenfall-tabellen en oude grafiek zijn weg',()=>{
+ const card=Object.create(C.EnergiehuisCard.prototype);card._ehcmpContracts=[];
+ const html=card._costsHtml({states:{}},C.EH_DEFAULTS);
+ assert.match(html,/<h2>Leveranciers vergelijken/);
+ assert.match(html,/Zonneplan vandaag/);
+ assert.match(html,/Maandprognose en budget/);
+ assert.doesNotMatch(html,/Vattenfall 1 jaar deze maand|Vattenfall 3 jaar dit jaar|data-eh-cost-period|data-ehcmp-action="open"/);
+ assert.match(html,/data-ehcat-action="open"/);
+});
+test('Contracttarieven blijven zichtbaar zonder afgeronde dag of Recorder-data',()=>{
+ const card=Object.create(C.EnergiehuisCard.prototype);
+ card._ehcmpContracts=[fixed({name:'Eneco vast',source:null}),dynamic({name:'ANWB Energie',priceBasis:'market',tax:.11,markup:.018,exportMode:'market',exportAdjustment:0})];
+ const html=C.ehCompareHtml(card);
+ assert.match(html,/Contracttarieven/);
+ assert.match(html,/Eneco vast/);
+ assert.match(html,/ANWB Energie/);
+ assert.match(html,/Kale beursprijs/);
+ assert.match(html,/0,0180/);
+ assert.doesNotMatch(html,/<main class="subpage ehcmp">/);
 });
 test('contractnamen worden als tekst weergegeven en geen volledige winnaar bij ontbrekende data',()=>{
  const card={_ehcmpContracts:[fixed({name:'<img src=x onerror=alert(1)>'}),dynamic()],_ehcmpPeriod:'custom',_ehcmpStart:'2026-10-01',_ehcmpEnd:'2026-10-01',_ehcmpData:{key:`${+from}|${+to}`,rows,prices:{}}};
