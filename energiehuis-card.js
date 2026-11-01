@@ -1,8 +1,8 @@
-/* Energiehuis v1.19.0 — controledashboard voor batterij-historie.
+/* Energiehuis v1.20.0-rc.1 — voorspellende batterijinterface.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.19.0';
+const EH_VERSION = '1.20.0-rc.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -2875,6 +2875,83 @@ function eh25AuditHtml(card,h,c,rows){
   (card._eh25Error?'<p class="eh20-notice">'+ehEsc(card._eh25Error)+'</p>':'')+detail+
   '<p class="eh25-small">Steekproef, geen validatie van een compleet jaar. Bij onvolledige historie blijft de fijnere en jaarweergave uitgeschakeld.</p></details>';
 }
+
+/* v1.20: price-based battery outlook, not measured battery state or a live energy forecast.
+   No HA service calls, no assumed PV generation or home consumption. */
+function eh26BatteryForecast(h,c,now,capacity,power,mode){
+ const feed=ehPricesForDay(h,c,now);
+ const merged=ehHourlyFromPrices(feed.quarters,feed.hourly);
+ const from=Math.ceil(now.getTime()/3600000)*3600000;
+ const until=from+24*3600000,seen=new Set(),slots=[];
+ for(const p of merged){
+  const t=Date.parse(p.t);
+  if(!Number.isFinite(t)||t<from||t>=until||seen.has(t)||!Number.isFinite(p.p))continue;
+  seen.add(t);slots.push({t,price:p.p});
+ }
+ slots.sort((a,b)=>a.t-b.t);
+ if(slots.length<3)return {slots:[],selected:[],missing:true,reason:'Minder dan 3 toekomstige uurprijzen beschikbaar in Zonneplan. Er worden geen prijzen of laaduren bijverzonnen.'};
+ const count=Math.min(slots.length,Math.max(1,Math.min(6,Math.ceil(slots.length/4))),Math.max(1,Math.ceil(capacity/power)));
+ const cheapest=slots.slice().sort((a,b)=>a.price-b.price||a.t-b.t).slice(0,count);
+ const chosen=new Set(cheapest.map(s=>s.t));
+ let soc=0;
+ const eta=Math.sqrt(Math.max(.01,Math.min(1,eh17N(c.battery_roundtrip_efficiency)??.88)));
+ const projected=slots.map(s=>{
+  const eligible=chosen.has(s.t),gridKwh=mode==='smart'&&eligible?Math.min(power,Math.max(0,(capacity-soc)/eta)):0;
+  if(mode==='smart')soc=Math.min(capacity,soc+gridKwh*eta);
+  return {...s,eligible,gridKwh,projectedPct:mode==='smart'?100*soc/capacity:null};
+ });
+ return {slots:projected,selected:cheapest.sort((a,b)=>a.t-b.t),missing:false,
+  complete:slots.length===24,from,until,capacity,power,mode};
+}
+function eh26ForecastHtml(h,c,cap,power,mode){
+ const result=eh26BatteryForecast(h,c,new Date(),cap,power,mode);
+ if(result.missing)return '<section class="eh26-outlook"><h4>Laadverwachting · komende 24 uur</h4><p class="eh20-notice">'+ehEsc(result.reason)+'</p><p class="eh26-foot">Controleer of de ingestelde Zonneplan-prijssensor toekomstige uur- of kwartiertarieven heeft. Dit is een alleen-lezen simulatie.</p></section>';
+ const rows=result.slots,W=640,L=50,R=28,top=22,bottom=180;
+ const prices=rows.map(p=>p.price),lo=Math.min(...prices),hi=Math.max(...prices);
+ const margin=Math.max(.02,(hi-lo)*.18),min=lo-margin,max=hi+margin;
+ const x=i=>L+(i+.5)*(W-L-R)/rows.length;
+ const y=p=>bottom-(p-min)/(max-min)*(bottom-top);
+ const line=rows.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(p.price).toFixed(1)).join(' ');
+ const projected=mode==='smart'?rows.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+','+(bottom-(p.projectedPct/100)*(bottom-top)).toFixed(1)).join(' '):'';
+ const barWidth=Math.max(5,(W-L-R)/rows.length*.7);
+ const bars=rows.filter(s=>s.eligible).map(s=>{
+  const i=rows.indexOf(s);
+  return '<rect x="'+(x(i)-barWidth/2).toFixed(1)+'" y="'+top+'" width="'+barWidth.toFixed(1)+'" height="'+(bottom-top)+'" fill="#39caa1" opacity=".16"><title>'+ehEsc(new Date(s.t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))+' · '+ehEuro2(s.price)+'/kWh · '+(mode==='smart'?'netlaadscenario':'potentieel goedkoop prijsuur')+'</title></rect>';
+ }).join('');
+ const labels=rows.map((p,i)=>i%Math.max(1,Math.ceil(rows.length/5))===0?'<text x="'+x(i).toFixed(1)+'" y="210" fill="#bdd4e1" text-anchor="middle" font-size="13">'+ehEsc(new Date(p.t).toLocaleString('nl-NL',{hour:'2-digit'}))+'</text>':'').join('');
+ const cheap=result.selected[0],earliest=cheap?new Date(cheap.t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+ const cheapestPrice=cheap?Math.min(...result.selected.map(p=>p.price)):null;
+ const charged=rows.reduce((sum,p)=>sum+p.gridKwh,0);
+ const forecastTitle=mode==='smart'?'Voorgestelde netlaaduren':'Goedkope stroomuren ter vergelijking';
+ const notes=mode==='smart'?
+  'Witte stippellijn: zuiver hypothetisch SOC vanaf 0%, zonder verbruik, ontladen of zonladen. Niet de actuele batterijstand en geen echt uitvoerbaar laadplan.':
+  'Alleen-zonmodus: geen netlading gepland. Zonder betrouwbare PV- en verbruiksprognose voorspellen we geen toekomstige batterijvulling.';
+ const status=result.complete?'24 toekomstige uren met uurprijzen':'Slechts '+rows.length+' van 24 toekomstige uren met prijzen; goedkoopste selectie is onvolledig';
+ const subtitle=mode==='smart'?'<strong>Netladen in dit voorbeeld: '+ehFmt(charged,1)+' kWh</strong> · gekozen uren zijn de goedkoopste beschikbare '+result.selected.length+' uurblokken.':'<strong>Geen netladen</strong> · de groene uren zijn alleen prijsinformatie.';
+ return '<section class="eh26-outlook" aria-label="Toekomstige prijsuren en virtueel batterijlaadscenario">'+
+  '<div class="eh26-outlook-head"><h4>Laadverwachting · komende 24 uur</h4><small>Prognose, geen meting</small></div>'+
+  '<div class="eh26-price-highlights"><div><small>Laagste bekende uurprijs</small><strong>'+ehEuro2(cheapestPrice)+'/kWh</strong></div>'+
+  '<div><small>Eerstvolgende geselecteerde uur</small><strong>'+ehEsc(earliest)+'</strong></div></div>'+
+  '<div class="eh26-chart-key"><span><i class="eh26-price-line"></i>Stroomprijs</span><span><i class="eh26-charge-bar"></i>'+ehEsc(forecastTitle)+'</span>'+
+  (mode==='smart'?'<span><i class="eh26-soc-line"></i>Scenario-SOC</span>':'')+'</div>'+
+  '<svg class="eh26-forecast-svg" viewBox="0 0 640 226" role="img" aria-label="Toekomstige uurprijzen, geselecteerde goedkope uren'+(mode==='smart'?' en hypothetische batterijvulling vanaf nul procent':'')+'">'+
+  '<line x1="'+L+'" y1="'+bottom+'" x2="'+(W-R)+'" y2="'+bottom+'" stroke="#829eaf" opacity=".7"/>'+
+  '<text x="2" y="24" fill="#c8dce7" font-size="13">'+ehEsc(ehEuro2(max))+'</text><text x="2" y="'+(bottom+4)+'" fill="#c8dce7" font-size="13">'+ehEsc(ehEuro2(min))+'</text>'+
+  bars+'<path d="'+line+'" fill="none" stroke="#79bdff" stroke-width="3" stroke-linejoin="round"/>'+
+  (projected?'<path class="eh26-projected-soc" d="'+projected+'" fill="none" stroke="#fff" stroke-dasharray="7 5" stroke-width="2" opacity=".9"/>':'')+
+  labels+'</svg><p class="eh26-outlook-summary">'+subtitle+'</p>'+
+  '<p class="eh26-foot">'+ehEsc(status)+' · '+ehEsc(notes)+'</p>'+
+  '<p class="eh26-foot">Selectie op basis van beschikbare Zonneplan-uurprijzen, zonder terugleververgoeding, slijtage of netbelasting. Bij onvolledige prijzen geen garantie op goedkoopste uren. Geen Home Assistant- of Alfen-commando’s.</p></section>';
+}
+function eh26BatteryTabs(card){
+ const active=['today','history','returns'].includes(card._eh26Tab)?card._eh26Tab:'today';
+ return '<div class="eh26-tabs" role="group" aria-label="Batterijpagina-onderdelen">'+
+  [['today','Vandaag'],['history','Historie'],['returns','Rendement']].map(([key,name])=>'<button type="button" data-eh26-tab="'+key+'" aria-pressed="'+(active===key)+'" class="'+(active===key?'selected':'')+'">'+name+'</button>').join('')+'</div>';
+}
+function eh26BatteryCss(){
+ return '.eh26-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:14px 0 11px}.eh26-tabs button{min-width:0;min-height:45px;border-radius:10px;background:#102e40;color:#d8ebf3;border:1px solid #7395a7;font:inherit;font-size:13px;cursor:pointer}.eh26-tabs button.selected{background:#17604c;border-color:#55dfb1;color:#fff;font-weight:700}.eh26-tabs button:focus-visible{outline:2px solid white;outline-offset:2px}.eh26-panel[hidden]{display:none!important}.eh26-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0}.eh26-overview>div{padding:11px 9px;background:#09293b;border-radius:10px;border:1px solid #85acc02d;min-width:0}.eh26-overview small{display:block;font-size:10px;color:#acc8d5;line-height:1.4}.eh26-overview strong{display:block;font-size:17px;margin-top:6px;overflow-wrap:anywhere}.eh26-outlook{border:1px solid #5a91a282;border-radius:13px;background:#0a2939;padding:12px;min-width:0}.eh26-outlook-head{display:flex;gap:5px;justify-content:space-between;align-items:center;flex-wrap:wrap}.eh26-outlook h4{font-size:15px;margin:0}.eh26-outlook-head small{font-size:10px;color:#9cbfd0}.eh26-price-highlights{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.eh26-price-highlights>div{padding:10px;background:#12364a;border:1px solid #6f9baa55;border-radius:9px;min-width:0}.eh26-price-highlights small{display:block;color:#b6d2dc;font-size:10px;margin-bottom:6px}.eh26-price-highlights strong{font-size:13px;overflow-wrap:anywhere}.eh26-chart-key{display:flex;gap:8px 13px;flex-wrap:wrap;color:#c0dce7;font-size:10px}.eh26-chart-key span{display:inline-flex;align-items:center;gap:5px}.eh26-chart-key i{width:13px;height:0;border-top:3px solid #79bdff}.eh26-chart-key .eh26-charge-bar{height:10px;background:#39caa166;border:1px solid #39caa1}.eh26-chart-key .eh26-soc-line{border-top:2px dashed white}.eh26-forecast-svg{display:block;width:100%;height:auto;max-height:240px;margin-top:5px}.eh26-outlook-summary{font-size:12px;margin:8px 0;color:#d3e9f0;line-height:1.5}.eh26-foot{font-size:11px;color:#a7c6d2;line-height:1.45;margin:7px 0}.eh26-history .eh20-kpis{display:none}.eh26-advanced{border:1px solid #6c94aa55;border-radius:10px;padding:10px;margin:12px 0}.eh26-advanced summary{cursor:pointer;font-weight:700;font-size:12px}.eh26-advanced .eh20-meta{line-height:1.45}@media(max-width:370px){.eh26-overview strong{font-size:14px}.eh26-outlook{padding:9px}.eh26-price-highlights{grid-template-columns:1fr}.eh26-tabs button{font-size:12px}}';
+}
+
 function eh20BatteryView(card,h,c){
  const data=card._eh20Battery,cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
  const days=card._eh22Days===30?30:7;
@@ -2918,6 +2995,16 @@ function eh20BatteryView(card,h,c){
   eh23BatteryFlowChart(card,selected,rows)+
   '<details class="eh23-soc-details"><summary>Grafiek batterijvulling (SOC) over hele periode</summary>'+eh20Chart(selected,chosenHour)+'</details>':
   '<p class="eh20-notice">Te weinig betrouwbare P1-uren: minimaal 48 uur met beide energiestatistieken nodig. Geen bedragen berekend.</p>';
+ const eh26Summary=canShow?'<div class="eh26-overview"><div><small>Vermeden netafname · historie</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
+  '<div><small>Zonnestroom opgeslagen · historie</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
+  '<div><small>Indicatieve besparing · historie</small><strong>'+ehEuro2(selected.savings)+'</strong></div></div>':'';
+ const eh26Tab=['today','history','returns'].includes(card._eh26Tab)?card._eh26Tab:'today';
+ const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+hourPicker+'</div>';
+ const eh26Today='<div class="eh26-panel" '+(eh26Tab==='today'?'':'hidden')+'>'+eh26ForecastHtml(h,c,cap,selected?.chargeKw||power,mode)+'</div>';
+ const eh26Returns='<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryFinancialHtml(card,results,rows,cap)+
+  '<details class="eh26-advanced"><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
+  '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
+  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div></details></div>';
  const coverageText=coverage+' / '+rows.length+' uren met P1-data'+(ratesGood?' · historische uurprijzen beschikbaar':' · historische uurprijzen ontbreken of zijn onvolledig');
  const priceText=selected?.assumedPrices?'Financiële berekening gebruikt alleen instelbare aannames voor vermeden inkoop en gemiste teruglevering.':'Financiële berekening gebruikt geregistreerde uurprijzen voor vermeden afname en netladen; voor teruglevering geldt nog een vast aangenomen tarief.';
  const picked=chosenHour;
@@ -2931,18 +3018,16 @@ function eh20BatteryView(card,h,c){
  const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
  const delta=canShow&&mode==='smart'&&solarAlways?ehEuro2(selected.savings-solarAlways.savings):null;
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
-  '<h3>'+ehIcon('battery')+' Batterij 4.0 · historische uurvergelijking</h3>'+
-  '<p class="eh20-meta">Uitsluitend simulatie · laatste '+days+' volledige dagen · '+ehEsc(coverageText)+'</p>'+
-  eh22BatteryPeriodControls(card)+modes+
-  '<div class="eh23-cap-tabs" role="group" aria-label="Selecteer virtuele batterijcapaciteit">'+[5,10,15].map(n=>'<button type="button" data-eh17-cap="'+n+'" aria-pressed="'+(cap===n)+'" class="'+(cap===n?'chosen':'')+'">'+n+' kWh</button>').join('')+'</div>'+
-  profileNote+equalityNote+blocks+hourPicker+
-  '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
-  eh22BatteryFinancialHtml(card,results,rows,cap)+eh25AuditHtml(card,h,c,rows)+
+  '<h3>'+ehIcon('battery')+' Batterij · inzicht en verwachting</h3>'+
+  '<p class="eh20-meta">Virtuele batterij, geen fysiek gemeten opslag. Historische berekeningen: '+days+' volledige dagen · '+ehEsc(coverageText)+'</p>'+
+  modes+'<div class="eh23-cap-tabs" role="group" aria-label="Selecteer virtuele batterijcapaciteit">'+[5,10,15].map(n=>'<button type="button" data-eh17-cap="'+n+'" aria-pressed="'+(cap===n)+'" class="'+(cap===n?'chosen':'')+'">'+n+' kWh</button>').join('')+'</div>'+
+  eh26Summary+eh26BatteryTabs(card)+eh26Today+eh26History+
+  '<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryPeriodControls(card)+profileNote+equalityNote+eh26Returns+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
-  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
-  '<p class="subtle">'+ehEsc(priceText)+' Dit zijn scenarioresultaten voor beschikbare uren, geen maandprognoses of gerealiseerde eurobesparingen. Zonneplan is voor deze installatie pas vanaf 1 november 2026 leverancier.</p>'+baseNote+
-  '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; per batterij een afzonderlijke laad-/ontlaadlimiet (standaard '+ehFmt(power,1)+' kW) en standaard 100% bruikbare nominale capaciteit. Alle limieten zijn simulatie-instellingen, geen productspecificaties. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
+  '<p class="eh20-meta">'+ehEsc(priceText)+' De bedragen zijn indicatief en geen gerealiseerde maandbesparingen.</p>'+
+  '<p class="eh20-meta">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; laad-/ontlaadlimiet '+ehFmt(power,1)+' kW. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor jouw 1×40 A-aansluiting, tarieven, pieken of batterijlevensduur.</p>'+
+  baseNote+'</div></section>';
 }
 function eh20Css(){
  return '.eh25-audit{margin:13px 0;padding:12px;border:1px solid #86a7b45c;border-radius:11px;background:#0b293b}.eh25-audit summary{font-size:13px;font-weight:700;cursor:pointer}.eh25-audit p{font-size:12px;color:#c8e1eb;line-height:1.45;margin:8px 0}.eh25-audit p.eh25-small{font-size:11px;color:#b3cfd9}.eh25-audit button{font:inherit;font-size:12px;min-height:42px;padding:8px 12px;background:#17435a;color:#ecfaff;border:1px solid #91b5c2;border-radius:9px;cursor:pointer}.eh25-audit button:disabled{opacity:.5;cursor:default}.eh25-audit-result{border-top:1px solid #90b5bf55;margin-top:10px;padding-top:6px}.eh24-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:10px 0}.eh24-tabs button{font:inherit;font-size:12px;border-radius:9px;min-height:40px;border:1px solid #7595a9;background:#143447;color:#e5f2f7;cursor:pointer}.eh24-tabs button.selected{background:#5d2e86;color:#fff;border-color:#c687f2;font-weight:700}.eh24-tabs button:disabled{opacity:.42;cursor:not-allowed}.eh24-combined-svg{max-height:270px}.eh24-combined-svg [data-eh23-hour],.eh24-combined-svg [data-eh24-day]{cursor:pointer}.eh24-combined-svg [data-eh23-hour]:focus,.eh24-combined-svg [data-eh24-day]:focus{stroke:white;stroke-width:1.5}.eh23-legend .eh24-purple{background:#b84bea}.eh23-legend .eh24-lilac{background:#8580e8}.eh23-legend .eh24-green{background:#31c78e}.eh23-legend .eh24-soc{background:transparent;border-top:2px dashed white;height:0;width:13px;border-radius:0}.eh23-battery-page{min-width:0}.eh23-battery-page .eh20-panel{margin-top:2px}.eh23-battery-page .eh20-kpis{margin:12px 0}.eh23-battery-page .eh20-meta{line-height:1.5}.eh23-cap-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.eh23-cap-tabs button{font:inherit;font-size:13px;font-weight:700;min-height:43px;color:#d7f1f6;background:#102f41;border:1px solid #779aaf;border-radius:10px;cursor:pointer}.eh23-cap-tabs button.chosen{background:#195640;border-color:#54ddb0;color:#fff}.eh23-day-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0}.eh23-day-nav strong{font-size:12px;text-align:center;min-width:0}.eh23-day-nav button{font:inherit;font-weight:700;font-size:22px;min-width:42px;min-height:40px;background:#12394b;color:#fff;border-radius:9px;border:1px solid #87b2c3;cursor:pointer}.eh23-day-nav button:disabled{opacity:.32;cursor:default}.eh23-flow{margin:13px 0;background:#0b2939;border:1px solid #58839670;border-radius:13px;padding:11px;min-width:0}.eh23-flow-head{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.eh23-flow-head h4{font-size:14px;margin:0}.eh23-flow-head small{color:#9bc3d2;font-size:10px}.eh23-legend{display:flex;gap:7px 12px;flex-wrap:wrap;font-size:10px;color:#b6d3df;margin:9px 0}.eh23-legend span{display:flex;gap:4px;align-items:center}.eh23-legend i{height:9px;width:9px;display:block;border-radius:2px}.eh23-solar{background:#47d9a5}.eh23-grid{background:#69acfa}.eh23-out{background:#ffbf77}.eh23-no-data{background:#8091a2}.eh23-flow-svg{display:block;width:100%;height:auto;max-height:200px;overflow:visible}.eh23-flow-svg [data-eh23-hour]{cursor:pointer}.eh23-flow-svg [data-eh23-hour]:focus{outline:none;stroke:#fff;stroke-width:1}.eh23-flow-totals{font-size:11px;color:#d8ebf2;line-height:1.5;margin:5px 0 0}.eh23-advanced,.eh23-profiles,.eh23-soc-details{border:1px solid #7ca1b64d;border-radius:10px;margin:12px 0;padding:10px 12px;background:#0a223233;min-width:0}.eh23-advanced summary,.eh23-profiles summary,.eh23-soc-details summary{font-size:12px;font-weight:700;color:#c5e5f2;cursor:pointer;padding:3px}.eh23-legacy-content>.subpage-head{display:none}.eh23-advanced .eh17-panel{margin-top:12px}.eh23-advanced .subgrid{margin-top:12px}.eh22-periods{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.eh22-periods button{min-height:40px;border:1px solid #668ea4;background:#102d40;color:#e8f7ff;border-radius:9px;padding:9px 14px;cursor:pointer}.eh22-periods button.chosen{background:#18533e;border-color:#61dfb4}.eh22-finance{margin-top:14px;border-top:1px solid #779ab24b;padding-top:13px}.eh22-finance h3{font-size:16px}.eh22-ledger{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}.eh22-ledger>div{display:flex;flex-direction:column;gap:6px;background:#0a2638;border:1px solid #7cacc02e;border-radius:10px;padding:11px;min-width:0}.eh22-ledger strong{font-size:17px}.eh22-ledger small{font-size:11px;color:#afd0de}.eh22-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.eh22-inputs label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#c3deea}.eh22-inputs input{min-width:0;width:100%;box-sizing:border-box;border:1px solid #779ab2;border-radius:8px;padding:10px;background:#0b293b;color:#fff;font:inherit;font-size:16px}.eh22-payback{border-left:3px solid #54dbb1;padding:9px 12px;font-size:12px;color:#dcf7ec;background:#1e51332b}@media(max-width:460px){.eh22-inputs{grid-template-columns:1fr}.eh22-ledger strong{font-size:15px}}.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
@@ -3020,7 +3105,7 @@ function eh20Css(){
   const root=this.shadowRoot;
   if(!root||!this.config||!this._hass)return;
   const style=root.querySelector?.('style');
-  if(style&&!style.textContent.includes('.eh20-panel{'))style.textContent+='\n'+eh20Css();
+  if(style&&!style.textContent.includes('.eh20-panel{'))style.textContent+='\n'+eh20Css()+'\n'+eh26BatteryCss();
   if(this._eh20Events)return;
   this._eh20Events=true;
   root.addEventListener('change',e=>{
@@ -3057,6 +3142,11 @@ function eh20Css(){
    if(e.target?.matches?.('[data-eh24-day]')){e.preventDefault();this._eh23DayIndex=Number(e.target.dataset.eh24Day);this._eh24GraphPeriod='day';this._eh20Selected=null;this._schedule();}
   });
   root.addEventListener('click',e=>{
+   const newTab=e.target?.closest?.('[data-eh26-tab]');
+   if(newTab){
+    const key=newTab.dataset.eh26Tab;
+    if(['today','history','returns'].includes(key)){this._eh26Tab=key;this._schedule();}return;
+   }
    const auditSummary=e.target?.closest?.('.eh25-audit summary');
    if(auditSummary){this._eh25Open=!auditSummary.parentElement.open;return;}
    const audit=e.target?.closest?.('[data-eh25-probe]');
