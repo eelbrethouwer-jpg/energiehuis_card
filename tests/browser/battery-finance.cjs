@@ -54,6 +54,10 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.match(await page.locator('.eh23-flow').innerText(),/Gesimuleerd, niet fysiek gemeten/);
  const lastDay=await page.locator('.eh23-day-nav strong').innerText();
  await page.locator('[data-eh23-step="-1"]').click();
+ await page.waitForFunction(previous=>{
+  const card=document.querySelector('energiehuis-card');
+  return card?.shadowRoot?.querySelector('.eh23-day-nav strong')?.textContent?.trim()!==previous;
+ },lastDay);
  const previousDay=await page.locator('.eh23-day-nav strong').innerText();
  assert.notEqual(previousDay,lastDay);
  const hour=page.locator('[data-eh23-hour]').nth(3);
