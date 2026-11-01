@@ -1,4 +1,4 @@
-/* Energiehuis v1.13.0-rc.2 — afzonderlijke stroomvergelijker.
+/* Energiehuis v1.14.0 — overzicht besparing stroomcontracten.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
