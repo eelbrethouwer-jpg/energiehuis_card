@@ -50,6 +50,6 @@ test('kaart zonder echte browser-DOM blijft veilig voor bestaande Node-tests',()
  assert.equal(eh28DetailEntries({querySelector(){}},'battery').length,0);
  assert.equal(eh28DetailEntries(null,'cupra').length,0);
  const card=Object.create(EnergiehuisCard.prototype);
- card.shadowRoot={querySelector(){}};
+ card.shadowRoot={querySelector(){return null;},addEventListener(){}};
  assert.doesNotThrow(()=>card._render());
 });
