@@ -37,11 +37,15 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh22-invest="10"]'));
  assert.equal(await page.locator('[data-eh26-tab="today"]').getAttribute('aria-pressed'),'true');
  assert.equal(await page.locator('.eh26-forecast-svg').count(),1);
+ assert.ok(await page.locator('.eh26-forecast-svg [data-eh27-price-hour]').count()>=3);
+ await page.locator('[data-eh27-price-hour="1"]').click();
+ assert.match(await page.locator('.eh27-price-detail').innerText(),/kWh/);
  assert.match(await page.locator('.eh26-outlook').innerText(),/komende 24 uur/);
  await page.locator('[data-eh26-tab="returns"]').click();
  assert.match(await page.locator('.eh22-finance').innerText(),/Batterij 4.0/);
  await page.locator('[data-eh22-period="30"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
+ await page.locator('.eh27-finance-more > summary').click();
  await page.locator('[data-eh22-invest="10"]').fill('3500');
  await page.locator('[data-eh22-invest="10"]').blur();
  await page.waitForFunction(()=>{
@@ -49,6 +53,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   return c._eh22Investments?.[10]===3500&&root.querySelector('[data-eh22-invest="10"]')?.value==='3500'
    &&root.querySelector('.eh22-payback')?.textContent.includes('slijtagekost');
  });
+ await page.locator('.eh27-finance-more > summary').click();
  await page.locator('[data-eh22-wear]').fill('0.02');
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Wear===.02);
  await page.locator('[data-eh22-wear]').blur();
@@ -88,6 +93,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.match(await page.locator('.eh20-hour-detail').innerText(),/PV-lading|Ontladen/);
  // HomeWizard-style graph combines charging, discharging and simulated SOC with clear labels.
  assert.equal(await page.locator('.eh24-combined-svg').count(),1);
+ assert.ok(await page.locator('.eh27-pv-bar').count()>=1);
+ assert.ok(await page.locator('.eh27-discharge-bar').count()>=1);
  assert.equal(await page.locator('.eh24-charge').count(),1);
  assert.equal(await page.locator('.eh24-discharge').count(),1);
  assert.ok(await page.locator('.eh24-combined-svg polyline[stroke="#f6f8ff"]').count()>0);
