@@ -2903,8 +2903,8 @@ function eh26BatteryForecast(h,c,now,capacity,power,mode){
  return {slots:projected,selected:cheapest.sort((a,b)=>a.t-b.t),missing:false,
   complete:slots.length===24,from,until,capacity,power,mode};
 }
-function eh26ForecastHtml(h,c,cap,power,mode){
- const result=eh26BatteryForecast(h,c,new Date(),cap,power,mode);
+function eh26ForecastHtml(h,c,cap,power,mode,now=new Date()){
+ const result=eh26BatteryForecast(h,c,now,cap,power,mode);
  if(result.missing)return '<section class="eh26-outlook"><h4>Laadverwachting · komende 24 uur</h4><p class="eh20-notice">'+ehEsc(result.reason)+'</p><p class="eh26-foot">Controleer of de ingestelde Zonneplan-prijssensor toekomstige uur- of kwartiertarieven heeft. Dit is een alleen-lezen simulatie.</p></section>';
  const rows=result.slots,W=640,L=50,R=28,top=22,bottom=180;
  const prices=rows.map(p=>p.price),lo=Math.min(...prices),hi=Math.max(...prices);
@@ -2995,16 +2995,6 @@ function eh20BatteryView(card,h,c){
   eh23BatteryFlowChart(card,selected,rows)+
   '<details class="eh23-soc-details"><summary>Grafiek batterijvulling (SOC) over hele periode</summary>'+eh20Chart(selected,chosenHour)+'</details>':
   '<p class="eh20-notice">Te weinig betrouwbare P1-uren: minimaal 48 uur met beide energiestatistieken nodig. Geen bedragen berekend.</p>';
- const eh26Summary=canShow?'<div class="eh26-overview"><div><small>Vermeden netafname · historie</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
-  '<div><small>Zonnestroom opgeslagen · historie</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
-  '<div><small>Indicatieve besparing · historie</small><strong>'+ehEuro2(selected.savings)+'</strong></div></div>':'';
- const eh26Tab=['today','history','returns'].includes(card._eh26Tab)?card._eh26Tab:'today';
- const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+hourPicker+'</div>';
- const eh26Today='<div class="eh26-panel" '+(eh26Tab==='today'?'':'hidden')+'>'+eh26ForecastHtml(h,c,cap,selected?.chargeKw||power,mode)+'</div>';
- const eh26Returns='<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryFinancialHtml(card,results,rows,cap)+
-  '<details class="eh26-advanced"><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
-  '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
-  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div></details></div>';
  const coverageText=coverage+' / '+rows.length+' uren met P1-data'+(ratesGood?' · historische uurprijzen beschikbaar':' · historische uurprijzen ontbreken of zijn onvolledig');
  const priceText=selected?.assumedPrices?'Financiële berekening gebruikt alleen instelbare aannames voor vermeden inkoop en gemiste teruglevering.':'Financiële berekening gebruikt geregistreerde uurprijzen voor vermeden afname en netladen; voor teruglevering geldt nog een vast aangenomen tarief.';
  const picked=chosenHour;
@@ -3015,6 +3005,16 @@ function eh20BatteryView(card,h,c){
   '<small>PV-lading '+ehEnergy(point?.chargedSolar)+' · Netlading '+ehEnergy(point?.chargedGrid)+' · Ontladen '+ehEnergy(point?.discharged)+'</small>'+ '<small>Niet opgeslagen wegens vol '+ehEnergy(point?.fullRejected)+' · wegens laadlimiet '+ehEnergy(point?.powerRejected)+'</small>'+
   '<small>Historisch uurtarief '+(Number.isFinite(point?.price)?ehEuro2(point.price)+'/kWh':'niet beschikbaar')+'</small></div>':'';
  const hourPicker=canShow?'<label class="eh20-hour-picker"><span>Kies een uur op deze dag</span><input type="range" data-eh20-hour="1" min="'+chosenDay.indices[0]+'" max="'+chosenDay.indices[chosenDay.indices.length-1]+'" step="1" value="'+picked+'" aria-label="Kies uur van virtuele batterij"/></label>'+hourDetail:'';
+ const eh26Summary=canShow?'<div class="eh26-overview"><div><small>Vermeden netafname · historie</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
+  '<div><small>Zonnestroom opgeslagen · historie</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
+  '<div><small>Indicatieve besparing · historie</small><strong>'+ehEuro2(selected.savings)+'</strong></div></div>':'';
+ const eh26Tab=['today','history','returns'].includes(card._eh26Tab)?card._eh26Tab:'today';
+ const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+hourPicker+'</div>';
+ const eh26Today='<div class="eh26-panel" '+(eh26Tab==='today'?'':'hidden')+'>'+eh26ForecastHtml(h,c,cap,selected?.chargeKw||power,mode)+'</div>';
+ const eh26Returns='<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryFinancialHtml(card,results,rows,cap)+
+  '<details class="eh26-advanced"><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
+  '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
+  '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div></details></div>';
  const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
  const delta=canShow&&mode==='smart'&&solarAlways?ehEuro2(selected.savings-solarAlways.savings):null;
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
