@@ -21,7 +21,7 @@ test('simulatie levert aparte invoerreeksen voor zon, net en ontladen, zonder fy
  assert.ok(s.points.some(x=>x.discharged>0));
  const html=eh23BatteryFlowChart({},s,rows);
  assert.match(html,/Gesimuleerd, niet fysiek gemeten/);
- assert.match(html,/Zonnestroom/);
+ assert.match(html,/Laden uit zon/);
  assert.match(html,/Netladen/);
  assert.match(html,/Ontladen/);
  assert.match(html,/data-eh23-hour="48"/);
@@ -41,15 +41,15 @@ test('dagselectie is begrensd, en uurselectie blijft binnen zichtbare dag',()=>{
 test('gaten in P1 worden expliciet grijs getoond, niet als nul of fictief laden',()=>{
  const gap=rows.map((r,i)=>i===54?{...r,import:null,export:null}:r);
  const html=eh23BatteryFlowChart({},sim(gap),gap);
- assert.match(html,/1 ontbrekende uren/);
- assert.match(html,/ontbrekende uurdata/);
+ assert.match(html,/1 onvolledige meetpunten/);
+ assert.match(html,/ontbrekende of onvolledige uurdata/);
  assert.match(html,/Geen data/);
 });
 test('grafiek kan een niet-geselecteerd uur aanklikbaar en via toetsenbord kiezen',()=>{
  const html=eh23BatteryFlowChart({},sim(),rows);
  assert.match(html,/role="button" tabindex="0"/);
  assert.match(html,/data-eh23-hour="69"/);
- assert.match(source,/e\.key==='Enter'\|\|e\.key===' '/);
+ assert.match(source,/e\.key!=='Enter'&&e\.key!==' '/);
  assert.match(source,/this\._eh20Selected=Number\(hour\.dataset\.eh23Hour\)/);
 });
 test('compacte Batterij 4.0 staat vóór oudere 10-kWh- en dagtotalen-modellen',()=>{

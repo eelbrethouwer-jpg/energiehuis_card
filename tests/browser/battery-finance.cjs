@@ -39,10 +39,14 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
  await page.locator('[data-eh22-invest="10"]').fill('3500');
  await page.locator('[data-eh22-invest="10"]').blur();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Investments?.[10]===3500);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card'),root=c.shadowRoot;
+  return c._eh22Investments?.[10]===3500&&root.querySelector('[data-eh22-invest="10"]')?.value==='3500'
+   &&root.querySelector('.eh22-payback')?.textContent.includes('slijtagekost');
+ });
  await page.locator('[data-eh22-wear]').fill('0.02');
- await page.locator('[data-eh22-wear]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Wear===.02);
+ await page.locator('[data-eh22-wear]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh22-payback')?.textContent.includes('terugverdientijd'));
  const state=await page.evaluate(()=>{
   const c=document.querySelector('energiehuis-card');
@@ -76,6 +80,37 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  const range=await page.locator('[data-eh20-hour]').inputValue();
  assert.equal(Number(range),hourIndex);
  assert.match(await page.locator('.eh20-hour-detail').innerText(),/PV-lading|Ontladen/);
+ // HomeWizard-style graph combines charging, discharging and simulated SOC with clear labels.
+ assert.equal(await page.locator('.eh24-combined-svg').count(),1);
+ assert.equal(await page.locator('.eh24-charge').count(),1);
+ assert.equal(await page.locator('.eh24-discharge').count(),1);
+ assert.ok(await page.locator('.eh24-combined-svg polyline[stroke="#f6f8ff"]').count()>0);
+ assert.equal(await page.locator('.eh24-tabs button', {hasText:'Jaar'}).isDisabled(),true);
+ await page.locator('[data-eh24-view="week"]').click();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-eh24-day]').length===7);
+ assert.equal(await page.locator('[data-eh24-day]').count(),7);
+ await page.locator('[data-eh24-view="month"]').click();
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  return c._eh24GraphPeriod==='month'&&c.shadowRoot.querySelectorAll('[data-eh24-day]').length>=21;
+ },null,{timeout:7000}).catch(async error=>{
+  const snapshot=await page.evaluate(()=>{
+   const c=document.querySelector('energiehuis-card');
+   return {mode:c._eh24GraphPeriod,index:c._eh23DayIndex,days:c._eh20Battery?.days,
+    rows:c._eh20Battery?.rows?.length,buckets:c.shadowRoot.querySelectorAll('[data-eh24-day]').length,
+    panel:c.shadowRoot.querySelector('.eh23-flow')?.textContent?.slice(0,200)};
+  });
+  throw new Error('Month chart did not render: '+JSON.stringify({snapshot,errors}));
+ });
+ const months=await page.locator('[data-eh24-day]').count();
+ assert.ok(months>=21&&months<=30);
+ const firstDay=Number(await page.locator('[data-eh24-day]').first().getAttribute('data-eh24-day'));
+ await page.locator('[data-eh24-day="'+firstDay+'"]').click();
+ await page.waitForFunction(index=>{
+  const c=document.querySelector('energiehuis-card');
+  return c._eh24GraphPeriod==='day'&&c._eh23DayIndex===index&&c.shadowRoot.querySelectorAll('[data-eh23-hour]').length>=23;
+ },firstDay);
+ assert.equal(await page.locator('[data-eh23-hour]').count()>=23,true);
  // Full-period SOC and old models can be opened, with no data deletion.
  await page.locator('.eh23-soc-details summary').click();
  assert.equal(await page.locator('.eh23-soc-details').evaluate(e=>e.open),true);
