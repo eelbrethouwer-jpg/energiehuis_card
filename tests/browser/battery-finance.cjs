@@ -69,6 +69,10 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.waitForFunction(index=>document.querySelector('energiehuis-card')._eh20Selected===index,hourIndex);
  const picked=await page.evaluate(()=>document.querySelector('energiehuis-card')._eh20Selected);
  assert.equal(picked,hourIndex);
+ await page.waitForFunction(index=>{
+  const card=document.querySelector('energiehuis-card');
+  return Number(card?.shadowRoot?.querySelector('[data-eh20-hour]')?.value)===index;
+ },hourIndex);
  const range=await page.locator('[data-eh20-hour]').inputValue();
  assert.equal(Number(range),hourIndex);
  assert.match(await page.locator('.eh20-hour-detail').innerText(),/PV-lading|Ontladen/);
