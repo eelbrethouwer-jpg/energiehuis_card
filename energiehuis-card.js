@@ -2866,7 +2866,7 @@ function eh25AuditHtml(card,h,c,rows){
   '<p>Uurstatistieken circa één jaar geleden (7 dagen): '+sample(report.old)+(report.oldError?' · '+ehEsc(report.oldError):'')+'</p>'+
   '<p>'+(report.five?.coverage>=.8?'Vijfminutendata in deze proefdag grotendeels aanwezig; langere dekking nog onbekend.':'Geen voldoende volledige vijfminuten-proefdag aangetoond.')+'</p>'+
   '<p>'+(report.old?.coverage>=.8?'Oudere uurdata in deze steekproef aanwezig; een compleet jaar is niet bewezen.':'Nog onvoldoende bewijs voor een jaarweergave.')+'</p></div>':'';
- return '<details class="eh25-audit" aria-label="Batterij datakwaliteit controleren">'+
+ return '<details class="eh25-audit" aria-label="Batterij datakwaliteit controleren"'+(card._eh25Open?' open':'')+'>'+
   '<summary>Datakwaliteit · fijnere metingen en jaarhistorie</summary>'+
   '<p>P1-uurhistorie: <strong>'+data.valid+' / '+data.total+' ('+percent(data.valid,data.total)+')</strong> · '+data.completeDays+' volledige dagen.</p>'+
   '<p>Historische uurprijzen: <strong>'+data.prices+' / '+data.valid+' ('+percent(data.prices,data.valid)+')</strong>.</p>'+
@@ -2950,7 +2950,7 @@ function eh20Css(){
 (function eh20Install(){
  const P=EnergiehuisCard.prototype,originalBattery=P._batteryHtml,originalRender=P._render,originalConfig=P.setConfig;
  P.setConfig=function(config){
-  this._eh25Request=(this._eh25Request||0)+1;this._eh25Audit=null;this._eh25Loading=false;this._eh25Error='';
+  this._eh25Request=(this._eh25Request||0)+1;this._eh25Audit=null;this._eh25Loading=false;this._eh25Error='';this._eh25Open=false;
   this._eh20Battery=null;
   this._eh20Loading=false;
   this._eh20Request=(this._eh20Request||0)+1;
@@ -2985,7 +2985,7 @@ function eh20Css(){
  P._eh25LoadAudit=async function(){
   const h=this._hass,c=this.config;
   if(this._eh25Loading||!this.isConnected||!h?.callWS||!c?.import||!c?.export)return;
-  this._eh25Loading=true;this._eh25Error='';
+  this._eh25Loading=true;this._eh25Error='';this._eh25Open=true;
   const request=this._eh25Request=(this._eh25Request||0)+1;
   const n=new Date(),today=new Date(n.getFullYear(),n.getMonth(),n.getDate());
   const yesterday=new Date(n.getFullYear(),n.getMonth(),n.getDate()-1);
@@ -3057,6 +3057,8 @@ function eh20Css(){
    if(e.target?.matches?.('[data-eh24-day]')){e.preventDefault();this._eh23DayIndex=Number(e.target.dataset.eh24Day);this._eh24GraphPeriod='day';this._eh20Selected=null;this._schedule();}
   });
   root.addEventListener('click',e=>{
+   const auditSummary=e.target?.closest?.('.eh25-audit summary');
+   if(auditSummary){this._eh25Open=!auditSummary.parentElement.open;return;}
    const audit=e.target?.closest?.('[data-eh25-probe]');
    if(audit){if(!audit.disabled)this._eh25LoadAudit();return;}
    const graphView=e.target?.closest?.('[data-eh24-view]');
