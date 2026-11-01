@@ -7,14 +7,23 @@ class FakeElement{attachShadow(){return {addEventListener(){}};}}
 const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,
  window:{customCards:[],navigator:{onLine:true}},
  customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
-vm.runInNewContext(source+'\n;globalThis.CHART={eh24BatteryBuckets,eh24AreaPath,eh24SocPath,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile};',ctx);
-const {eh24BatteryBuckets,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile}=ctx.CHART;
+vm.runInNewContext(source+'\n;globalThis.CHART={eh24BatteryWindows,eh20Limits,eh24BatteryBuckets,eh24AreaPath,eh24SocPath,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile};',ctx);
+const {eh24BatteryWindows,eh20Limits,eh24BatteryBuckets,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile}=ctx.CHART;
 const base=Date.parse('2026-10-01T00:00:00Z');
 const hour=(i,imp,exp,price=.25)=>({t:base+i*3600000,end:base+(i+1)*3600000,import:imp,export:exp,price});
 const rows=Array.from({length:720},(_,i)=>hour(i,i%24>=12?2:0,i%24<12?3:0));
 const sim=(data=rows)=>eh20Simulate(data,10,.81,3,'solar',.25,.08,eh21BatteryProfile(10,{}));
 const fNum=(a,b)=>Math.abs(a-b)<1e-7;
 
+test('30 kalenderdagen batterijhistorie is niet langer tot 400 uur afgekapt, inclusief DST',()=>{
+ const ordinary=eh24BatteryWindows({from:new Date('2026-08-01T00:00:00Z'),to:new Date('2026-08-31T00:00:00Z')});
+ assert.equal(ordinary.length,720);
+ assert.equal(ordinary[0].t,Date.parse('2026-08-01T00:00:00Z'));
+ assert.equal(ordinary.at(-1).end,Date.parse('2026-08-31T00:00:00Z'));
+ const dst=eh24BatteryWindows(eh20Limits(new Date(2026,10,1,12),30));
+ assert.ok(dst.length>=719&&dst.length<=721);
+ assert.ok(dst.length>400);
+});
 test('HomeWizard-stijl: paars boven nul, groen onder nul en witte SOC-stippellijn in één grafiek',()=>{
  const html=eh23BatteryFlowChart({},sim(),rows);
  assert.match(html,/class="eh23-flow-svg eh24-combined-svg"/);
