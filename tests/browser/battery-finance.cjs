@@ -30,10 +30,15 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
     }
     return result;
    }};
+  h.states['sensor.price'].attributes.forecast=Array.from({length:24},(_,i)=>({start:new Date(Date.parse('2026-11-01T13:00:00Z')+i*3600000).toISOString(),price:i===3?.04:.18+i*.004}));
   card.setConfig({import:'sensor.in',export:'sensor.out',prijs:'sensor.price',mobile_fixed_navigation:false});
   card.hass=h;card._view='battery';card._render();
  });
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh22-invest="10"]'));
+ assert.equal(await page.locator('[data-eh26-tab="today"]').getAttribute('aria-pressed'),'true');
+ assert.equal(await page.locator('.eh26-forecast-svg').count(),1);
+ assert.match(await page.locator('.eh26-outlook').innerText(),/komende 24 uur/);
+ await page.locator('[data-eh26-tab="returns"]').click();
  assert.match(await page.locator('.eh22-finance').innerText(),/Batterij 4.0/);
  await page.locator('[data-eh22-period="30"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
@@ -55,6 +60,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(state.days,30);assert.equal(state.price,3500);assert.equal(state.wear,.02);
  assert.equal(state.serviceCalls,0);
  assert.match(await page.locator('.eh22-finance').innerText(),/30 volledige kalenderdagen|30 volledige dagen/);
+ await page.locator('[data-eh26-tab="history"]').click();
  // One primary, interactive flow chart; legacy scenarios remain accessible but collapsed.
  assert.equal(await page.locator('.eh23-flow-svg').count(),1);
  assert.equal(await page.locator('.eh23-advanced').evaluate(e=>e.open),false);
