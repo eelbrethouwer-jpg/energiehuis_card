@@ -126,6 +126,11 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   return !c._eh25Loading&&c._eh25Audit?.five?.valid>0&&c._eh25Audit?.old?.valid>0;
  });
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  const d=c?.shadowRoot?.querySelector('.eh25-audit');
+  return d?.open&&d.textContent.includes('Vijfminutenstatistieken gisteren');
+ });
  assert.equal(await page.locator('.eh25-audit').evaluate(e=>e.open),true,'audit panel should stay open after results');
  assert.match(await page.locator('.eh25-audit').innerText(),/Vijfminutenstatistieken gisteren/);
  assert.match(await page.locator('.eh25-audit').innerText(),/een compleet jaar is niet bewezen/);
