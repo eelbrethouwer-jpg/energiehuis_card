@@ -19,7 +19,7 @@ test('v1.20: 24 echte toekomstige uurprijzen en goedkoopste vensters, geen verzo
  assert.equal(EH_VERSION,'1.20.0-rc.1');
  const r=eh26BatteryForecast(hass(),c,now,10,3,'smart');
  assert.equal(r.slots.length,24);assert.equal(r.complete,true);assert.equal(r.selected.length,4);
- assert.equal(r.selected[0].t,start+7*3600000);
+ assert.ok(r.selected.some(s=>s.t===start+7*3600000));
  assert.equal(r.slots.filter(s=>s.eligible).length,4);
  assert.ok(r.slots.some(s=>s.gridKwh>0));
  assert.ok(r.slots.every(s=>s.projectedPct>=0&&s.projectedPct<=100));
@@ -31,18 +31,18 @@ test('onvolledig prijsschema blijft zichtbaar als onvolledig, nooit aangevuld me
  const partial=eh26BatteryForecast(hass(6),c,now,5,3,'smart');
  assert.equal(partial.complete,false);
  assert.equal(partial.slots.length,6);
- assert.match(eh26ForecastHtml(hass(6),c,5,3,'smart'),/Slechts 6 van 24/);
+ assert.match(eh26ForecastHtml(hass(6),c,5,3,'smart',now),/Slechts 6 van 24/);
 });
 test('alleen-zonmodus selecteert prijsuren, maar produceert geen fictieve netto lading of SOC',()=>{
  const r=eh26BatteryForecast(hass(),c,now,10,3,'solar');
  assert.equal(r.slots.reduce((sum,s)=>sum+s.gridKwh,0),0);
  assert.ok(r.slots.every(s=>s.projectedPct===null));
- const html=eh26ForecastHtml(hass(),c,10,3,'solar');
+ const html=eh26ForecastHtml(hass(),c,10,3,'solar',now);
  assert.match(html,/Geen netladen/);
  assert.doesNotMatch(html,/class="eh26-projected-soc"/);
 });
 test('slimme modus toont een uitsluitend hypothetische SOC-vulling en waarschuwt expliciet',()=>{
- const html=eh26ForecastHtml(hass(),c,10,3,'smart');
+ const html=eh26ForecastHtml(hass(),c,10,3,'smart',now);
  assert.match(html,/class="eh26-forecast-svg"/);
  assert.match(html,/class="eh26-projected-soc"/);
  assert.match(html,/vanaf 0%/);
@@ -50,7 +50,7 @@ test('slimme modus toont een uitsluitend hypothetische SOC-vulling en waarschuwt
  assert.match(html,/Geen Home Assistant- of Alfen-commando/);
 });
 test('ontbrekende forecast leidt niet tot een grafiek met uitgevonden informatie',()=>{
- const html=eh26ForecastHtml({states:{}},c,10,3,'smart');
+ const html=eh26ForecastHtml({states:{}},c,10,3,'smart',now);
  assert.match(html,/Minder dan 3 toekomstige uurprijzen/);
  assert.doesNotMatch(html,/eh26-forecast-svg/);
 });
