@@ -3025,7 +3025,7 @@ function eh20BatteryView(card,h,c){
   '<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryPeriodControls(card)+profileNote+equalityNote+eh26Returns+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
-  '<p class="eh20-meta">'+ehEsc(priceText)+' De bedragen zijn indicatief en geen gerealiseerde maandbesparingen.</p>'+
+  '<p class="eh20-meta">'+ehEsc(priceText)+' Dit zijn scenarioresultaten, geen maandprognoses of gerealiseerde eurobesparingen.</p>'+
   '<p class="eh20-meta">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; laad-/ontlaadlimiet '+ehFmt(power,1)+' kW. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor jouw 1×40 A-aansluiting, tarieven, pieken of batterijlevensduur.</p>'+
   baseNote+'</div></section>';
 }
