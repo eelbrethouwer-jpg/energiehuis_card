@@ -16,7 +16,7 @@ function hass(n=24){
 }
 const c={prijs:'sensor.price',kwartier_forecast:'',battery_roundtrip_efficiency:.88};
 test('v1.20: 24 echte toekomstige uurprijzen en goedkoopste vensters, geen verzonnen uur',()=>{
- assert.equal(EH_VERSION,'1.21.1');
+ assert.equal(EH_VERSION,'1.21.2');
  const r=eh26BatteryForecast(hass(),c,now,10,3,'smart');
  assert.equal(r.slots.length,24);assert.equal(r.complete,true);assert.equal(r.selected.length,4);
  assert.ok(r.selected.some(s=>s.t===start+7*3600000));
