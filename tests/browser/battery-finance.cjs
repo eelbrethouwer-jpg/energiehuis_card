@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
     const result={};
     for(const id of q.statistic_ids){
       result[id]=[];
-      for(let t=Date.parse(q.start_time);t<Date.parse(q.end_time);t+=3600000){
+      for(let t=Date.parse(q.start_time);t<Date.parse(q.end_time);t+=(q.period==='5minute'?300000:3600000)){
         const hour=new Date(t).getUTCHours();
         result[id].push({start:t,change:id==='sensor.in'?(hour>=12?2:0):(hour<12?2:0),mean:.25});
       }
@@ -117,6 +117,23 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('.eh23-advanced summary').click();
  assert.equal(await page.locator('.eh23-advanced').evaluate(e=>e.open),true);
  await page.locator('.eh23-advanced summary').click();
+ // Read-only Recorder quality check: only explicit click, never automated on render.
+ assert.equal(await page.locator('.eh25-audit').count(),1);
+ await page.locator('.eh25-audit summary').click();
+ await page.locator('[data-eh25-probe]').click();
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  return !c._eh25Loading&&c._eh25Audit?.five?.valid>0&&c._eh25Audit?.old?.valid>0;
+ });
+ assert.equal(await page.evaluate(()=>window.serviceCalls),0);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  const d=c?.shadowRoot?.querySelector('.eh25-audit');
+  return d?.open&&d.textContent.includes('Vijfminutenstatistieken gisteren');
+ });
+ assert.equal(await page.locator('.eh25-audit').evaluate(e=>e.open),true,'audit panel should stay open after results');
+ assert.match(await page.locator('.eh25-audit').innerText(),/Vijfminutenstatistieken gisteren/);
+ assert.match(await page.locator('.eh25-audit').innerText(),/een compleet jaar is niet bewezen/);
  for(const width of [320,390,768,1280]){
   await page.setViewportSize({width,height:900});
   assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow battery '+width);

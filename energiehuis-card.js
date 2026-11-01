@@ -1,8 +1,8 @@
-/* Energiehuis v1.18.0 — gecombineerde batterijgrafiek in HomeWizard-stijl.
+/* Energiehuis v1.19.0 — controledashboard voor batterij-historie.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.18.0';
+const EH_VERSION = '1.19.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -2834,6 +2834,47 @@ function eh23BatteryFlowChart(card,simulation,rows){
   '<p class="eh20-meta">Grafiek gebruikt historische P1-uursimulatie, geen echte batterijtelemetrie. Dag = kWh per uur; week/maand = kWh per dag. De witte SOC-lijn gebruikt de rechter procentas; de laad-/ontlaadenergie gebruikt een eigen schaal. Jaar is niet beschikbaar zonder langere, betrouwbare historie.</p></section>';
 }
 
+
+/* Read-only Recorder data audit. Requires explicit interaction; samples are not full-year proof. */
+function eh25AuditSummary(rows){
+ const list=Array.isArray(rows)?rows:[];
+ const valid=list.filter(r=>Number.isFinite(r?.import)&&r.import>=0&&Number.isFinite(r?.export)&&r.export>=0);
+ const prices=valid.filter(r=>Number.isFinite(r.price)).length;
+ return {total:list.length,valid:valid.length,prices,completeDays:eh22BatteryCoverage(list).completeDays};
+}
+function eh25ProbeCoverage(reply,ids,from,to,minutes){
+ const expected=Math.round((to-from)/(minutes*60000));
+ const series=ids.map(id=>{
+  const matching=new Set();
+  for(const r of Array.isArray(reply?.[id])?reply[id]:[]){
+   const t=eh20PriceTime(r.start),v=eh17N(r.change),sum=eh17N(r.sum);
+   if(!Number.isFinite(t)||((v===null||v<0)&&(sum===null||sum<0)))continue;
+   const idx=Math.floor((t-from)/(minutes*60000));
+   if(idx>=0&&idx<expected)matching.add(idx);
+  }
+  return matching;
+ });
+ const valid=series.length===2?[...series[0]].filter(i=>series[1].has(i)).length:0;
+ return {expected,valid,coverage:expected?valid/expected:0};
+}
+function eh25AuditHtml(card,h,c,rows){
+ const data=eh25AuditSummary(rows),percent=(n,d)=>d?ehFmt(n/d*100,0)+'%':'—';
+ const report=card._eh25Audit;
+ const sample=(p)=>p?'<strong>'+p.valid+' / '+p.expected+' ('+percent(p.valid,p.expected)+')</strong>':'<strong>Niet vastgesteld</strong>';
+ const detail=report?'<div class="eh25-audit-result">'+
+  '<p>Vijfminutenstatistieken gisteren: '+sample(report.five)+(report.fiveError?' · '+ehEsc(report.fiveError):'')+'</p>'+
+  '<p>Uurstatistieken circa één jaar geleden (7 dagen): '+sample(report.old)+(report.oldError?' · '+ehEsc(report.oldError):'')+'</p>'+
+  '<p>'+(report.five?.coverage>=.8?'Vijfminutendata in deze proefdag grotendeels aanwezig; langere dekking nog onbekend.':'Geen voldoende volledige vijfminuten-proefdag aangetoond.')+'</p>'+
+  '<p>'+(report.old?.coverage>=.8?'Oudere uurdata in deze steekproef aanwezig; een compleet jaar is niet bewezen.':'Nog onvoldoende bewijs voor een jaarweergave.')+'</p></div>':'';
+ return '<details class="eh25-audit" aria-label="Batterij datakwaliteit controleren"'+(card._eh25Open?' open':'')+'>'+
+  '<summary>Datakwaliteit · fijnere metingen en jaarhistorie</summary>'+
+  '<p>P1-uurhistorie: <strong>'+data.valid+' / '+data.total+' ('+percent(data.valid,data.total)+')</strong> · '+data.completeDays+' volledige dagen.</p>'+
+  '<p>Historische uurprijzen: <strong>'+data.prices+' / '+data.valid+' ('+percent(data.prices,data.valid)+')</strong>.</p>'+
+  '<p class="eh25-small">Eenmalig en alleen op jouw verzoek: lees gisteren de 5-minutenstatistieken en een oudere week uurstatistieken. Geen apparaten of entiteiten worden gewijzigd.</p>'+
+  '<button type="button" data-eh25-probe="1" '+(card._eh25Loading||!h?.callWS||!c?.import||!c?.export?'disabled':'')+'>'+(card._eh25Loading?'Controleren…':'Controleer mijn Recorder-data')+'</button>'+
+  (card._eh25Error?'<p class="eh20-notice">'+ehEsc(card._eh25Error)+'</p>':'')+detail+
+  '<p class="eh25-small">Steekproef, geen validatie van een compleet jaar. Bij onvolledige historie blijft de fijnere en jaarweergave uitgeschakeld.</p></details>';
+}
 function eh20BatteryView(card,h,c){
  const data=card._eh20Battery,cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
  const days=card._eh22Days===30?30:7;
@@ -2841,7 +2882,7 @@ function eh20BatteryView(card,h,c){
  if(card.isConnected&&!card._eh20Loading&&(!data||data.days!==days||Date.now()-data.at>30*60000))card._eh20LoadBattery();
  const baseNote='<p class="subtle">Afzonderlijk chronologisch uurmodel. Start met een lege batterij; bij ontbrekende uren wordt de SOC niet over dat gat doorgetrokken. Uurafname/-teruglevering bepalen geen exacte volgorde binnen het uur. Geen fysieke batterij en geen laadcommando’s.</p>';
  if(!data)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
- if(data.error)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p>'+baseNote+'</section>';
+ if(data.error)return '<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p>'+baseNote+eh25AuditHtml(card,h,c,[])+'</section>';
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
  const rows=data.rows,coverage=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
@@ -2896,7 +2937,7 @@ function eh20BatteryView(card,h,c){
   '<div class="eh23-cap-tabs" role="group" aria-label="Selecteer virtuele batterijcapaciteit">'+[5,10,15].map(n=>'<button type="button" data-eh17-cap="'+n+'" aria-pressed="'+(cap===n)+'" class="'+(cap===n?'chosen':'')+'">'+n+' kWh</button>').join('')+'</div>'+
   profileNote+equalityNote+blocks+hourPicker+
   '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
-  eh22BatteryFinancialHtml(card,results,rows,cap)+
+  eh22BatteryFinancialHtml(card,results,rows,cap)+eh25AuditHtml(card,h,c,rows)+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
   '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div>'+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
@@ -2904,11 +2945,12 @@ function eh20BatteryView(card,h,c){
   '<p class="subtle">Aannames: '+ehFmt(eff*100,0)+'% rondrendement; per batterij een afzonderlijke laad-/ontlaadlimiet (standaard '+ehFmt(power,1)+' kW) en standaard 100% bruikbare nominale capaciteit. Alle limieten zijn simulatie-instellingen, geen productspecificaties. '+ehEuro2(buy)+'/kWh inkoopreferentie en '+ehEuro2(sell)+'/kWh terugleververgoeding. Geen garantie voor 1×40 A, tarieven, pieken of batterijlevensduur.</p></section>';
 }
 function eh20Css(){
- return '.eh24-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:10px 0}.eh24-tabs button{font:inherit;font-size:12px;border-radius:9px;min-height:40px;border:1px solid #7595a9;background:#143447;color:#e5f2f7;cursor:pointer}.eh24-tabs button.selected{background:#5d2e86;color:#fff;border-color:#c687f2;font-weight:700}.eh24-tabs button:disabled{opacity:.42;cursor:not-allowed}.eh24-combined-svg{max-height:270px}.eh24-combined-svg [data-eh23-hour],.eh24-combined-svg [data-eh24-day]{cursor:pointer}.eh24-combined-svg [data-eh23-hour]:focus,.eh24-combined-svg [data-eh24-day]:focus{stroke:white;stroke-width:1.5}.eh23-legend .eh24-purple{background:#b84bea}.eh23-legend .eh24-lilac{background:#8580e8}.eh23-legend .eh24-green{background:#31c78e}.eh23-legend .eh24-soc{background:transparent;border-top:2px dashed white;height:0;width:13px;border-radius:0}.eh23-battery-page{min-width:0}.eh23-battery-page .eh20-panel{margin-top:2px}.eh23-battery-page .eh20-kpis{margin:12px 0}.eh23-battery-page .eh20-meta{line-height:1.5}.eh23-cap-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.eh23-cap-tabs button{font:inherit;font-size:13px;font-weight:700;min-height:43px;color:#d7f1f6;background:#102f41;border:1px solid #779aaf;border-radius:10px;cursor:pointer}.eh23-cap-tabs button.chosen{background:#195640;border-color:#54ddb0;color:#fff}.eh23-day-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0}.eh23-day-nav strong{font-size:12px;text-align:center;min-width:0}.eh23-day-nav button{font:inherit;font-weight:700;font-size:22px;min-width:42px;min-height:40px;background:#12394b;color:#fff;border-radius:9px;border:1px solid #87b2c3;cursor:pointer}.eh23-day-nav button:disabled{opacity:.32;cursor:default}.eh23-flow{margin:13px 0;background:#0b2939;border:1px solid #58839670;border-radius:13px;padding:11px;min-width:0}.eh23-flow-head{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.eh23-flow-head h4{font-size:14px;margin:0}.eh23-flow-head small{color:#9bc3d2;font-size:10px}.eh23-legend{display:flex;gap:7px 12px;flex-wrap:wrap;font-size:10px;color:#b6d3df;margin:9px 0}.eh23-legend span{display:flex;gap:4px;align-items:center}.eh23-legend i{height:9px;width:9px;display:block;border-radius:2px}.eh23-solar{background:#47d9a5}.eh23-grid{background:#69acfa}.eh23-out{background:#ffbf77}.eh23-no-data{background:#8091a2}.eh23-flow-svg{display:block;width:100%;height:auto;max-height:200px;overflow:visible}.eh23-flow-svg [data-eh23-hour]{cursor:pointer}.eh23-flow-svg [data-eh23-hour]:focus{outline:none;stroke:#fff;stroke-width:1}.eh23-flow-totals{font-size:11px;color:#d8ebf2;line-height:1.5;margin:5px 0 0}.eh23-advanced,.eh23-profiles,.eh23-soc-details{border:1px solid #7ca1b64d;border-radius:10px;margin:12px 0;padding:10px 12px;background:#0a223233;min-width:0}.eh23-advanced summary,.eh23-profiles summary,.eh23-soc-details summary{font-size:12px;font-weight:700;color:#c5e5f2;cursor:pointer;padding:3px}.eh23-legacy-content>.subpage-head{display:none}.eh23-advanced .eh17-panel{margin-top:12px}.eh23-advanced .subgrid{margin-top:12px}.eh22-periods{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.eh22-periods button{min-height:40px;border:1px solid #668ea4;background:#102d40;color:#e8f7ff;border-radius:9px;padding:9px 14px;cursor:pointer}.eh22-periods button.chosen{background:#18533e;border-color:#61dfb4}.eh22-finance{margin-top:14px;border-top:1px solid #779ab24b;padding-top:13px}.eh22-finance h3{font-size:16px}.eh22-ledger{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}.eh22-ledger>div{display:flex;flex-direction:column;gap:6px;background:#0a2638;border:1px solid #7cacc02e;border-radius:10px;padding:11px;min-width:0}.eh22-ledger strong{font-size:17px}.eh22-ledger small{font-size:11px;color:#afd0de}.eh22-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.eh22-inputs label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#c3deea}.eh22-inputs input{min-width:0;width:100%;box-sizing:border-box;border:1px solid #779ab2;border-radius:8px;padding:10px;background:#0b293b;color:#fff;font:inherit;font-size:16px}.eh22-payback{border-left:3px solid #54dbb1;padding:9px 12px;font-size:12px;color:#dcf7ec;background:#1e51332b}@media(max-width:460px){.eh22-inputs{grid-template-columns:1fr}.eh22-ledger strong{font-size:15px}}.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
+ return '.eh25-audit{margin:13px 0;padding:12px;border:1px solid #86a7b45c;border-radius:11px;background:#0b293b}.eh25-audit summary{font-size:13px;font-weight:700;cursor:pointer}.eh25-audit p{font-size:12px;color:#c8e1eb;line-height:1.45;margin:8px 0}.eh25-audit p.eh25-small{font-size:11px;color:#b3cfd9}.eh25-audit button{font:inherit;font-size:12px;min-height:42px;padding:8px 12px;background:#17435a;color:#ecfaff;border:1px solid #91b5c2;border-radius:9px;cursor:pointer}.eh25-audit button:disabled{opacity:.5;cursor:default}.eh25-audit-result{border-top:1px solid #90b5bf55;margin-top:10px;padding-top:6px}.eh24-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:10px 0}.eh24-tabs button{font:inherit;font-size:12px;border-radius:9px;min-height:40px;border:1px solid #7595a9;background:#143447;color:#e5f2f7;cursor:pointer}.eh24-tabs button.selected{background:#5d2e86;color:#fff;border-color:#c687f2;font-weight:700}.eh24-tabs button:disabled{opacity:.42;cursor:not-allowed}.eh24-combined-svg{max-height:270px}.eh24-combined-svg [data-eh23-hour],.eh24-combined-svg [data-eh24-day]{cursor:pointer}.eh24-combined-svg [data-eh23-hour]:focus,.eh24-combined-svg [data-eh24-day]:focus{stroke:white;stroke-width:1.5}.eh23-legend .eh24-purple{background:#b84bea}.eh23-legend .eh24-lilac{background:#8580e8}.eh23-legend .eh24-green{background:#31c78e}.eh23-legend .eh24-soc{background:transparent;border-top:2px dashed white;height:0;width:13px;border-radius:0}.eh23-battery-page{min-width:0}.eh23-battery-page .eh20-panel{margin-top:2px}.eh23-battery-page .eh20-kpis{margin:12px 0}.eh23-battery-page .eh20-meta{line-height:1.5}.eh23-cap-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}.eh23-cap-tabs button{font:inherit;font-size:13px;font-weight:700;min-height:43px;color:#d7f1f6;background:#102f41;border:1px solid #779aaf;border-radius:10px;cursor:pointer}.eh23-cap-tabs button.chosen{background:#195640;border-color:#54ddb0;color:#fff}.eh23-day-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0}.eh23-day-nav strong{font-size:12px;text-align:center;min-width:0}.eh23-day-nav button{font:inherit;font-weight:700;font-size:22px;min-width:42px;min-height:40px;background:#12394b;color:#fff;border-radius:9px;border:1px solid #87b2c3;cursor:pointer}.eh23-day-nav button:disabled{opacity:.32;cursor:default}.eh23-flow{margin:13px 0;background:#0b2939;border:1px solid #58839670;border-radius:13px;padding:11px;min-width:0}.eh23-flow-head{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}.eh23-flow-head h4{font-size:14px;margin:0}.eh23-flow-head small{color:#9bc3d2;font-size:10px}.eh23-legend{display:flex;gap:7px 12px;flex-wrap:wrap;font-size:10px;color:#b6d3df;margin:9px 0}.eh23-legend span{display:flex;gap:4px;align-items:center}.eh23-legend i{height:9px;width:9px;display:block;border-radius:2px}.eh23-solar{background:#47d9a5}.eh23-grid{background:#69acfa}.eh23-out{background:#ffbf77}.eh23-no-data{background:#8091a2}.eh23-flow-svg{display:block;width:100%;height:auto;max-height:200px;overflow:visible}.eh23-flow-svg [data-eh23-hour]{cursor:pointer}.eh23-flow-svg [data-eh23-hour]:focus{outline:none;stroke:#fff;stroke-width:1}.eh23-flow-totals{font-size:11px;color:#d8ebf2;line-height:1.5;margin:5px 0 0}.eh23-advanced,.eh23-profiles,.eh23-soc-details{border:1px solid #7ca1b64d;border-radius:10px;margin:12px 0;padding:10px 12px;background:#0a223233;min-width:0}.eh23-advanced summary,.eh23-profiles summary,.eh23-soc-details summary{font-size:12px;font-weight:700;color:#c5e5f2;cursor:pointer;padding:3px}.eh23-legacy-content>.subpage-head{display:none}.eh23-advanced .eh17-panel{margin-top:12px}.eh23-advanced .subgrid{margin-top:12px}.eh22-periods{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.eh22-periods button{min-height:40px;border:1px solid #668ea4;background:#102d40;color:#e8f7ff;border-radius:9px;padding:9px 14px;cursor:pointer}.eh22-periods button.chosen{background:#18533e;border-color:#61dfb4}.eh22-finance{margin-top:14px;border-top:1px solid #779ab24b;padding-top:13px}.eh22-finance h3{font-size:16px}.eh22-ledger{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}.eh22-ledger>div{display:flex;flex-direction:column;gap:6px;background:#0a2638;border:1px solid #7cacc02e;border-radius:10px;padding:11px;min-width:0}.eh22-ledger strong{font-size:17px}.eh22-ledger small{font-size:11px;color:#afd0de}.eh22-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}.eh22-inputs label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#c3deea}.eh22-inputs input{min-width:0;width:100%;box-sizing:border-box;border:1px solid #779ab2;border-radius:8px;padding:10px;background:#0b293b;color:#fff;font:inherit;font-size:16px}.eh22-payback{border-left:3px solid #54dbb1;padding:9px 12px;font-size:12px;color:#dcf7ec;background:#1e51332b}@media(max-width:460px){.eh22-inputs{grid-template-columns:1fr}.eh22-ledger strong{font-size:15px}}.eh21-scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.eh21-scenario{font:inherit;text-align:left;background:#0b2a39;color:#e6f5fc;border:1px solid #7c9faf63;border-radius:12px;padding:11px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}.eh21-scenario.chosen{border-color:#4bdda9;background:#18473e}.eh21-scenario:focus-visible,.eh20-table button:focus-visible{outline:2px solid #fff;outline-offset:2px}.eh21-label{display:flex;flex-wrap:wrap;gap:4px;justify-content:space-between;font-weight:750;font-size:14px}.eh21-label small{font-size:10px;color:#abcbd7;font-weight:500}.eh21-fill{height:13px;border-radius:4px;border:1px solid #95c3d46a;background:#081b29;overflow:hidden}.eh21-fill>span{display:block;height:100%;background:#4fdbad}.eh21-detail{font-size:10px;line-height:1.45;color:#c4dce7}.eh20-table button{border:1px solid #8bb4cb;background:#103747;color:#ecfff5;border-radius:7px;padding:7px;cursor:pointer}@media(max-width:550px){.eh21-scenarios{grid-template-columns:1fr}.eh21-scenario{gap:6px}}.eh20-hour-picker{display:flex;flex-direction:column;gap:6px;color:#c7e1ed;font-size:11px;margin:11px 0}.eh20-hour-picker input{width:100%;accent-color:#56e4b5}.eh20-hour-detail{background:#092638;border:1px solid #91b8cb44;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}.eh20-hour-detail span{color:#b4d2e0;font-size:11px}.eh20-hour-detail strong{font-size:15px}.eh20-hour-detail small{font-size:11px;color:#bad4e2;line-height:1.5}.eh20-panel{margin-top:13px}.eh20-panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:7px}.eh20-panel h3 .icon{width:19px;height:19px;color:#54e8b7}.eh20-meta{color:#b8d1dd;font-size:11px;line-height:1.5;margin:9px 0}.eh20-modes{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.eh20-modes button{font:inherit;font-size:12px;background:#0c2b3f;border:1px solid #668ea45c;color:#d9eff9;border-radius:9px;padding:10px;cursor:pointer}.eh20-modes button.chosen{background:#17523f;border-color:#5fe1b7}.eh20-modes button:disabled{opacity:.48;cursor:not-allowed}.eh20-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh20-kpis>div{min-width:0;background:#0a2638;border:1px solid #7cacc02e;padding:12px;border-radius:11px;display:flex;flex-direction:column;gap:7px}.eh20-kpis small{font-size:11px;color:#afd0de}.eh20-kpis strong{font-size:19px;overflow-wrap:anywhere}.eh20-notice{padding:10px 12px;border-left:3px solid #eabb78;background:#5a3d251e;color:#ffd8ae;font-size:12px}.eh20-soc-chart{width:100%;height:auto;max-height:170px;margin:15px 0;display:block}.eh20-table-wrap{overflow-x:auto}.eh20-table{width:100%;border-collapse:collapse;font-size:12px;min-width:320px}.eh20-table caption{text-align:left;color:#a6c8d5;font-size:11px;margin-bottom:6px}.eh20-table td,.eh20-table th{border-bottom:1px solid #8cb5cb30;padding:9px 7px;text-align:left}.eh20-table .eh20-active{background:#194b3c5e;color:#cdfcec}@media(max-width:440px){.eh20-kpis strong{font-size:16px}.eh20-modes button{flex:1;font-size:11px;padding:10px 6px}}';
 }
 (function eh20Install(){
  const P=EnergiehuisCard.prototype,originalBattery=P._batteryHtml,originalRender=P._render,originalConfig=P.setConfig;
  P.setConfig=function(config){
+  this._eh25Request=(this._eh25Request||0)+1;this._eh25Audit=null;this._eh25Loading=false;this._eh25Error='';this._eh25Open=false;
   this._eh20Battery=null;
   this._eh20Loading=false;
   this._eh20Request=(this._eh20Request||0)+1;
@@ -2938,6 +2980,32 @@ function eh20Css(){
   }catch(_){
    if(request===this._eh20Request)this._eh20Battery={at:Date.now(),rows:[],days,error:'Recorder-uurstatistieken ontbreken. Controleer P1-statistieken, entiteiten en toegang tot Recorder.'};
   }finally{if(request===this._eh20Request){this._eh20Loading=false;if(this.isConnected)this._schedule();}}
+ };
+
+ P._eh25LoadAudit=async function(){
+  const h=this._hass,c=this.config;
+  if(this._eh25Loading||!this.isConnected||!h?.callWS||!c?.import||!c?.export)return;
+  this._eh25Loading=true;this._eh25Error='';this._eh25Open=true;
+  const request=this._eh25Request=(this._eh25Request||0)+1;
+  const n=new Date(),today=new Date(n.getFullYear(),n.getMonth(),n.getDate());
+  const yesterday=new Date(n.getFullYear(),n.getMonth(),n.getDate()-1);
+  const yearFrom=new Date(n.getFullYear()-1,n.getMonth(),n.getDate()-7);
+  const yearTo=new Date(n.getFullYear()-1,n.getMonth(),n.getDate());
+  const ids=[c.import,c.export];
+  const read=(a,b,period)=>h.callWS({type:'recorder/statistics_during_period',start_time:a.toISOString(),
+   end_time:b.toISOString(),statistic_ids:ids,period,types:['change','sum']});
+  if(this.isConnected)this._schedule();
+  try{
+   const [five,old]=await Promise.allSettled([read(yesterday,today,'5minute'),read(yearFrom,yearTo,'hour')]);
+   if(request!==this._eh25Request)return;
+   this._eh25Audit={
+    five:five.status==='fulfilled'?eh25ProbeCoverage(five.value,ids,yesterday.getTime(),today.getTime(),5):null,
+    old:old.status==='fulfilled'?eh25ProbeCoverage(old.value,ids,yearFrom.getTime(),yearTo.getTime(),60):null,
+    fiveError:five.status==='rejected'?'Geen toegang tot vijfminutenstatistieken.':'',
+    oldError:old.status==='rejected'?'Geen toegang tot oudere uurstatistieken.':''
+   };
+  }catch(_){if(request===this._eh25Request)this._eh25Error='Recorder-datacontrole is niet gelukt.';}
+  finally{if(request===this._eh25Request){this._eh25Loading=false;if(this.isConnected)this._schedule();}}
  };
  P._batteryHtml=function(h,c){
   const legacy=originalBattery.call(this,h,c);
@@ -2989,6 +3057,10 @@ function eh20Css(){
    if(e.target?.matches?.('[data-eh24-day]')){e.preventDefault();this._eh23DayIndex=Number(e.target.dataset.eh24Day);this._eh24GraphPeriod='day';this._eh20Selected=null;this._schedule();}
   });
   root.addEventListener('click',e=>{
+   const auditSummary=e.target?.closest?.('.eh25-audit summary');
+   if(auditSummary){this._eh25Open=!auditSummary.parentElement.open;return;}
+   const audit=e.target?.closest?.('[data-eh25-probe]');
+   if(audit){if(!audit.disabled)this._eh25LoadAudit();return;}
    const graphView=e.target?.closest?.('[data-eh24-view]');
    if(graphView&&!graphView.disabled){
     const next=graphView.dataset.eh24View;
