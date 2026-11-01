@@ -2978,9 +2978,9 @@ function eh20Css(){
    if(e.target?.matches?.('[data-eh24-day]')){e.preventDefault();this._eh23DayIndex=Number(e.target.dataset.eh24Day);this._eh24GraphPeriod='day';this._eh20Selected=null;this._schedule();}
   });
   root.addEventListener('click',e=>{
-   const period=e.target?.closest?.('[data-eh24-view]');
-   if(period&&!period.disabled){
-    const next=period.dataset.eh24View;
+   const graphView=e.target?.closest?.('[data-eh24-view]');
+   if(graphView&&!graphView.disabled){
+    const next=graphView.dataset.eh24View;
     if(['day','week','month'].includes(next)){
      this._eh24GraphPeriod=next;this._eh20Selected=null;
      if(next==='month'&&this._eh22Days!==30){
