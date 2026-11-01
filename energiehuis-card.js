@@ -3012,7 +3012,7 @@ function eh20BatteryView(card,h,c){
  const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+hourPicker+'</div>';
  const eh26Today='<div class="eh26-panel" '+(eh26Tab==='today'?'':'hidden')+'>'+eh26ForecastHtml(h,c,cap,selected?.chargeKw||power,mode)+'</div>';
  const eh26Returns='<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryFinancialHtml(card,results,rows,cap)+
-  '<details class="eh26-advanced"><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
+  '<details class="eh26-advanced"'+(card._eh26AdvancedOpen?' open':'')+'><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
   '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
   '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div></details></div>';
  const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
@@ -3147,6 +3147,8 @@ function eh20Css(){
     const key=newTab.dataset.eh26Tab;
     if(['today','history','returns'].includes(key)){this._eh26Tab=key;this._schedule();}return;
    }
+   const detailSummary=e.target?.closest?.('.eh26-advanced summary');
+   if(detailSummary){this._eh26AdvancedOpen=!detailSummary.parentElement.open;return;}
    const auditSummary=e.target?.closest?.('.eh25-audit summary');
    if(auditSummary){this._eh25Open=!auditSummary.parentElement.open;return;}
    const audit=e.target?.closest?.('[data-eh25-probe]');
