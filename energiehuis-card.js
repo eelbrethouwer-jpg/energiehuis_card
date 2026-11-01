@@ -680,6 +680,8 @@ function ehCupraSegments(history,c,h,from,to,capacity){
  const chargeAnchors=series.soc.filter(p=>p.t>=from.getTime()&&p.t<=to.getTime());
  for(let i=1;i<chargeAnchors.length;i++){
    const a=chargeAnchors[i-1],b=chargeAnchors[i],socGain=b.v-a.v;
+   // Een langdurig ontbrekend meetinterval is geen betrouwbare laadsessie.
+   if(b.t<=a.t||b.t-a.t>48*60*60*1000)continue;
    if(!Number.isFinite(socGain)||socGain<=.3)continue;
    const aAlfen=ehNearestPoint(series.alfen,a.t),bAlfen=ehNearestPoint(series.alfen,b.t);
    if(!aAlfen||!bAlfen)continue;
@@ -1240,7 +1242,7 @@ class EnergiehuisCard extends HTMLElement {
   const expectedNow=currentTempGroup?.range??null;
   const maxRange=Math.max(1,...(r.tempGroups||[]).map(g=>g.range||0));
   const tempRows=(r.tempGroups||[]).filter(g=>g.count>0).map(g=>`<div class="temp-row"><div class="temp-copy"><strong>${ehEsc(g.label)}</strong><span>${ehEsc(ehFmt(g.km,0))} km · ${g.count} segment${g.count===1?'':'en'}</span></div><div class="temp-bar"><i style="width:${Math.max(5,Math.min(100,(g.range||0)/maxRange*100)).toFixed(0)}%"></i></div><div class="temp-values"><strong>${Number.isFinite(g.range)?ehEsc(ehFmt(g.range,0)+' km'):'—'}</strong><span>${Number.isFinite(g.kwh100)?ehEsc(ehFmt(g.kwh100,1)+' kWh/100 km'):'—'}${Number.isFinite(g.delta)?' · '+ehEsc(fmtPct(g.delta))+' vs 15–20°C':''}</span></div></div>`).join('');
-  const coverage=r.coverageFrom?`${new Date(r.coverageFrom).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})} – ${new Date(r.coverageTo||Date.now()).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}`:'Geen detailhistorie';
+  const coverage=r.coverageFrom?`${new Date(r.coverageFrom).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})} – ${new Date(r.coverageTo||Date.now()).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}`:'Geen detailhistorie';
   const warnings=[r.statsWarning,r.historyWarning].filter(Boolean).map(x=>`<p class="plan-warning">${ehEsc(x)}</p>`).join('');
   return `<section class="cupra-card cupra-insights">
    <div class="section-title">${ehIcon('chart')} Cupra Insights <span class="only-sim">Praktijkanalyse</span></div>
