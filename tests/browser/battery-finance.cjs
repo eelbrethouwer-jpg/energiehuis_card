@@ -126,8 +126,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   return !c._eh25Loading&&c._eh25Audit?.five?.valid>0&&c._eh25Audit?.old?.valid>0;
  });
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);
- await page.locator('.eh25-audit summary').click();
- await page.locator('.eh25-audit summary').click();
+ assert.equal(await page.locator('.eh25-audit').evaluate(e=>e.open),true,'audit panel should stay open after results');
  assert.match(await page.locator('.eh25-audit').innerText(),/Vijfminutenstatistieken gisteren/);
  assert.match(await page.locator('.eh25-audit').innerText(),/een compleet jaar is niet bewezen/);
  for(const width of [320,390,768,1280]){
