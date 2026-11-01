@@ -2872,8 +2872,20 @@ function eh20Css(){
    }
   });
   root.addEventListener('input',e=>{
-   if(!e.target?.matches?.('[data-eh20-hour]'))return;
-   const n=Number(e.target.value);
+   const input=e.target;
+   if(input?.matches?.('[data-eh22-invest],[data-eh22-wear]')){
+    const invest=input.hasAttribute('data-eh22-invest'),raw=String(input.value??'').trim();
+    const n=raw===''?null:Number(raw),cap=Number(input.dataset.eh22Invest);
+    const valid=n===null||(Number.isFinite(n)&&(invest?n>0&&n<=100000:n>=0&&n<=.5));
+    if(valid){
+     if(invest&&[5,10,15].includes(cap)){if(!this._eh22Investments)this._eh22Investments={};this._eh22Investments[cap]=n;}
+     if(!invest)this._eh22Wear=n;
+    }
+    // No render while typing: keep focus and avoid losing edits.
+    return;
+   }
+   if(!input?.matches?.('[data-eh20-hour]'))return;
+   const n=Number(input.value);
    if(Number.isInteger(n)&&n>=0){this._eh20Selected=n;this._schedule();}
   });
   root.addEventListener('keydown',e=>{
