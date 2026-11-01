@@ -7,7 +7,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'..','energiehu
 const registry=new Map();
 class FakeElement{attachShadow(){return {addEventListener(){}};}}
 const context={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,Intl,window:{customCards:[]},customElements:{get:k=>registry.get(k),define:(k,v)=>registry.set(k,v)},HTMLElement:FakeElement};
-vm.runInNewContext(source+'\n;globalThis.C={ehCompareInputNumber,ehCompareValidateForm,ehCompareForm,ehCompareContract,ehCompareList,ehCompareDates,ehCompareRows,ehCompareCalculate,ehCompareHtml,EnergiehuisCard,EH_DEFAULTS};',context);
+vm.runInNewContext(source+'\n;globalThis.C={ehCompareInputNumber,ehCompareValidateForm,ehCompareForm,ehCompareContract,ehCompareList,ehCompareDates,ehCompareRows,ehCompareCalculate,ehCompareSavings,ehCompareSavingsHtml,ehCompareHtml,EnergiehuisCard,EH_DEFAULTS};',context);
 const C=context.C;
 const from=new Date(2026,9,1),to=new Date(2026,9,2),limits={from,to,days:1};
 const rows=Array.from({length:24},(_,i)=>({t:+from+i*3600000,import:2,export:.5}));
@@ -122,4 +122,48 @@ test('formulier gebruikt zichtbare appvalidatie en behoudt een decimaal toetsenb
  assert.match(html,/data-ehcmp-error role="alert" tabindex="-1" hidden/);
  assert.match(html,/data-ehcmp-number inputmode="decimal"/);
  assert.ok(html.indexOf('data-ehcmp-error')<html.indexOf('Contract opslaan'));
+});
+
+test('samenvatting toont per extra contract de echte gesimuleerde euro-afwijking tegenover referentie',()=>{
+ const contracts=[fixed(),dynamic()],out=calc(contracts),savings=C.ehCompareSavings(out);
+ assert.equal(savings.rows.length,1);
+ assert.equal(savings.rows[0].contract.id,'fixed');
+ assert.ok(Math.abs(savings.rows[0].delta-2.4)<1e-9);
+ const html=C.ehCompareSavingsHtml(out,contracts);
+ assert.match(html,/Jouw voordeel of nadeel/);
+ assert.match(html,/Zonneplan: <strong>€ 11,36/);
+ assert.match(html,/€ 2,40 voordeliger/);
+ assert.match(html,/Contract € 13,76/);
+ assert.match(html,/Scenario met je gemeten P1-uren/);
+});
+test('samenvatting toont ook dat Zonneplan duurder of even duur was geweest',()=>{
+ const cheaper=[fixed({buy:.2}),dynamic()],same=[fixed({buy:.25}),dynamic()];
+ const a=C.ehCompareSavingsHtml(calc(cheaper),cheaper),b=C.ehCompareSavingsHtml(calc(same),same);
+ assert.match(a,/€ 2,40 duurder/);
+ assert.match(a,/ehcmp-savings-bad/);
+ assert.match(b,/Even duur/);
+ assert.doesNotMatch(b,/€ 0,00 voordeliger|€ 0,00 duurder/);
+});
+test('geen schijnbesparing zonder referentie, prijshistorie of complete contractdata',()=>{
+ const contracts=[fixed(),dynamic()];
+ const missingRef=C.ehCompareSavingsHtml(calc([fixed()]),[fixed()]);
+ assert.match(missingRef,/Stel Zonneplan eerst in als referentie/);
+ const missingPrices=C.ehCompareCalculate(contracts,rows,{},limits);
+ const missing=C.ehCompareSavingsHtml(missingPrices,contracts);
+ assert.match(missing,/Nog geen betrouwbaar verschil te berekenen/);
+ assert.doesNotMatch(missing,/voordeliger<|duurder</);
+ const expired=fixed({to:'2026-09-30'}),partial=[expired,dynamic()];
+ const html=C.ehCompareSavingsHtml(calc(partial),partial);
+ assert.match(html,/Verschil niet beschikbaar/);
+ assert.match(html,/Contract niet geldig over de hele periode/);
+ assert.doesNotMatch(html,/€ 0,00 voordeliger|€ 0,00 duurder/);
+});
+test('samenvatting escaped contractnamen en verschijnt vóór de uitklapresultaten',()=>{
+ const contracts=[fixed({name:'<svg onload=alert(1)>'}),dynamic()];
+ const card={_ehcmpContracts:contracts,_ehcmpPeriod:'custom',_ehcmpStart:'2026-10-01',_ehcmpEnd:'2026-10-01',
+  _ehcmpData:{key:`${+from}|${+to}`,rows,prices}};
+ const html=C.ehCompareHtml(card);
+ assert.ok(html.indexOf('class="ehcmp-savings"')<html.indexOf('class="ehcmp-result"'));
+ assert.match(html,/&lt;svg/);
+ assert.doesNotMatch(html,/<svg onload/);
 });
