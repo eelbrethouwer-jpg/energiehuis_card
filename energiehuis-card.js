@@ -2,7 +2,7 @@
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.13.1';
+const EH_VERSION = '1.14.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -2902,6 +2902,45 @@ function ehCompareCalculate(contracts,rows,prices,limits){
  results.sort((a,b)=>(a.total===null?Infinity:a.total)-(b.total===null?Infinity:b.total));
  return {results,reference,imported,exported,coverage:expected?valid.length/expected:0,complete};
 }
+// Separate, read-only comparison: what each saved alternative would have cost
+// against the configured reference over the exact same complete P1 period.
+function ehCompareSavings(result){
+ const reference=result?.reference||null;
+ if(!reference)return {reference:null,rows:[]};
+ return {reference,rows:result.results.filter(r=>r.contract.id!==reference.contract.id).map(r=>({
+  contract:r.contract,total:r.total,reason:r.reason,
+  delta:Number.isFinite(reference.total)&&Number.isFinite(r.total)?r.total-reference.total:null
+ }))};
+}
+function ehCompareSavingsHtml(result,contracts){
+ const configured=(contracts||[]).find(c=>c.reference);
+ if(!contracts?.length)return '';
+ const heading='<h3>Jouw voordeel of nadeel</h3>';
+ if(!configured)return '<section class="ehcmp-savings" aria-label="Kostenverschillen">'+heading+
+  '<p class="subtle">Stel Zonneplan eerst in als referentie om de euroverschillen met je andere contracten te zien.</p></section>';
+ const name=ehEsc(configured.name);
+ if(!result)return '<section class="ehcmp-savings" aria-label="Kostenverschillen">'+heading+
+  '<p class="subtle">Verschillen met '+name+' verschijnen zodra de gekozen periode volledig is doorgerekend.</p></section>';
+ const comparison=ehCompareSavings(result),reference=comparison.reference;
+ if(!reference||!Number.isFinite(reference.total))return '<section class="ehcmp-savings" aria-label="Kostenverschillen">'+heading+
+  '<p class="subtle">Nog geen betrouwbaar verschil te berekenen: '+ehEsc(reference?.reason||'referentiekosten ontbreken')+'.</p></section>';
+ if(!comparison.rows.length)return '<section class="ehcmp-savings" aria-label="Kostenverschillen">'+heading+
+  '<p class="subtle">'+name+' is ingesteld. Voeg een extra stroomcontract toe om het voordeel of nadeel te zien.</p></section>';
+ const rows=comparison.rows.map(r=>{
+  const delta=r.delta,available=Number.isFinite(delta),equal=available&&Math.abs(delta)<.005;
+  const outcome=!available?'Verschil niet beschikbaar':equal?'Even duur':ehEuro2(Math.abs(delta))+(delta>0?' voordeliger':' duurder');
+  const status=!available?'':equal?'ehcmp-savings-equal':delta>0?'ehcmp-savings-good':'ehcmp-savings-bad';
+  const explanation=!available?ehEsc(r.reason||'Tarief- of meetgegevens ontbreken'):equal?'met '+name:'met '+name;
+  return '<div class="ehcmp-savings-row"><div class="ehcmp-savings-contract"><strong>'+ehEsc(r.contract.name)+'</strong>'+
+   '<small>'+(Number.isFinite(r.total)?'Contract '+ehEuro2(r.total):'Contractkosten onbekend')+'</small></div>'+
+   '<div class="ehcmp-savings-difference '+status+'"><strong>'+outcome+'</strong><small>'+explanation+'</small></div></div>';
+ }).join('');
+ return '<section class="ehcmp-savings" aria-label="Kostenverschillen">'+heading+
+  '<p class="ehcmp-savings-reference">'+name+': <strong>'+ehEuro2(reference.total)+'</strong> over de gekozen periode</p>'+
+  '<div class="ehcmp-savings-rows">'+rows+'</div>'+
+  '<p class="subtle ehcmp-savings-foot">Scenario met je gemeten P1-uren en ingevoerde tarieven. Positief = '+name+
+  ' goedkoper; negatief = een ander contract goedkoper. Geen werkelijke jaarafrekening; bonussen, saldering en ontbrekende kosten kunnen afwijken.</p></section>';
+}
 function ehCompareInputNumber(value){
  const text=String(value??'').trim();
  if(!text)return null;
@@ -2984,10 +3023,11 @@ function ehCompareHtml(card){
  ${card._ehcmpTransfer?`<label>Contracten als JSON (geen meetgegevens)<textarea data-ehcmp-json rows="6">${ehEsc(JSON.stringify({version:1,contracts:list},null,2))}</textarea></label><div class="ehcmp-actions"><button type="button" data-ehcmp-action="download">Download JSON</button><button type="button" data-ehcmp-action="import">JSON toevoegen / bijwerken</button></div>`:''}
  ${error?`<p class="plan-warning">${ehEsc(error)}</p>`:card._ehcmpLoading?'<p role="status">P1- en prijshistorie ophalen…</p>':data?.error?`<p class="plan-warning">${ehEsc(data.error)}</p>`:''}
  ${result?`<p class="subtle">Meetdekking: ${ehFmt(result.coverage*100,1)}% · Afname ${ehFmt(result.imported,1)} kWh · Teruglevering ${ehFmt(result.exported,1)} kWh${result.complete?'':' (onvolledig)'}. ${ready.length===list.length&&ready.length>1?'Laagste berekende kosten van de ingevoerde contracten: '+ehEsc(ready[0].contract.name)+'.':'Geen volledige ranglijst zolang gegevens ontbreken.'}</p>`:''}
+ ${ehCompareSavingsHtml(result,list)}
  ${bars}${manage}${!list.length?'<div class="subsection"><h3>Voeg je eerste contract toe</h3><p>Neem tarieven over uit je aanbod. Stel daarna Zonneplan in als referentie. De bestaande Vattenfall-grafieken blijven apart beschikbaar.</p></div>':''}
  <p class="subtle">Contracten blijven alleen in deze browser / app op dit apparaat. Exporteer een back-up voor andere apparaten. Geen meetgeschiedenis of inloggegevens opgeslagen.</p></main>`;
 }
-function ehCompareCss(){return `.ehcat-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.ehcat-quick{padding:12px;border:1px solid #64899b66;border-radius:12px;display:flex;flex-direction:column;gap:7px}.ehcat-quick small{color:#b6d6df}.ehcat-quick p{margin:5px 0}.ehcat-picker select{width:100%}.ehcat [data-ehcat-action=save-selected]:disabled{opacity:.5;cursor:not-allowed}@media(max-width:520px){.ehcat-picker{grid-template-columns:1fr}}.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{font:inherit;min-height:44px;border:1px solid #64899b;border-radius:10px;background:#123345;color:#ecf9ff;padding:9px 12px;cursor:pointer}.ehcmp button[aria-pressed="true"]{background:#17523f;border-color:#62dfb5}.ehcmp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ehcmp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ehcmp label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.ehcmp [data-ehcmp-error]{padding:12px;border:1px solid #ffb5a7;border-radius:8px;color:#ffddd5;background:#402323}.ehcmp [aria-invalid="true"]{border-color:#ffb5a7;outline:2px solid #ffb5a7}.ehcmp input,.ehcmp select,.ehcmp textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid #64899b;background:#092535;color:#ecf9ff}.ehcmp .ehcmp-check{flex-direction:row;align-items:center;margin:14px 0}.ehcmp-check input{width:auto}.ehcmp-result{border:1px solid #64899b55;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere}.ehcmp-result summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer;min-height:44px}.ehcmp-result summary small,.ehcmp-track{grid-column:1/-1}.ehcmp-track{display:block;position:relative;height:16px;background:#081e2c;border-radius:4px}.ehcmp-bar{position:absolute;height:12px;top:2px;background:#53dbae;border-radius:3px}.ehcmp-zero{position:absolute;top:0;height:100%;width:1px;background:#d7eaff}.ehcmp button:focus-visible,.ehcmp summary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ehcmp-info{font-size:12px;color:#ffdcaa;margin:10px 0}.ehcmp-info summary{cursor:pointer;min-height:32px;display:flex;align-items:center}.ehcmp-info summary:before{content:"▸";margin-right:6px}.ehcmp-info[open] summary:before{content:"▾"}.ehcmp-info p{line-height:1.5;margin-top:0}.ehcat h3{margin:0}.ehcat-list{max-height:360px;overflow:auto;overscroll-behavior:contain;margin:12px 0}.ehcat-list article{border-bottom:1px solid #64899b66;padding:12px 0;display:flex;flex-direction:column;gap:8px}.ehcat-source{font-size:12px;color:#aecbd8;line-height:1.5;margin:8px 0;overflow-wrap:anywhere}.ehcmp a{color:#8fdcc6}.ehcmp-info li{margin:8px 0}.ehcmp-entry{width:100%;margin:8px 0 12px;text-align:left}@media(max-width:520px){.ehcmp-fields{grid-template-columns:1fr}.ehcmp-fields.ehcmp-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}`;}
+function ehCompareCss(){return `.ehcat-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.ehcat-quick{padding:12px;border:1px solid #64899b66;border-radius:12px;display:flex;flex-direction:column;gap:7px}.ehcat-quick small{color:#b6d6df}.ehcat-quick p{margin:5px 0}.ehcat-picker select{width:100%}.ehcat [data-ehcat-action=save-selected]:disabled{opacity:.5;cursor:not-allowed}@media(max-width:520px){.ehcat-picker{grid-template-columns:1fr}}.ehcmp{min-width:0}.ehcmp button,.ehcmp-entry{font:inherit;min-height:44px;border:1px solid #64899b;border-radius:10px;background:#123345;color:#ecf9ff;padding:9px 12px;cursor:pointer}.ehcmp button[aria-pressed="true"]{background:#17523f;border-color:#62dfb5}.ehcmp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ehcmp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ehcmp label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.ehcmp [data-ehcmp-error]{padding:12px;border:1px solid #ffb5a7;border-radius:8px;color:#ffddd5;background:#402323}.ehcmp [aria-invalid="true"]{border-color:#ffb5a7;outline:2px solid #ffb5a7}.ehcmp input,.ehcmp select,.ehcmp textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:16px;padding:10px;border-radius:8px;border:1px solid #64899b;background:#092535;color:#ecf9ff}.ehcmp .ehcmp-check{flex-direction:row;align-items:center;margin:14px 0}.ehcmp-check input{width:auto}.ehcmp-savings{border:1px solid #64899b88;border-radius:12px;padding:12px;margin:12px 0;background:#0d2938}.ehcmp-savings h3{font-size:16px;margin:0 0 6px}.ehcmp-savings-reference{margin:4px 0 12px;font-size:13px}.ehcmp-savings-rows{display:grid;gap:0}.ehcmp-savings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #64899b44}.ehcmp-savings-contract{min-width:0;flex:1}.ehcmp-savings-contract strong{display:block;overflow-wrap:anywhere;font-size:13px}.ehcmp-savings-contract small,.ehcmp-savings-difference small{display:block;font-size:11px;color:#b6d6df}.ehcmp-savings-difference{text-align:right;max-width:55%;min-width:0}.ehcmp-savings-difference strong{font-size:14px;overflow-wrap:anywhere}.ehcmp-savings-good strong{color:#79e5bb}.ehcmp-savings-bad strong{color:#ffaf96}.ehcmp-savings-equal strong{color:#c7deea}.ehcmp-savings-foot{margin:10px 0 0;font-size:11px;line-height:1.45}@media(max-width:380px){.ehcmp-savings-row{gap:8px}.ehcmp-savings-difference{max-width:53%}.ehcmp-savings-difference strong{font-size:13px}}.ehcmp-result{border:1px solid #64899b55;border-radius:12px;padding:12px;margin:10px 0;overflow-wrap:anywhere}.ehcmp-result summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer;min-height:44px}.ehcmp-result summary small,.ehcmp-track{grid-column:1/-1}.ehcmp-track{display:block;position:relative;height:16px;background:#081e2c;border-radius:4px}.ehcmp-bar{position:absolute;height:12px;top:2px;background:#53dbae;border-radius:3px}.ehcmp-zero{position:absolute;top:0;height:100%;width:1px;background:#d7eaff}.ehcmp button:focus-visible,.ehcmp summary:focus-visible{outline:2px solid #fff;outline-offset:3px}.ehcmp-info{font-size:12px;color:#ffdcaa;margin:10px 0}.ehcmp-info summary{cursor:pointer;min-height:32px;display:flex;align-items:center}.ehcmp-info summary:before{content:"▸";margin-right:6px}.ehcmp-info[open] summary:before{content:"▾"}.ehcmp-info p{line-height:1.5;margin-top:0}.ehcat h3{margin:0}.ehcat-list{max-height:360px;overflow:auto;overscroll-behavior:contain;margin:12px 0}.ehcat-list article{border-bottom:1px solid #64899b66;padding:12px 0;display:flex;flex-direction:column;gap:8px}.ehcat-source{font-size:12px;color:#aecbd8;line-height:1.5;margin:8px 0;overflow-wrap:anywhere}.ehcmp a{color:#8fdcc6}.ehcmp-info li{margin:8px 0}.ehcmp-entry{width:100%;margin:8px 0 12px;text-align:left}@media(max-width:520px){.ehcmp-fields{grid-template-columns:1fr}.ehcmp-fields.ehcmp-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}`;}
 (function ehCompareInstall(){
  const P=EnergiehuisCard.prototype,oldCosts=P._costsHtml,oldRender=P._render,oldConfig=P.setConfig;
  P.setConfig=function(config){this._ehcmpRequest=(this._ehcmpRequest||0)+1;this._ehcmpData=null;this._ehcmpLoading=false;return oldConfig.call(this,config);};
