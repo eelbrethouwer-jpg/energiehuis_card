@@ -83,17 +83,20 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.ok(await page.locator('.eh24-combined-svg polyline[stroke="#f6f8ff"]').count()>0);
  assert.equal(await page.locator('.eh24-tabs button', {hasText:'Jaar'}).isDisabled(),true);
  await page.locator('[data-eh24-view="week"]').click();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh24GraphPeriod==='week');
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-eh24-day]').length===7);
  assert.equal(await page.locator('[data-eh24-day]').count(),7);
  await page.locator('[data-eh24-view="month"]').click();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh24GraphPeriod==='month');
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  return c._eh24GraphPeriod==='month'&&c.shadowRoot.querySelectorAll('[data-eh24-day]').length>=21;
+ });
  const months=await page.locator('[data-eh24-day]').count();
  assert.ok(months>=21&&months<=30);
  const firstDay=Number(await page.locator('[data-eh24-day]').first().getAttribute('data-eh24-day'));
  await page.locator('[data-eh24-day="'+firstDay+'"]').click();
  await page.waitForFunction(index=>{
   const c=document.querySelector('energiehuis-card');
-  return c._eh24GraphPeriod==='day'&&c._eh23DayIndex===index;
+  return c._eh24GraphPeriod==='day'&&c._eh23DayIndex===index&&c.shadowRoot.querySelectorAll('[data-eh23-hour]').length>=23;
  },firstDay);
  assert.equal(await page.locator('[data-eh23-hour]').count()>=23,true);
  // Full-period SOC and old models can be opened, with no data deletion.
