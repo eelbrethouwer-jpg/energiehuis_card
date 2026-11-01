@@ -51,8 +51,9 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.match(await savings.innerText(),/Zonneplan: € 11,36/);
  assert.match(await savings.innerText(),/€ 2,40 voordeliger/);
  assert.match(await savings.innerText(),/Contract € 13,76/);
- await page.locator('.ehcmp-result summary').first().click();assert.match(await page.locator('.ehcmp-result').first().innerText(),/Terugleverkosten/);
- await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('summary').click();
+ const expand=async selector=>{const panel=page.locator(selector).first();if(!await panel.evaluate(el=>el.open))await panel.locator('summary').first().click();};
+ await expand('.ehcmp-result');assert.match(await page.locator('.ehcmp-result').first().innerText(),/Terugleverkosten/);
+ await expand('.ehcmp-result:has-text("Test vast")');
  await page.locator('.ehcmp-result').filter({hasText:'Test vast'}).locator('[data-ehcmp-edit]').click();await fill('daily','.3');await fill('buy','.2');await page.locator('[data-ehcmp-form] button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehcmp-savings')?.textContent.includes('2,30 duurder'));
  assert.match(await savings.innerText(),/€ 2,30 duurder/);
@@ -66,7 +67,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/energiehuis-stroomvergelijker.png',fullPage:true});
  assert.match(await page.locator('.subpage').innerText(),/Leveranciers vergelijken/);
  assert.doesNotMatch(await page.locator('.subpage').innerText(),/Vattenfall 1 jaar deze maand/);
- assert.ok(await page.locator('.ehcmp-tariff').count()>=2);page.once('dialog',d=>d.accept());await page.locator('.ehcmp-result').first().locator('summary').click();await page.locator('.ehcmp-result').first().locator('[data-ehcmp-delete]').click();
+ assert.ok(await page.locator('.ehcmp-tariff').count()>=2);page.once('dialog',d=>d.accept());await expand('.ehcmp-result');await page.locator('.ehcmp-result').first().locator('[data-ehcmp-delete]').click();
  assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
  assert.equal(await page.evaluate(()=>window.serviceCalls),0);assert.deepEqual(errors,[]);
  // Fictitious catalogue fixtures isolate the UI tests from changing third-party prices.
@@ -77,10 +78,10 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.route('https://raw.githubusercontent.com/zhinees/energieprijzen-nl/main/data/**',route=>offline?route.abort():route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(route.request().url().endsWith('/leveranciers.json')?catalogue.dynamic:route.request().url().endsWith('/energiebelasting.json')?taxFixture:catalogue.fixed)}));
  await page.locator('[data-ehcat-action="open"]').click();await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-ehcat-add]').length===2);assert.equal(await page.locator('[data-ehcat-add]').count(),2);
  await page.locator('[data-ehcat-filter]').selectOption('fixed');await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('[data-ehcat-add]').length===1);assert.equal(await page.locator('[data-ehcat-add]').count(),1);
- await page.locator('[data-ehcat-advanced] summary').click();await page.locator('[data-ehcat-add]').click();await fill('tax','.12');await page.locator('[data-ehcmp-form] button[type=submit]').click();assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
+ await expand('[data-ehcat-advanced]');await page.locator('[data-ehcat-add]').click();await fill('tax','.12');await page.locator('[data-ehcmp-form] button[type=submit]').click();assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length),1);
  await page.locator('[name="sourceConfirmed"]').check();await page.locator('[data-ehcmp-form] button[type=submit]').click();await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehcmpContracts.length===2);
  const saved=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehcmpContracts.find(c=>c.source));assert.equal(saved.buy,.32);assert.equal(saved.monthly,8);assert.equal(saved.source.fields.length,4);
- await page.locator('[data-ehcat-action="open"]').click();await page.locator('[data-ehcat-filter]').selectOption('dynamic');await page.locator('[data-ehcat-advanced] summary').click();await page.locator('[data-ehcat-add^="dynamic-"]').click();await fill('tax','.12');await fill('priceEntity','sensor.market');
+ await page.locator('[data-ehcat-action="open"]').click();await page.locator('[data-ehcat-filter]').selectOption('dynamic');await expand('[data-ehcat-advanced]');await page.locator('[data-ehcat-add^="dynamic-"]').click();await fill('tax','.12');await fill('priceEntity','sensor.market');
  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');c._hass.states['sensor.market']={state:'.25',attributes:{unit_of_measurement:'€/kWh'}};});
  await page.locator('[name="sourceConfirmed"]').check();
  for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.locator('.ehcmp').evaluate(el=>el.scrollWidth>el.clientWidth+1),false,'catalogue form overflow '+width);}
