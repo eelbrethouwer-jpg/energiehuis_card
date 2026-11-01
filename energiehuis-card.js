@@ -1,8 +1,8 @@
-/* Energiehuis v1.20.0 — voorspellende batterijinterface.
+/* Energiehuis v1.21.1 — stabiele batterij- en Cupra-interface.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.21.0';
+const EH_VERSION = '1.21.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -3657,5 +3657,43 @@ function ehCompareCss(){return `.ehcmp-tariffs{margin:12px 0}.ehcmp-tariffs h3{f
     case 'open':this._ehcmpEditing=null;this._ehcmpTransfer=false;this._ehcatOpen=true;if(!this._ehcatEntries)this._ehcatLoad();break;case 'refresh':this._ehcatLoad();break;case 'close':this._ehcatOpen=false;break;}
    update();
   });
+ };
+})();
+
+
+/* v1.21.1 — Keep native <details> expansion state when HA updates rebuild
+   the Shadow DOM. No browser storage, energy writes or model changes.
+   Cupra's custom vehicle-details button already uses _cupraDetails, which
+   is deliberately left unchanged and checked in the browser regression. */
+function eh28DetailEntries(root,view){
+ if(!root||typeof root.querySelectorAll!=='function')return [];
+ const seen=new Map(),result=[];
+ for(const node of root.querySelectorAll('details')){
+  const summary=node.querySelector?.(':scope > summary');
+  if(!summary)continue;
+  // Contract rows have changing computed totals, so identify by contract name.
+  const contractName=node.classList?.contains('ehcmp-result')?summary.querySelector('b')?.textContent:'';
+  const label=String(contractName||summary.textContent||'').trim().replace(/\s+/g,' ').slice(0,240);
+  const base=String(view||'overview')+'|'+String(node.className||'')+'|'+label;
+  const nth=seen.get(base)||0;
+  seen.set(base,nth+1);
+  result.push([base+'|'+nth,node]);
+ }
+ return result;
+}
+(function eh28PreserveExpansion(){
+ const P=EnergiehuisCard.prototype,previousRender=P._render;
+ P._render=function(){
+  const root=this.shadowRoot;
+  const states=this._eh28Expanded || (this._eh28Expanded=new Map());
+  for(const [key,node] of eh28DetailEntries(root,this._eh28RenderedView||this._view)){
+   states.set(key,node.open);
+  }
+  previousRender.call(this);
+  // Renderer replaces innerHTML, so restore the state on the new DOM nodes.
+  for(const [key,node] of eh28DetailEntries(this.shadowRoot,this._view)){
+   if(states.has(key))node.open=states.get(key);
+  }
+  this._eh28RenderedView=this._view;
  };
 })();
