@@ -3673,7 +3673,7 @@ function eh28DetailEntries(root,view){
   if(!summary)continue;
   // Contract rows have changing computed totals, so identify by contract name.
   const contractName=node.classList?.contains('ehcmp-result')?summary.querySelector('b')?.textContent:'';
-  const label=String(contractName||summary.textContent||'').trim().replace(/\\s+/g,' ').slice(0,240);
+  const label=String(contractName||summary.textContent||'').trim().replace(/\s+/g,' ').slice(0,240);
   const base=String(view||'overview')+'|'+String(node.className||'')+'|'+label;
   const nth=seen.get(base)||0;
   seen.set(base,nth+1);
