@@ -38,8 +38,11 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('[data-eh22-period="30"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh20Battery?.days===30&&!document.querySelector('energiehuis-card')._eh20Loading);
  await page.locator('[data-eh22-invest="10"]').fill('3500');
+ await page.locator('[data-eh22-invest="10"]').blur();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Investments?.[10]===3500);
  await page.locator('[data-eh22-wear]').fill('0.02');
  await page.locator('[data-eh22-wear]').blur();
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh22Wear===.02);
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh22-payback')?.textContent.includes('terugverdientijd'));
  const state=await page.evaluate(()=>{
   const c=document.querySelector('energiehuis-card');
@@ -48,9 +51,41 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.equal(state.days,30);assert.equal(state.price,3500);assert.equal(state.wear,.02);
  assert.equal(state.serviceCalls,0);
  assert.match(await page.locator('.eh22-finance').innerText(),/30 volledige kalenderdagen|30 volledige dagen/);
+ // One primary, interactive flow chart; legacy scenarios remain accessible but collapsed.
+ assert.equal(await page.locator('.eh23-flow-svg').count(),1);
+ assert.equal(await page.locator('.eh23-advanced').evaluate(e=>e.open),false);
+ assert.match(await page.locator('.eh23-flow').innerText(),/Gesimuleerd, niet fysiek gemeten/);
+ const lastDay=await page.locator('.eh23-day-nav strong').innerText();
+ await page.locator('[data-eh23-step="-1"]').click();
+ await page.waitForFunction(previous=>{
+  const card=document.querySelector('energiehuis-card');
+  return card?.shadowRoot?.querySelector('.eh23-day-nav strong')?.textContent?.trim()!==previous;
+ },lastDay);
+ const previousDay=await page.locator('.eh23-day-nav strong').innerText();
+ assert.notEqual(previousDay,lastDay);
+ const hour=page.locator('[data-eh23-hour]').nth(3);
+ const hourIndex=Number(await hour.getAttribute('data-eh23-hour'));
+ await page.locator('[data-eh23-hour="'+hourIndex+'"]').click();
+ await page.waitForFunction(index=>document.querySelector('energiehuis-card')._eh20Selected===index,hourIndex);
+ const picked=await page.evaluate(()=>document.querySelector('energiehuis-card')._eh20Selected);
+ assert.equal(picked,hourIndex);
+ await page.waitForFunction(index=>{
+  const card=document.querySelector('energiehuis-card');
+  return Number(card?.shadowRoot?.querySelector('[data-eh20-hour]')?.value)===index;
+ },hourIndex);
+ const range=await page.locator('[data-eh20-hour]').inputValue();
+ assert.equal(Number(range),hourIndex);
+ assert.match(await page.locator('.eh20-hour-detail').innerText(),/PV-lading|Ontladen/);
+ // Full-period SOC and old models can be opened, with no data deletion.
+ await page.locator('.eh23-soc-details summary').click();
+ assert.equal(await page.locator('.eh23-soc-details').evaluate(e=>e.open),true);
+ await page.locator('.eh23-advanced summary').click();
+ assert.equal(await page.locator('.eh23-advanced').evaluate(e=>e.open),true);
+ await page.locator('.eh23-advanced summary').click();
  for(const width of [320,390,768,1280]){
   await page.setViewportSize({width,height:900});
-  assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow '+width);
+  assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow battery '+width);
+  assert.equal(await page.locator('.eh23-flow').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow flow '+width);
  }
  assert.deepEqual(errors,[]);
  await browser.close();server.close();
