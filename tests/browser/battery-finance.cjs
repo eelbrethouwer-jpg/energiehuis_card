@@ -89,6 +89,14 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.waitForFunction(()=>{
   const c=document.querySelector('energiehuis-card');
   return c._eh24GraphPeriod==='month'&&c.shadowRoot.querySelectorAll('[data-eh24-day]').length>=21;
+ },null,{timeout:7000}).catch(async error=>{
+  const snapshot=await page.evaluate(()=>{
+   const c=document.querySelector('energiehuis-card');
+   return {mode:c._eh24GraphPeriod,index:c._eh23DayIndex,days:c._eh20Battery?.days,
+    rows:c._eh20Battery?.rows?.length,buckets:c.shadowRoot.querySelectorAll('[data-eh24-day]').length,
+    panel:c.shadowRoot.querySelector('.eh23-flow')?.textContent?.slice(0,200)};
+  });
+  throw new Error('Month chart did not render: '+JSON.stringify({snapshot,errors}));
  });
  const months=await page.locator('[data-eh24-day]').count();
  assert.ok(months>=21&&months<=30);
