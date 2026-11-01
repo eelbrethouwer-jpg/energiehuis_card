@@ -2588,7 +2588,7 @@ function eh20Chart(result,pickedIndex){
  return '<svg class="eh20-soc-chart" viewBox="0 0 640 144" role="img" aria-label="Historische berekende batterijvulling per uur, 0 tot '+(result.usableCapacity||result.capacity)+' kWh">'+
   '<line x1="0" y1="117" x2="640" y2="117" stroke="#849cab" stroke-width="1"/>'+
   '<line x1="0" y1="17" x2="640" y2="17" stroke="#849cab" stroke-width="1" stroke-dasharray="5 5"/>'+
-  '<text x="3" y="13" fill="#bdd5e4" font-size="11"'+(result.usableCapacity||result.capacity)+' kWh</text>'+
+  '<text x="3" y="13" fill="#bdd5e4" font-size="11">'+(result.usableCapacity||result.capacity)+' kWh</text>'+
   '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
 }
 
