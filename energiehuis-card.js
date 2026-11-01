@@ -652,6 +652,8 @@ function ehCupraSegments(history,c,h,from,to,capacity){
  const segments=[],chargeSegments=[];let homeChargeExcluded=0,externalChargeSuspected=0,noiseExcluded=0;
  for(let i=1;i<snapshots.length;i++){
    const a=snapshots[i-1],b=snapshots[i],km=b.mileage-a.mileage;
+   // Bij lange meetgaten kan rijden/laden niet betrouwbaar worden gescheiden.
+   if(b.t<=a.t||b.t-a.t>48*60*60*1000)continue;
    if(!Number.isFinite(km)||km<-.2||km>400)continue;
    const alfenDelta=Number.isFinite(a.alfen)&&Number.isFinite(b.alfen)?b.alfen-a.alfen:null;
    const homeCharged=Number.isFinite(alfenDelta)&&alfenDelta>.08;
