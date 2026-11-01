@@ -1,8 +1,8 @@
-/* Energiehuis v1.17.0-rc.1 — batterijdashboard met gesimuleerde laad-/ontlaadgrafieken.
+/* Energiehuis v1.17.0 — batterijdashboard met gesimuleerde laad-/ontlaadgrafieken.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.17.0-rc.1';
+const EH_VERSION = '1.17.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
