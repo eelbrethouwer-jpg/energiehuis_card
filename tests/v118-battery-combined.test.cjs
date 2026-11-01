@@ -35,7 +35,7 @@ test('dag laat echte uurblokken zien en navigeert zonder de simulatiereeks te ve
  const d=eh24BatteryBuckets({},s,data,'day');
  assert.equal(d.buckets.length,24);
  assert.equal(d.selected.index,2);
- assert.deepEqual(d.buckets.map(x=>x.hour),Array.from({length:24},(_,i)=>48+i));
+ assert.deepEqual(Array.from(d.buckets,x=>x.hour),Array.from({length:24},(_,i)=>48+i));
  assert.ok(d.buckets.every(x=>x.valid&&Number.isFinite(x.soc)));
 });
 test('week is 7 dagtotalen en maand maximaal 30 dagtotalen, nooit kunstmatige kwartieren',()=>{
