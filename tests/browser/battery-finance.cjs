@@ -55,4 +55,4 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  assert.deepEqual(errors,[]);
  await browser.close();server.close();
  console.log('Battery 4.0 browser: 7/30-day selection, financial inputs, mobile widths and zero HA service calls OK.');
-})().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+})().catch(e=>{console.error('Battery browser regression failed:',e);server.close();process.exit(1);});
