@@ -13,9 +13,10 @@ for(let t=Date.parse('2024-12-31T23:00Z');t<=Date.parse('2025-12-31T23:00Z');t+=
  const label=wall.format(new Date(t));
  csv+=label+','+imp.toFixed(3)+',0,'+exp.toFixed(3)+',0\n';imp+=.1;exp+=.05;
 }
+let browser;
 (async()=>{
  await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
- const browser=await chromium.launch({headless:true});
+ browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:390,height:900},timezoneId:'Europe/Amsterdam',locale:'nl-NL'});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port);
@@ -72,4 +73,4 @@ for(let t=Date.parse('2024-12-31T23:00Z');t<=Date.parse('2025-12-31T23:00Z');t+=
  assert.equal(await page.locator('.eh31-season').count(),0);
  assert.deepEqual(errors,[]);
  await browser.close();server.close();console.log('Personal battery comparison: CSV import, counter/DST replay, settings-only persistence, clear, expansion and responsive widths OK.');
-})().catch(e=>{console.error(e);server.close();process.exitCode=1;});
+})().catch(async e=>{console.error(e);if(browser)await browser.close();server.close();process.exit(1);});
