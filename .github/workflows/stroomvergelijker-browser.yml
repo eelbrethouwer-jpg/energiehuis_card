@@ -18,12 +18,16 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-save --package-lock=false playwright@1.56.1
-      - run: npx playwright install --with-deps chromium
+      - name: Install pinned Chromium browser
+        timeout-minutes: 3
+        run: npx playwright install chromium
       - run: node tests/browser/stroomvergelijker.cjs
         env:
           EH_TEST_LIVE_TARIFFS: '1'
       - name: Test batterij 4.0 browser
         run: node tests/browser/battery-finance.cjs
+      - name: Test persoonlijke batterijvergelijker
+        run: node tests/browser/personal-battery-comparison.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
