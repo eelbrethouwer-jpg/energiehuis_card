@@ -2647,6 +2647,38 @@ function eh20Chart(result,pickedIndex){
 
 /* Battery 4.0: finance is a read-only scenario over exactly the simulated hour rows.
    Capex is never inferred from a battery capacity or hidden in the savings model. */
+/* Personal comparison foundation: report evidence, never infer appliance use from P1. */
+function eh30PersonalEvidence(rows){
+ const sorted=(Array.isArray(rows)?rows:[]).filter(r=>Number.isFinite(r?.t)).slice().sort((a,b)=>a.t-b.t);
+ const unique=new Map();let duplicates=0;
+ for(const r of sorted){if(unique.has(r.t))duplicates++;else unique.set(r.t,r);}
+ const samples=[...unique.values()];
+ const start=samples[0]?.t??null,end=samples.length?samples[samples.length-1].end:null;
+ const expected=start!==null&&Number.isFinite(end)&&end>start?Math.ceil((end-start)/3600000):0;
+ const valid=samples.filter(r=>Number.isFinite(r.end)&&r.end-r.t===3600000&&Number.isFinite(r.import)&&r.import>=0&&Number.isFinite(r.export)&&r.export>=0);
+ const priced=valid.filter(r=>Number.isFinite(r.price));
+ const imported=valid.reduce((n,r)=>n+r.import,0),exported=valid.reduce((n,r)=>n+r.export,0);
+ const months=new Set(valid.map(r=>new Date(r.t).toISOString().slice(0,7))).size;
+ return {start,end,expected,valid:valid.length,priced:priced.length,duplicates,
+  missing:Math.max(0,expected-valid.length),coverage:expected?Math.min(1,valid.length/expected):0,
+  imported,exported,months};
+}
+function eh30PersonalEvidenceHtml(rows){
+ const q=eh30PersonalEvidence(rows);
+ const period=q.start===null?'Geen meetperiode':new Date(q.start).toLocaleDateString('nl-NL')+' – '+new Date(q.end-1).toLocaleDateString('nl-NL');
+ return '<section class="eh30-evidence" aria-label="Persoonlijke meetbasis"><h4>Jouw meetbasis · batterijvergelijker</h4>'+
+ '<p class="eh20-meta">'+ehEsc(period)+' · '+q.valid+' / '+q.expected+' uur bruikbare P1-data · '+ehFmt(q.coverage*100,0)+'% dekking</p>'+
+ '<div class="eh20-kpis"><div><small>Gemeten netafname</small><strong>'+ehFmt(q.imported,1)+' kWh</strong></div><div><small>Gemeten teruglevering</small><strong>'+ehFmt(q.exported,1)+' kWh</strong></div></div>'+
+ '<p class="eh20-meta">Historische inkoopprijzen: '+q.priced+' / '+q.valid+' bruikbare uren. Ontbrekende of ongeldige uren: '+q.missing+'. Dubbele tijdstippen: '+q.duplicates+'. Netafname omvat ook de Cupra; huishoudelijk verbruik en PV-opwek zijn hier niet afzonderlijk vastgesteld.</p>'+
+ '<p class="eh20-notice">Nog geen persoonlijk aankoopadvies. De huidige vergelijking gebruikt maximaal 30 dagen en generieke capaciteiten. Voor een onderbouwde jaarverwachting ontwerpen we een volledig seizoensprofiel, gecontroleerde contracttarieven en echte batterijmodellen.</p>'+
+ '<details class="eh30-evidence-details"><summary>Wat ontbreekt voor een betrouwbare keuze?</summary><ul>'+
+ '<li>Gekoppelde Alfen-laadhistorie en een gelijke laadbehoefte voor de Cupra in alle scenario’s.</li>'+
+ '<li>Historische inkoop én terugleverprijzen met belastingen, toeslagen en contractregels.</li>'+
+ '<li>Productspecificaties, installatieofferte, vaste kosten, standbyverbruik, degradatie en garantie.</li>'+
+ '<li>Vermogenscontrole voor de 1×40 A-aansluiting; uurdata bewijzen geen veilige piekbelasting.</li>'+
+ '<li>Vergelijking met geen batterij en slim autoladen; terugkijkend slim laden is een theoretisch scenario.</li>'+
+ '</ul><p class="eh20-meta">Ook volledige meetdekking bewijst geen juiste sensoren of representatief jaar. Dit overzicht beoordeelt de beschikbare rijen; de gegevens zijn niet onafhankelijk gevalideerd.</p></details></section>';
+}
 function eh22BatteryCoverage(rows){
  const hourRows=Array.isArray(rows)?rows:[];
  const groups=new Map();
@@ -3092,7 +3124,7 @@ function eh20BatteryView(card,h,c){
   '<h3>'+ehIcon('battery')+' Batterij · inzicht en verwachting</h3>'+
   '<p class="eh20-meta">Virtuele batterij, geen fysiek gemeten opslag. Historische berekeningen: '+days+' volledige dagen · '+ehEsc(coverageText)+'</p>'+
   modes+'<div class="eh23-cap-tabs" role="group" aria-label="Selecteer virtuele batterijcapaciteit">'+[5,10,15].map(n=>'<button type="button" data-eh17-cap="'+n+'" aria-pressed="'+(cap===n)+'" class="'+(cap===n?'chosen':'')+'">'+n+' kWh</button>').join('')+'</div>'+
-  eh26Summary+eh26BatteryTabs(card)+eh26Today+eh26History+
+  eh30PersonalEvidenceHtml(rows)+eh26Summary+eh26BatteryTabs(card)+eh26Today+eh26History+
   '<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryPeriodControls(card)+profileNote+equalityNote+eh26Returns+
   (delta?'<p class="eh20-meta">Verschil met alleen zonneladen bij '+cap+' kWh: <strong>'+delta+'</strong> over beschikbare uren.</p>':'')+
   '<p class="eh20-meta">'+ehEsc(modeText)+'</p>'+
