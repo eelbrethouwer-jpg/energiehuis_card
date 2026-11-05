@@ -44,7 +44,10 @@ let browser;
  await page.locator('.eh31-rates > summary').click();
  await page.locator('[data-eh31-rate="buy"]').fill('0.30');await page.locator('[data-eh31-rate="buy"]').blur();
  await page.locator('[data-eh31-rate="sell"]').fill('0.10');await page.locator('[data-eh31-rate="sell"]').blur();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._eh31Settings.sell===.1);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card'),results=c.shadowRoot.querySelector('.eh31-results');
+  return c._eh31Settings.sell===.1&&results&&!results.textContent.includes('Tariefinvoer ontbreekt');
+ });
  assert.match(await page.locator('.eh31-results').innerText(),/Mijn <accu>/);
  assert.match(await page.locator('.eh31-results').innerText(),/Nog niet verantwoord/);
  assert.doesNotMatch(await page.locator('.eh31-results').innerText(),/Tariefinvoer ontbreekt/);
