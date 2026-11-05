@@ -17,8 +17,8 @@ const hass={states:{'sensor.price':{state:'0.2',attributes:{unit_of_measurement:
 const config={prijs:'sensor.price',battery_roundtrip_efficiency:.88};
 const now=new Date('2026-11-01T21:00:00Z');
 
-test('v1.21.2 correct geregistreerd en mobiel component-CSS aanwezig',()=>{
- assert.equal(EH_VERSION,'1.21.2');
+test('v1.21.3 correct geregistreerd en mobiel component-CSS aanwezig',()=>{
+ assert.equal(EH_VERSION,'1.21.3');
  assert.match(eh26BatteryCss(),/eh27-finance-chart/);
  assert.match(eh26BatteryCss(),/eh27-price-detail/);
 });

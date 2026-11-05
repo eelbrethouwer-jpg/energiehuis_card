@@ -35,6 +35,12 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   card.hass=h;card._view='battery';card._render();
  });
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh22-invest="10"]'));
+ assert.equal(await page.locator('.eh30-evidence').count(),1);
+ assert.match(await page.locator('.eh30-evidence').innerText(),/Gemeten netafname/);
+ assert.match(await page.locator('.eh30-evidence').innerText(),/Nog geen persoonlijk aankoopadvies/);
+ await page.locator('.eh30-evidence-details > summary').click();
+ await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
+ assert.equal(await page.locator('.eh30-evidence-details').evaluate(e=>e.open),true);
  assert.equal(await page.locator('[data-eh26-tab="today"]').getAttribute('aria-pressed'),'true');
  assert.equal(await page.locator('.eh26-forecast-svg').count(),1);
  assert.ok(await page.locator('.eh26-forecast-svg [data-eh27-price-hour]').count()>=3);
@@ -166,6 +172,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   await page.setViewportSize({width,height:900});
   assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow battery '+width);
   assert.equal(await page.locator('.eh23-flow').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow flow '+width);
+  assert.equal(await page.locator('.eh30-evidence').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow evidence '+width);
  }
  // Cupra's custom expand/collapse uses model state, which must also survive HA rerenders.
  await page.locator('[data-eh-page="cupra"]').click();

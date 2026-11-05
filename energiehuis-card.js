@@ -1,8 +1,8 @@
-/* Energiehuis v1.21.2 — Cupra Insights met periode-onafhankelijke historie.
+/* Energiehuis v1.21.3 — Persoonlijke meetbasis voor batterijvergelijking.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.21.2';
+const EH_VERSION = '1.21.3';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',

@@ -68,3 +68,6 @@ Werkelijke Recorder-historielengte, exacte sensorkoppelingen en metergrenzen, zo
 - Volledige suite: 166/176 geslaagd. Dezelfde tien bestaande financiële/grafiekasserties falen ook op ongewijzigde main (nieuwe tests daarbij buiten beschouwing). Geen nieuwe falende bestaande tests waargenomen.
 - Browsercontrole niet uitgevoerd: Chromium kon in deze omgeving niet starten door geweigerde socket-operatie. Responsieve weergave en HA-praktijkacceptatie blijven open.
 - Geen productcatalogus, jaarmodel, aankoopadvies, merge of release in deze eerste stap.
+
+## Releasecontrole v1.21.3
+Alle 176 tests slagen met TZ=UTC, overeenkomstig GitHub CI. De tien eerder genoemde lokale fouten blijken tijdzonegevoelige testfixtures; zij falen bij Europe/Amsterdam. Bestaande GitHub-browsercontrole op de eerste PR-versie slaagt. Voor de release wordt ook het meetbasisblok expliciet op inhoud, uitklapstatus en schermbreedtes getest. Live HA-validatie blijft open.
