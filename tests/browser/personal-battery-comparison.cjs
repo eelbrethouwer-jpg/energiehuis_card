@@ -56,7 +56,7 @@ let browser;
  assert.equal(stored.profiles[0].standby,0);
  // Invalid replacement preserves the last successful import, with a visible error.
  await page.locator('[data-eh31-file]').setInputFiles({name:'ongeldig.csv',mimeType:'text/csv',buffer:Buffer.from('time,wrong\n1,2')});
- await page.waitForFunction(()=>!!document.querySelector('energiehuis-card')._eh31Error);
+ await page.locator('.eh31-compare [role=alert]').waitFor({state:'visible'});
  assert.equal(await page.locator('.eh31-compare [role=alert]').count(),1);
  assert.equal(await page.locator('.eh31-season').count(),1);
  for(const width of [320,390,768,1280]){
@@ -64,7 +64,8 @@ let browser;
   assert.equal(await page.locator('.eh31-compare').evaluate(e=>e.scrollWidth>e.clientWidth+2),false,'Comparison overflow '+width);
  }
  await page.locator('[data-eh31-clear]').click();
- await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh31History);
+ await page.locator('.eh31-season').waitFor({state:'detached'});
+ assert.equal(await page.evaluate(()=>window.calls),0,'No HA service calls');
  assert.equal(await page.locator('.eh31-season').count(),0);
  // Reopen page to verify settings persist while history does not.
  await page.reload();
