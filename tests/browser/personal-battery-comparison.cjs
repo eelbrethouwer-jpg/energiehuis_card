@@ -33,7 +33,10 @@ let browser;
  await page.locator('.eh31-profiles > summary').click();
  for(let i=0;i<3;i++){
   const input=page.locator('[data-eh31-profile="'+i+'"][data-eh31-field="standby"]');
-  await input.fill('0');await input.blur();
+  await input.fill('0');
+  await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
+  assert.equal(await input.inputValue(),'0','HA update must preserve a focused edit');
+  await input.blur();
   await page.waitForFunction(i=>document.querySelector('energiehuis-card')._eh31Settings.profiles[i].standby===0,i);
  }
  await page.locator('[data-eh31-profile="0"][data-eh31-field="name"]').fill('Mijn <accu>');

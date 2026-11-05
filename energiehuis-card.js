@@ -3981,13 +3981,32 @@ function eh31CompareHtml(card){
  return '<section class="eh31-compare" aria-label="Persoonlijke batterijvergelijker"><h3>Batterijen vergelijken op jouw verbruik</h3>'+controls+history+profiles+rates+comparisons+'<p class="eh20-meta" role="status">'+ehEsc(card._eh31SaveNote||'')+'</p></section>';
 }
 function eh31Css(){return '.eh26-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}.eh31-compare{min-width:0}.eh31-upload,.eh31-card,.eh31-profiles,.eh31-rates{background:#0a293c;border:1px solid #6799aa70;border-radius:13px;padding:12px;margin:12px 0;min-width:0}.eh31-compare h3{font-size:17px}.eh31-compare h4{font-size:15px;margin:4px 0 10px}.eh31-compare p{line-height:1.5}.eh31-file-label,.eh31-compare label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:#c9e5ee}.eh31-compare input,.eh31-compare select{box-sizing:border-box;min-width:0;width:100%;min-height:42px;border:1px solid #719caf;border-radius:8px;padding:9px;background:#092536;color:#e9fafb;font:inherit;font-size:16px}.eh31-compare input[type=file]{font-size:12px}.eh31-compare button{background:#134c40;color:#edfff8;border:1px solid #57cba4;border-radius:8px;min-height:42px;padding:9px;cursor:pointer}.eh31-compare summary{font-size:13px;min-height:36px;cursor:pointer;color:#c8e6ed}.eh31-season{display:block;width:100%;height:auto;max-height:240px}.eh31-profiles-grid,.eh31-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.eh31-profiles fieldset,.eh31-results article{min-width:0;border:1px solid #6894a75c;border-radius:10px;padding:11px;background:#0b3042}.eh31-profiles label{margin:10px 0}.eh31-results h5{font-size:15px;margin:0 0 12px;overflow-wrap:anywhere}.eh31-results dl{margin:0}.eh31-results dt{font-size:11px;color:#a8c9d6;margin-top:10px}.eh31-results dd{font-size:14px;color:#e9fff8;margin:4px 0;overflow-wrap:anywhere}@media(max-width:600px){.eh26-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.eh31-profiles-grid,.eh31-results{grid-template-columns:1fr}.eh31-upload,.eh31-card{padding:10px}}';}
+function eh31UpdateSetting(card,el){
+ if(!el?.matches?.('[data-eh31-profile],[data-eh31-rate]'))return false;
+   const settings=eh31CompareState(card),raw=String(el.value).trim();
+   const key=el.dataset.eh31Field;
+   if(el.hasAttribute('data-eh31-profile')){
+    const index=Number(el.dataset.eh31Profile);
+    if(!Number.isInteger(index)||index<0||index>2||!['name','capacity','chargeKw','dischargeKw','efficiency','standby','investment','annualCosts'].includes(key))return false;
+    const draft={...settings.profiles[index],[key]:key==='name'?raw:raw===''?null:Number(raw)};
+    settings.profiles[index]=eh31ValidateProfile(draft);
+   }else{
+    const rateKey=el.dataset.eh31Rate;if(!['buy','sell'].includes(rateKey))return false;
+    const n=raw===''?null:Number(raw);settings[rateKey]=n!==null&&Number.isFinite(n)&&Math.abs(n)<=5?n:null;
+   }
+ card._eh31Cache=null;return true;
+}
 (function eh31ImportEvents(){
  const P=EnergiehuisCard.prototype,render=P._render;
  P._render=function(){
+  // Preserve focused edits during incoming HA updates; update results on blur.
+  if(this._view==='battery'&&this._eh26Tab==='compare'&&this.shadowRoot?.activeElement?.matches?.('[data-eh31-profile],[data-eh31-rate]'))return;
   render.call(this);
   const root=this.shadowRoot,style=root?.querySelector?.('style');
   if(style&&!style.textContent.includes('.eh31-compare{'))style.textContent+='\n'+eh31Css();
   if(!root||this._eh31Events)return;this._eh31Events=true;
+  root.addEventListener('input',e=>{eh31UpdateSetting(this,e.target);});
+  root.addEventListener('focusout',e=>{if(e.target?.matches?.('[data-eh31-profile],[data-eh31-rate]'))this._schedule();});
   root.addEventListener('change',async e=>{
    const el=e.target;
    if(el?.matches?.('[data-eh31-file]')){
@@ -4007,18 +4026,8 @@ function eh31Css(){return '.eh26-tabs{grid-template-columns:repeat(4,minmax(0,1f
     return;
    }
    if(el?.matches?.('[data-eh31-year]')){this._eh31ChartYear=el.value;this._schedule();return;}
-   if(!el?.matches?.('[data-eh31-profile],[data-eh31-rate]'))return;
-   const settings=eh31CompareState(this),raw=String(el.value).trim();
-   const key=el.dataset.eh31Field;
-   if(el.hasAttribute('data-eh31-profile')){
-    const index=Number(el.dataset.eh31Profile);
-    if(!Number.isInteger(index)||index<0||index>2||!['name','capacity','chargeKw','dischargeKw','efficiency','standby','investment','annualCosts'].includes(key))return;
-    const draft={...settings.profiles[index],[key]:key==='name'?raw:raw===''?null:Number(raw)};
-    settings.profiles[index]=eh31ValidateProfile(draft);
-   }else{
-    const rateKey=el.dataset.eh31Rate;if(!['buy','sell'].includes(rateKey))return;
-    const n=raw===''?null:Number(raw);settings[rateKey]=n!==null&&Number.isFinite(n)&&Math.abs(n)<=5?n:null;
-   }
+   if(!eh31UpdateSetting(this,el))return;
+   const settings=eh31CompareState(this);
    try{window.localStorage.setItem(EH31_SETTINGS_KEY,JSON.stringify({profiles:settings.profiles.map(eh31ValidateProfile),buy:settings.buy,sell:settings.sell}));this._eh31SaveNote='Batterij- en tariefinstellingen lokaal bewaard.';}
    catch(_){this._eh31SaveNote='Opslaan niet gelukt; instellingen blijven alleen in dit tabblad.';}
    this._eh31Cache=null;this._schedule();
