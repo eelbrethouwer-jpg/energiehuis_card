@@ -1701,11 +1701,11 @@ function eh23ChargePowerHtml(card,h,c,prices,need,opts={}){
   (history?choice('history','Gemiddeld sessievermogen',history.kw,history.count):'');
  const limitNote=!hasUsable?'':!validLimits?'Controleer de ingestelde veiligheidsgrenzen.':
   maxKw<1.38?'Minder dan 6 A beschikbaar bij de gebruikte huisbelasting.':
-  capped?'Voor dit scenario begrensd tot '+ehFmt(maxKw,2)+' kW.':
-  'Berekende vermogensgrens: '+ehFmt(maxKw,2)+' kW.';
+  capped?'Aansluitgrens: '+ehFmt(maxKw,2)+' kW. Hogere keuzes rekent de simulatie tot dit vermogen.':
+  'Aansluitgrens: '+ehFmt(maxKw,2)+' kW.';
  const houseNote=!houseKnown?' Huisbelasting onbekend (aanname 2000 W).':'';
  return '<div class="eh23-power-suggestions" aria-label="Laadvermogen kiezen">'+choices+
-  (limitNote?'<p class="subtle eh23-power-limit">'+ehEsc(limitNote+houseNote)+'</p>':'')+
+  (limitNote?'<p class="subtle eh23-power-limit">'+ehEsc(limitNote+houseNote+' Simulatiegrens; Alfen Active Load Balancing bepaalt het werkelijke vermogen.')+'</p>':'')+
   '<p class="subtle">Kies zelf een gemeten waarde voor deze simulatie. Handmatige invoer blijft staan totdat je een knop kiest. Het actuele Alfen-vermogen is een momentopname; de sessiemediaan omvat ook langzamer laden en pauzes.</p></div>';
 }
 function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
