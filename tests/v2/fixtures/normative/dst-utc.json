@@ -1,0 +1,26 @@
+{
+  "schema": "energie-regisseur-fixture-v1",
+  "type": "normative",
+  "zone": "Europe/Amsterdam",
+  "autumn": {
+    "localDay": "2026-10-25",
+    "fromUtc": "2026-10-24T22:00:00Z",
+    "untilUtc": "2026-10-25T23:00:00Z",
+    "hours": 25,
+    "duplicateWall": "2026-10-25 02:30",
+    "duplicateUtc": [
+      "2026-10-25T00:30:00Z",
+      "2026-10-25T01:30:00Z"
+    ],
+    "chargeFromUtc": "2026-10-24T21:00:00Z",
+    "chargeUntilUtc": "2026-10-25T05:00:00Z",
+    "chargeHours": 8
+  },
+  "spring": {
+    "localDay": "2027-03-28",
+    "fromUtc": "2027-03-27T23:00:00Z",
+    "untilUtc": "2027-03-28T22:00:00Z",
+    "hours": 23,
+    "nonexistentWall": "2027-03-28 02:30"
+  }
+}
