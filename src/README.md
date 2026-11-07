@@ -45,3 +45,9 @@ Bij een eventuele merge van PR #41 zal het HACS-bestand veranderen, maar de PR1-
 - Publicatieworkflows expliciet van `node scripts/build.cjs --check` voorzien (voorlopig alleen de algemene validate- en browser-workflow + Node-pariteitstest in CI).
 - Het vaste `EH_VERSION`-criterium in `tests/v2-build-parity.test.cjs` aanpassen wanneer PR #41 later een versieverhoging doorvoert; niet stilzwijgend loslaten.
 - America/New_York heeft drie bestaande testproblemen op `main`; deze staan los van de PR1-bronopdeling.
+
+## PR 2 — Extractie batterijmotor (in ontwikkeling)
+
+`src/engines/battery-engine.cjs` is de los importeerbare, zuivere rekenmotor (Node `require`), zonder Home Assistant, DOM of opslag. In de HACS classic-script wordt deze bron **zonder wrapper/transformatie** tussen `src/legacy/08-battery-core.js` en `08-battery-chart.js` ingevoegd. De functies behouden exact hun globale namen. `eh17N` is in deze module vervangen door een identieke lokale numerieke parser, zodat de import geen dashboardafhankelijkheid heeft. Verificatie: golden snapshots vóór extractie, realtime vergelijking met de gebundelde kaart, browserregressies en CI buildpariteit.
+
+De historische PR41-blob was vóór deze refactor exact gecontroleerd; na extractie blijft die hash alleen gedocumenteerd. De vaste volledige-file SHA-test is bewust vervangen door reproduceerbare build/gedragschecks. PR2 wijzigt nog geen fysieke batterijlogica of runtime-scriptacties.

@@ -8,7 +8,7 @@ const crypto=require('node:crypto');
 const manifest=Object.freeze([
   '00-foundation.js','01-history-analytics.js','02-card-shell.js',
   '03-energy-intelligence.js','04-utility-sources.js','05-energy-insights.js',
-  '06-mobile-shell.js','07-script-charge-controls.js','08-battery-core.js',
+  '06-mobile-shell.js','07-script-charge-controls.js','08-battery-core.js','08-battery-chart.js',
   '09-battery-finance.js','10-battery-flow.js','11-data-quality.js',
   '12-battery-forecast-ui.js','13-contracts.js','14-detail-state.js',
   '15-homewizard-history.js'
@@ -38,7 +38,7 @@ if(JSON.stringify(actual)!==JSON.stringify(expected)){
  console.error('Build aborted: source fragment list differs from explicit manifest.');
  console.error('Expected: '+expected.join(', '));
  console.error('Found: '+actual.join(', '));
- console.error('Hint: restore the 16 known fragments; update the manifest only after an intentional source review.');
+ console.error('Hint: restore all recognized legacy fragments; update the manifest only after an intentional source review.');
  process.exit(1);
 }
 for(const name of manifest){
@@ -47,7 +47,30 @@ for(const name of manifest){
   process.exit(1);
  }
 }
-const output=Buffer.concat(manifest.map(name=>fs.readFileSync(path.join(sourceDir,name))));
+// PR2: exactly one self-contained CommonJS-compatible engine, inserted before legacy chart code.
+const engineDir=path.join(root,'src','engines');
+const engineName='battery-engine.cjs';
+let engineEntries;
+try{
+ if(!fs.statSync(engineDir).isDirectory())throw Error('Not a directory');
+ engineEntries=fs.readdirSync(engineDir).sort();
+}catch(_){
+ console.error('Build aborted: missing or unreadable source directory: '+engineDir);
+ process.exit(1);
+}
+if(JSON.stringify(engineEntries)!==JSON.stringify([engineName])){
+ console.error('Build aborted: engine source list differs from manifest: '+engineEntries.join(', '));
+ process.exit(1);
+}
+const engineFile=path.join(engineDir,engineName);
+if(!fs.lstatSync(engineFile).isFile()){
+ console.error('Build aborted: engine source is not a regular file: '+engineFile);
+ process.exit(1);
+}
+const output=Buffer.concat(manifest.flatMap(name=>[
+ ...(name==='08-battery-chart.js'?[fs.readFileSync(engineFile)]:[]),
+ fs.readFileSync(path.join(sourceDir,name))
+]));
 const hash=crypto.createHash('sha256').update(output).digest('hex');
 const previous=fs.existsSync(artifact)?fs.readFileSync(artifact):null;
 function difference(expectedBytes,actualBytes){
