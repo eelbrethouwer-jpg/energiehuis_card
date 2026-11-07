@@ -25,7 +25,7 @@ function fixture(fn){
 }
 test('PR1: source concatenation exactly reproduces deployed HACS JavaScript bytes',()=>{
  const sourceFiles=fs.readdirSync(src).filter(x=>x.endsWith('.js')).sort();
- assert.equal(sourceFiles.length,17);
+ assert.equal(sourceFiles.length,18);
  const current=fs.readFileSync(original);
  const r=run('--check');
  assert.equal(r.status,0,'Build parity: '+r.stdout+r.stderr);
