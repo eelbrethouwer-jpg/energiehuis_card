@@ -39,3 +39,28 @@ test('PR0 legacy: weighted dynamic contract is characterized with complete synth
  assert.equal(result.complete,true);near(result.imported,x.expected.importKwh);
  near(result.exported,x.expected.exportKwh);near(result.reference.total,x.expected.totalEur);
 });
+test('PR0 legacy: 38 battery-kWh with 90% efficiency bills 42.222 wall-kWh',()=>{
+ const x=f.plannerWithLoss;
+ const r=engine.eh17Plan(x.prices,new Date(x.nowUtc),x.departureUtc,x.batteryNeedKwh,x.requestedKw,x.mode,x.opts);
+ assert.equal(r.error,null);near(r.remaining,x.expected.remainingKwh);
+ near(r.selected.reduce((sum,slot)=>sum+slot.wallKwh,0),x.expected.wallKwh);
+ near(r.cost,x.expected.costEur);
+});
+test('PR0 legacy: negative fixed export remuneration is a charge under separate and net settlements',()=>{
+ const x=f.negativeExport,from=new Date(x.fromUtc),to=new Date(x.untilUtc),rows=[{...x.row,t:Date.parse(x.row.t)}];
+ for(const settlement of ['separate','net']){
+  const contract=engine.ehCompareContract({id:'negative-'+settlement,name:'Fictief',type:'fixed',
+   settlement,buy:0,sell:x.fixed.sellEurPerKwh,daily:0,exportFee:0,reference:true});
+  const res=engine.ehCompareCalculate([contract],rows,{}, {from,to,days:1});
+  near(res.reference.total,x.fixed.expectedCostEur);
+ }
+});
+test('PR0 legacy: negative market export prices increase dynamic-contract costs',()=>{
+ const x=f.negativeExport,from=new Date(x.fromUtc),to=new Date(x.untilUtc),rows=[{...x.row,t:Date.parse(x.row.t)}];
+ const contract=engine.ehCompareContract({id:'negative-market',name:'Fictief',type:'dynamic',
+  settlement:'separate',priceEntity:'sensor.pr0_price',buy:0,sell:0,daily:0,exportFee:0,
+  priceBasis:'market',tax:0,markup:0,exportMode:'market',exportAdjustment:0,reference:true});
+ const prices={'sensor.pr0_price':new Map([[rows[0].t,x.dynamic.marketPriceEurPerKwh]])};
+ const res=engine.ehCompareCalculate([contract],rows,prices,{from,to,days:1});
+ near(res.reference.total,x.dynamic.expectedCostEur);
+});

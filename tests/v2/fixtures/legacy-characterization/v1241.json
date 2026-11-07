@@ -90,5 +90,75 @@
       "importKwh": 10,
       "exportKwh": 0
     }
+  },
+  "plannerWithLoss": {
+    "prices": [
+      {
+        "t": "2026-10-01T00:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T01:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T02:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T03:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T04:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T05:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T06:00:00.000Z",
+        "p": 0.3
+      },
+      {
+        "t": "2026-10-01T07:00:00.000Z",
+        "p": 0.3
+      }
+    ],
+    "nowUtc": "2026-10-01T00:00:00Z",
+    "departureUtc": "2026-10-01T08:00:00Z",
+    "batteryNeedKwh": 38,
+    "requestedKw": 6.6,
+    "mode": "direct",
+    "opts": {
+      "fuseAmp": 40,
+      "chargerAmp": 32,
+      "reserveAmp": 2,
+      "houseW": 0,
+      "efficiency": 0.9
+    },
+    "expected": {
+      "wallKwh": 42.22222222222222,
+      "costEur": 12.666666666666666,
+      "remainingKwh": 0
+    }
+  },
+  "negativeExport": {
+    "fromUtc": "2026-10-01T00:00:00Z",
+    "untilUtc": "2026-10-01T01:00:00Z",
+    "row": {
+      "t": "2026-10-01T00:00:00Z",
+      "import": 0,
+      "export": 1
+    },
+    "fixed": {
+      "sellEurPerKwh": -0.05,
+      "expectedCostEur": 0.05
+    },
+    "dynamic": {
+      "marketPriceEurPerKwh": -0.1,
+      "expectedCostEur": 0.1
+    }
   }
 }

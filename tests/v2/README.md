@@ -35,3 +35,5 @@ Fixture review checklist for Claude: arithmetic; units; quarter profiles; DST in
 - O7: The CI test loader has an explicit five-module manifest; adding/removing one requires updating the manifest.
 - E3 historical figures (€6.14 / €5.01 / €1.13) remain unverified by PR0: the complete 72-hour fixture table was not supplied.
 - Claude reported 3 pre-existing America/New_York test failures on main and PR0, outside this tests-only scope.
+- O4: The counterexample now explicitly tests the naive hourly result, quantifies its €0.25 error, and uses the roundtrip-efficiency parameter.
+- O6: Legacy characterization includes 38-kWh charging losses and negative remuneration under fixed, net and dynamic-market settlement.
