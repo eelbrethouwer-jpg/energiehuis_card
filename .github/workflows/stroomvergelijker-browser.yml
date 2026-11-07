@@ -21,6 +21,8 @@ jobs:
       - name: Install pinned Chromium browser
         timeout-minutes: 3
         run: npx playwright install chromium
+      - name: Charging suggestions and control styling
+        run: node tests/browser/charging-suggestions.cjs
       - name: Mobile visual acceptance
         run: node tests/browser/mobile-visual.cjs
       - run: node tests/browser/stroomvergelijker.cjs
@@ -35,6 +37,7 @@ jobs:
         with:
           name: stroomvergelijker-preview
           path: |
+            /tmp/energiehuis-charge-suggestions.png
             /tmp/eh-*.png
             /tmp/energiehuis-stroomvergelijker.png
             /tmp/energiehuis-aanbiederstarieven*.png
