@@ -12,7 +12,7 @@ const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,Intl,
  customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
 vm.runInNewContext(src+'\n;globalThis.BAT4={eh20Limits,eh20Simulate,eh22BatteryCoverage,eh22BatteryFinance,eh22BatteryFinancialHtml,eh20BatteryView,eh21BatteryProfile,EnergiehuisCard,EH_DEFAULTS};',ctx);
 const b=ctx.BAT4;
-const start=Date.parse('2026-06-01T00:00:00Z');
+const start=new Date(2026,5,1).getTime();
 const row=(i,imp,exp,price=.25)=>({t:start+i*3600000,end:start+(i+1)*3600000,import:imp,export:exp,price});
 const days30=Array.from({length:720},(_,i)=>row(i,i%24>=12?2:0,i%24<12?2:0));
 const simulate=(rows,cap=10,mode='solar')=>b.eh20Simulate(rows,cap,.81,3,mode,.25,.08,b.eh21BatteryProfile(cap,{}));

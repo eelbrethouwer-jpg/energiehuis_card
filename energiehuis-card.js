@@ -1,8 +1,8 @@
-/* Energiehuis v1.23.0 — Mobiel overzicht en planning met deeluren.
+/* Energiehuis v1.24.0 — Gemeten laadvermogensuggesties en tijdzonevaste validatie.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.23.0';
+const EH_VERSION = '1.24.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -798,6 +798,15 @@ class EnergiehuisCard extends HTMLElement {
    }
    const details=e.target.closest('[data-eh-cupra-details]');
    if(details){this._cupraDetails=!this._cupraDetails;this._schedule();return;}
+   const powerChoice=e.target.closest('[data-eh23-power]');
+   if(powerChoice){
+     if(powerChoice.disabled)return;
+     const current=ehW(this._hass,this.config.laden);
+     const suggestion=powerChoice.dataset.eh23Power==='current'?(current!==null&&current>=1400?current/1000:null):
+       powerChoice.dataset.eh23Power==='history'?eh23ChargePowerSuggestion(this._eh17Sessions?.error?[]:this._eh17Sessions?.sessions)?.kw:null;
+     if(Number.isFinite(suggestion)&&suggestion>=1.4){this._simPower=Math.min(7.4,Number(suggestion.toFixed(2)));this._schedule();}
+     return;
+   }
    const mode=e.target.closest('[data-eh-mode]');
    if(mode){
      if(['slim','direct','sun','pause'].includes(mode.dataset.ehMode)){
@@ -1311,13 +1320,14 @@ class EnergiehuisCard extends HTMLElement {
   const tariff=ehPricesForDay(h,c,new Date());
   const forecast=ehHourlyFromPrices(tariff.quarters,tariff.hourly.length?tariff.hourly:ehForecast(h,c.prijs));
   const prices=forecast.filter(x=>x.t&&Number.isFinite(Date.parse(x.t))).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
-  const planned=eh17Plan(prices,new Date(),this._departure,need,power,this._chargeMode,{
+  const planOpts={
      fuseAmp:eh17N(c.fuse_amp)??40,chargerAmp:eh17N(c.charger_amp)??32,
      reserveAmp:eh17N(c.reserve_amp)??2,houseW:ehW(h,c.huis),
      efficiency:eh17N(c.ev_charge_efficiency)??.9,
      solar:eh17Solar(h,c.pv_forecast),
      exportCompensation:eh17N(c.export_compensation_eur_kwh)
-   });
+   };
+  const planned=eh17Plan(prices,new Date(),this._departure,need,power,this._chargeMode,planOpts);
   const safeImg=ehValidHero(c.cupra_image)?c.cupra_image:'';
   const connectionText=connected===null||connected===undefined?'Niet gekoppeld':String(connected);
   const chargeLabel=ev===null?'Alfen niet beschikbaar':charging?'Auto laadt via Alfen':'Geen laadsessie actief';
@@ -1370,14 +1380,15 @@ class EnergiehuisCard extends HTMLElement {
       <div class="planning-inputs">
         <label class="plan-input"><span>Gewenste accustand <b>${target}%</b></span><input data-eh-target="1" type="range" min="50" max="100" step="5" value="${target}" aria-label="Gewenst accupercentage"/></label>
         <label class="plan-input"><span>Vertrektijd <small>voorbeeld, aanpasbaar</small></span><input type="datetime-local" data-eh-departure="1" value="${ehEsc(this._departure)}" aria-label="Vertrektijd"/></label>
-        <div class="plan-input-row"><label class="plan-input"><span>Laadbehoefte (kWh)</span><input type="number" min="1" max="100" step="1" data-eh-kwh="1" value="${ehEsc(need)}" aria-label="Te laden energie in kilowattuur"/></label><label class="plan-input"><span>Laadvermogen (kW)</span><input type="number" min="1.4" max="7.4" step="0.1" data-eh-kw="1" value="${ehEsc(power)}" aria-label="Aangenomen laadvermogen"/></label></div>
+        <div class="plan-input-row"><label class="plan-input"><span>Laadbehoefte (kWh)</span><input type="number" min="1" max="100" step="1" data-eh-kwh="1" value="${ehEsc(need)}" aria-label="Te laden energie in kilowattuur"/></label><label class="plan-input"><span>Laadvermogen (kW)</span><input type="number" min="1.4" max="7.4" step="0.01" data-eh-kw="1" value="${ehEsc(power)}" aria-label="Aangenomen laadvermogen"/></label></div>
       </div>
+      ${eh23ChargePowerHtml(this,h,c,prices,need,planOpts)}
       <p class="subtle">${hasCapacity?`Behoefte berekend uit ${ehFmt(soc,0)}% SOC, ${ehFmt(capacity,1)} kWh bruikbare accucapaciteit en doel ${target}%. ${this._simNeed!==null?'Handmatige laadbehoefte gaat voor.':''}`:(soc===null?'De Cupra-SOC is nog niet gekoppeld. Vul daarom je laadbehoefte zelf in.':`Voor een automatische behoefteberekening bij ${target}% is cupra_usable_kwh nodig. Vul voorlopig zelf de laadbehoefte in.`)} Deze waarden zijn uitsluitend een simulatie.</p>
     </section>
     <section class="cupra-card"><div class="section-title">${ehIcon('bolt')} Planningsmodus</div><div class="mode-grid">
       ${[['slim','leaf','Slim','Goedkoopste uren'],['direct','bolt','Direct','Eerstvolgende uren'],['sun','sun','Zon','PV-prognose nodig'],['pause','dots','Pauze','Geen uren plannen']].map(([id,icon,title,desc])=>`<button class="mode ${this._chargeMode===id?'active':''}" data-eh-mode="${id}" type="button" ${id==='sun'&&!eh17Solar(h,c.pv_forecast).length?'disabled title="Koppel een betrouwbare zonneprognose"':''}>${ehIcon(icon)}<strong>${title}</strong><span>${desc}</span></button>`).join('')}
     </div></section>
-    <section class="cupra-card"><div class="section-title">${ehIcon('euro')} Verwachte laadplanning</div><p class="subtle">Tarieven komen uit je Zonneplan-forecast. Geschatte kosten zijn exclusief laadverlies, vaste kosten en eventuele tariefverschillen. Geen laadopdrachten worden verzonden.</p>${priceCompare}${forecastBars}${plannedMarkup}</section>
+    <section class="cupra-card"><div class="section-title">${ehIcon('euro')} Verwachte laadplanning</div><p class="subtle">Tarieven komen uit je Zonneplan-forecast. Inclusief laadverlies (rendement ${ehFmt(Math.min(1,Math.max(.5,eh17N(c.ev_charge_efficiency)??.9))*100,0)}%); exclusief vaste kosten en tariefverschillen. Geen laadopdrachten worden verzonden.</p>${priceCompare}${forecastBars}${plannedMarkup}</section>
     <div class="cupra-safety">${ehIcon('shield')} <span><strong>Veilige simulatie.</strong> Deze knoppen regelen de Alfen niet. Werkelijke laadsnelheid kan variëren door de 1×40A-aansluiting, huisverbruik, laadpaalinstellingen en Active Load Balancing. Er worden geen laadcommando’s verstuurd.</span></div>
   </main>`;
  }
@@ -1594,13 +1605,16 @@ class EnergiehuisCard extends HTMLElement {
 .shell .body,.shell:not(.eh19-roomy) .body{margin-top:0}.shell .metrics .metric .metric-sub{display:block;font-size:10px;line-height:1.4;margin-top:4px;white-space:normal}
 .metric-grid .metric-symbol,.metric-grid .metric-value{color:var(--eh-net)}.metric-sun .metric-symbol,.metric-sun .metric-value{color:var(--eh-zon)}.metric-home .metric-symbol,.metric-home .metric-value{color:var(--eh-huis)}.metric-car .metric-symbol,.metric-car .metric-value{color:var(--eh-auto)}
 .shell .legend{flex-wrap:wrap;gap:10px 15px}.shell .cupra-head{margin:0}.cupra-kicker,.eyebrow{display:none}.shell .cupra-head h2,.shell .subpage-head h2{font-size:24px}.shell .cupra-hero,.shell:not(.eh19-roomy) .cupra-hero{min-height:112px;padding:12px}.cupra-car-icon .icon{width:75px;height:75px}.cupra-big{font-size:30px}.cupra-name{display:none}
-.charge-page>.cupra-head{order:-3}.charge-page>.eh17-panel{order:-2;margin-top:0}.charge-page>.eh20-control{order:0}
+.charge-page>.cupra-head{order:-3}.charge-page>.eh17-panel{order:-2;margin-top:0}.charge-page>.eh20-control {order:0}
 .charge-page .eh17-title{font-size:15px}.charge-page .eh17-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.charge-page .eh17-option{min-width:0;padding:10px 7px}.charge-page .eh17-option strong{font-size:19px}.charge-page .eh17-option small,.charge-page .eh17-option span,.charge-page .eh17-option em{font-size:10px;line-height:1.4;overflow-wrap:anywhere}.charge-page .eh17-good{font-size:12px;padding:8px 0;margin:0}
 .eh32-model,.eh32-hours,.eh32-feasibility{margin:10px 0;font-size:12px;color:#bcd6e3}.eh32-model summary,.eh32-hours summary,.eh32-feasibility summary,.eh30-evidence>summary{cursor:pointer;min-height:36px;line-height:1.5;padding:8px 0;font-weight:650}.eh32-model p{font-size:11px;line-height:1.5}
 .charge-page .planning-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.planning-inputs>*,.plan-input-row>*,.plan-input{min-width:0}.planning-inputs .plan-input-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.plan-input input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}.plan-input input[type=datetime-local]{display:block;appearance:none;-webkit-appearance:none;width:100%;font-size:14px;padding:10px 6px;min-height:42px}.plan-input span{flex-wrap:wrap}.plan-input small{display:none}
 .eh32-quality{position:relative}.eh32-coverage{position:absolute;right:10px;top:12px;pointer-events:none;font-size:10px;color:#bbd5df}.eh32-quality .eh30-evidence>summary{padding-right:155px}.eh30-evidence{margin:8px 0;padding:0 10px;border:1px solid #638c9d55;border-radius:10px;color:#bbd5df}.eh30-evidence>summary{font-size:11px}.eh30-evidence h4{font-size:13px}.eh26-overview{margin-top:0}.eh32-feasibility .eh18-kpi{display:none}.eh31-season text,.eh23-flow-svg text,.eh26-forecast-svg text{paint-order:stroke;stroke:#092637;stroke-width:3px;stroke-linejoin:round}
 .eh23-legacy-content .subpage-head{display:none}.eh20-panel>h3{display:none}.subgrid.three{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.shell .cupra-price-slot,.shell .cupra-price-bars.is-quarter .cupra-price-slot{min-width:0;flex:1 1 0}.metric-copy{min-width:0}.metric-value{overflow-wrap:anywhere}.shell .metric-euro .metric-value{font-size:16px;white-space:nowrap}.ehcmp h3,.ehcat h3{font-size:17px;margin:0}
 @media(max-width:720px){.shell .metrics>.metric:last-child:nth-child(odd),.body>.eh17-panel .eh17-grid>div:last-child:nth-child(odd){grid-column:1/-1}.shell .eh26-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}.shell .eh26-tabs button{font-size:10px;padding:6px 3px}.shell .eh19-appbar .eh19-connection{display:inline-block;max-width:130px;font-size:9px}.shell .eh19-density{font-size:10px}.shell .hero{height:76px}.shell .title{font-size:24px}.shell .cupra-head,.shell .subpage-head{padding:2px 0}.shell .cupra-page,.shell .subpage{padding-top:10px}.shell .subpage-head p{display:none}.eh26-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.eh26-overview strong{font-size:16px}.planning-inputs>label{grid-column:1/-1}.shell .cupra-safety{font-size:10px;line-height:1.5}.shell .eh17-option{border-radius:10px}.shell .eh17-option strong{font-size:17px}.charge-page .eh17-panel>.cupra-safety{display:none}}
+
+.eh23-power-suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 0}.eh23-power-suggestions>p{grid-column:1/-1;margin:0}.eh23-power-choice{font:inherit;font-size:12px;text-align:left;min-width:0;min-height:44px;padding:11px;border:1px solid #7295aa;border-radius:10px;color:#e5f5fc;background:#123449;cursor:pointer;display:flex;flex-direction:column;gap:6px}.eh23-power-choice[data-eh23-power="current"]{border-color:#49cfa5;background:#124638}.eh23-power-choice:disabled{opacity:.5;cursor:not-allowed}.eh23-power-choice:focus-visible{outline:2px solid white;outline-offset:2px}.eh23-power-choice strong{font-size:16px;overflow-wrap:anywhere}.eh23-power-choice small{font-size:10px;line-height:1.5;color:#c7dfe7}.eh23-window-note{font-size:10px;color:#b0cedb;line-height:1.5;margin:8px 0}.charge-page .eh20-actions{display:flex;gap:10px;flex-wrap:wrap}.charge-page .eh20-actions button{min-height:44px;min-width:90px}.charge-page .eh20-state{display:inline-flex;align-items:center;border:1px solid #8fbbba80;border-radius:999px;padding:5px 8px;font-size:10px}.charge-page .eh20-control .section-title{flex-wrap:wrap;gap:8px}
+@media(max-width:360px){.eh23-power-suggestions{grid-template-columns:1fr}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
  ${this._view==='cupra'||this._view==='charge'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
@@ -1628,7 +1642,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.23.0',description:'Slim laden, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.24.0',description:'Slim laden, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -1640,6 +1654,43 @@ function eh17Solar(h,id){
  const a=h?.states?.[id]?.attributes||{},raw=a.forecast??a.hourly??a.data??[];
  if(!Array.isArray(raw))return [];
  return raw.map(o=>{const t=Date.parse(o?.start??o?.start_date??o?.datetime??o?.time??"");const n=eh17N(o?.pv_kw??o?.power_kw??o?.estimated_power_kw??o?.estimate_kw);return {t,pv:n};}).filter(o=>Number.isFinite(o.t)&&o.pv!==null&&o.pv>=0&&o.pv<=30);
+}
+
+// Session energy is measured at the charger. The median describes observed average
+// session power, including tapering/pauses; it is not the charger's maximum rating.
+function eh23ChargePowerSuggestion(sessions,{minKwh=5,minMinutes=30,minSessions=3}={}){
+ if(!Array.isArray(sessions)||!Number.isFinite(minKwh)||minKwh<=0||!Number.isFinite(minMinutes)||minMinutes<=0||!Number.isInteger(minSessions)||minSessions<1)return null;
+ const powers=[];
+ for(const session of sessions){
+  if(!session||session.estimated)continue;
+  const kwh=eh17N(session.kwh),start=eh17N(session.start),end=eh17N(session.end);
+  if(kwh===null||kwh<minKwh||start===null||end===null||end<=start)continue;
+  const minutes=(end-start)/60000;
+  if(minutes<minMinutes)continue;
+  const kw=kwh/(minutes/60);
+  if(Number.isFinite(kw)&&kw>0)powers.push(kw);
+ }
+ if(powers.length<minSessions)return null;
+ powers.sort((a,b)=>a-b);
+ const middle=Math.floor(powers.length/2);
+ return {kw:powers.length%2?powers[middle]:(powers[middle-1]+powers[middle])/2,count:powers.length};
+}
+function eh23ChargePowerHtml(card,h,c,prices,need,opts){
+ const result=card._eh17Sessions;
+ if(card.isConnected&&!card._eh17SessionsLoading&&(!result||Date.now()-result.at>15*60000))card._eh17LoadSessions();
+ const measured=ehW(h,c.laden),current=measured!==null&&measured>=1400?measured/1000:null;
+ const history=eh23ChargePowerSuggestion(result?.error?[]:result?.sessions);
+ const choice=(kind,title,kw,count)=>{
+  const usable=Number.isFinite(kw)&&kw>=1.4;
+  const input=usable?Math.min(7.4,Number(kw.toFixed(2))):null;
+  const plan=usable?eh17Plan(prices,new Date(),card._departure,need>0?need:1,input,'direct',opts):null;
+  const capped=Number.isFinite(plan?.allowedKw)&&plan.allowedKw<kw-.005;
+  const note=capped?'Voor dit scenario begrensd tot '+ehFmt(plan.allowedKw,2)+' kW.':usable&&!Number.isFinite(plan?.allowedKw)?'Vermogensgrens zichtbaar zodra er een geldig laadplan is.':'';
+  return '<button type="button" class="eh23-power-choice" data-eh23-power="'+kind+'" '+(!usable?'disabled':'')+'><span>'+title+'</span><strong>'+(usable?ehFmt(kw,2)+' kW':kind==='current'?'Geen actieve laadmeting':'Onder 1,4 kW')+'</strong>'+(count?'<small>Mediaan uit '+count+' geschikte sessies</small>':'')+(note?'<small>'+ehEsc(note)+'</small>':'')+'</button>';
+ };
+ return '<div class="eh23-power-suggestions" aria-label="Laadvermogen kiezen">'+choice('current','Huidig laadvermogen',current)+
+  (history?choice('history','Gemiddeld sessievermogen',history.kw,history.count):'')+
+  '<p class="subtle">Kies zelf een gemeten waarde voor deze simulatie. Handmatige invoer blijft staan totdat je een knop kiest. Het actuele Alfen-vermogen is een momentopname; de sessiemediaan omvat ook langzamer laden en pauzes.</p></div>';
 }
 
 function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
@@ -1723,9 +1774,9 @@ function eh17Charge(h,c,card){
  const sims=["direct","slim","sun"].map(m=>[m,eh17Plan(prices,now,card._departure,need,kw,m,opts)]);
  const slim=sims[1][1],direct=sims[0][1];
  const diff=slim.cost!==null&&direct.cost!==null&&slim.remaining<=.05&&direct.remaining<=.05?direct.cost-slim.cost:null;
- const markup=sims.map(([mode,p])=>`<div class="eh17-option"><small>${mode==="direct"?"Direct":mode==="slim"?"Slim":"Zonneladen"}</small><strong>${p.cost===null?"—":ehEuro2(p.cost)}</strong><span>${p.error?ehEsc(p.error):`${ehFmt(p.totalKwh,1)} van ${ehFmt(need,1)} kWh · ${ehFmt(p.selected.reduce((sum,s)=>sum+(s.slotEnd-s.slotStart)/3600000,0),1)} uurvenster`}</span>${p.remaining>.05?`<em>Nog ${ehFmt(p.remaining,1)} kWh te laden</em>`:""}</div>`).join("");
+ const markup=sims.map(([mode,p])=>`<div class="eh17-option"><small>${mode==="direct"?"Direct":mode==="slim"?"Slim":"Zonneladen"}</small><strong>${p.cost===null?"—":ehEuro2(p.cost)}</strong><span>${p.error?(mode==="sun"&&!opts.solar.length?"PV-prognose ontbreekt":ehEsc(p.error)):`${ehFmt(p.totalKwh,1)} van ${ehFmt(need,1)} kWh · tijdvakken: ${ehFmt(p.selected.reduce((sum,s)=>sum+(s.slotEnd-s.slotStart)/3600000,0),1)} uur`}</span>${p.remaining>.05?`<em>Nog ${ehFmt(p.remaining,1)} kWh te laden</em>`:""}</div>`).join("");
  const source=house===null?"Huisbelasting aangenomen: 2.000 W (geen actuele meting).":`Huisbelasting aangenomen constant: ${ehFmt(house/1000,2)} kW (huidige meting).`;
- return `<section class="cupra-card eh17-panel"><div class="eh17-title">${ehIcon("chart")} Laadverwachting</div><details class="eh32-model"><summary>Berekening en aannames</summary><p class="subtle">Voorzien van eenfase-grenzen en volledige toekomstige uren. Het rekenmodel houdt rekening met ${ehFmt(opts.fuseAmp,0)}A hoofdaansluiting, maximaal ${ehFmt(opts.chargerAmp,0)}A voor de lader, ${ehFmt(opts.reserveAmp,0)}A reserve en ${ehFmt(opts.efficiency*100,0)}% aangenomen efficiëntie.</p></details><div class="eh17-options">${markup}</div>${diff===null?"":`<p class="eh17-good">Indicatief voordeel goedkoop laden t.o.v. direct: ${ehEuro2(diff)}</p>`}<details class="eh32-model"><summary>Databronnen en beperkingen</summary><p class="subtle">${ehEsc(source)} Het model gebruikt geen voorspelling van toekomstig huishoudverbruik. Zon vereist een expliciete PV-uurprognose en ingestelde terugleververgoeding; anders blijven kosten onbekend.</p></details><div class="cupra-safety">${ehIcon("shield")} Alle adviezen zijn uitsluitend simulaties. De Alfen en Active Load Balancing bepalen de werkelijk toegestane laadstroom.</div></section>`;
+ return `<section class="cupra-card eh17-panel"><div class="eh17-title">${ehIcon("chart")} Laadverwachting</div><details class="eh32-model"><summary>Berekening en aannames</summary><p class="subtle">Voorzien van eenfase-grenzen; begin- en einddeeluren tellen naar rato mee. Het rekenmodel houdt rekening met ${ehFmt(opts.fuseAmp,0)}A hoofdaansluiting, maximaal ${ehFmt(opts.chargerAmp,0)}A voor de lader, ${ehFmt(opts.reserveAmp,0)}A reserve en ${ehFmt(opts.efficiency*100,0)}% aangenomen efficiëntie.</p></details><div class="eh17-options">${markup}</div><p class="eh23-window-note">Tijdvakken zijn beschikbare laadperiodes; het laatste kan deels worden gebruikt. Dit is geen berekende actieve laadtijd.</p>${diff===null?"":`<p class="eh17-good">Indicatief voordeel goedkoop laden t.o.v. direct: ${ehEuro2(diff)}</p>`}<details class="eh32-model"><summary>Databronnen en beperkingen</summary><p class="subtle">${ehEsc(source)} Het model gebruikt geen voorspelling van toekomstig huishoudverbruik. Zon vereist een expliciete PV-uurprognose en ingestelde terugleververgoeding; anders blijven kosten onbekend.</p></details><div class="cupra-safety">${ehIcon("shield")} Alle adviezen zijn uitsluitend simulaties. De Alfen en Active Load Balancing bepalen de werkelijk toegestane laadstroom.</div></section>`;
 }
 
 function eh17Budget(h,c){
