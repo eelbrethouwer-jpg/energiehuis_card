@@ -85,3 +85,19 @@ test('PR2: export naar bestaande host-module behoudt oudere exports',()=>{
  assert.equal(host.exports.previousFunction,42);
  for(const name of ['eh20Simulate','eh21BatteryProfile','eh20Percentile'])assert.equal(typeof host.exports[name],'function');
 });
+
+test('PR2: bevroren host-exports laten kaartregistratie en engine intact',()=>{
+ const engine=fs.readFileSync(path.join(root,'src','engines','battery-engine.cjs'),'utf8');
+ const frozen=Object.freeze({previousFunction:42});
+ assert.doesNotThrow(()=>vm.runInNewContext(engine,{module:{exports:frozen}}));
+ assert.equal(frozen.previousFunction,42);
+ assert.deepEqual(Object.keys(frozen),['previousFunction']);
+ const registry=new Map();
+ const sandbox={...ctx,
+  module:{exports:frozen},window:{customCards:[]},
+  customElements:{get:k=>registry.get(k),define:(k,v)=>registry.set(k,v)}
+ };
+ assert.doesNotThrow(()=>vm.runInNewContext(source,sandbox));
+ assert.equal(typeof registry.get('energiehuis-card'),'function');
+ assert.equal(sandbox.module.exports,frozen);
+});
