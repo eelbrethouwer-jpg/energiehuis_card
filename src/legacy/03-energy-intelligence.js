@@ -28,18 +28,45 @@ function eh23ChargePowerSuggestion(sessions,{minKwh=5,minMinutes=30,minSessions=
  const middle=Math.floor(powers.length/2);
  return {kw:powers.length%2?powers[middle]:(powers[middle-1]+powers[middle])/2,count:powers.length};
 }
+// v1.24.2 reviewkandidaat: meetkwaliteit uitsluitend voor de laadscenario's.
+// Onbetrouwbare sensoren worden niet als actuele meetwaarde gepresenteerd.
+function eh24ChargeReading(h,id,{now=Date.now(),maxAgeMs=10*60*1000}={}){
+ const sensor=h?.states?.[id];
+ if(!sensor)return {watts:null,quality:'missing'};
+ const watts=ehW(h,id);
+ if(watts===null||!Number.isFinite(watts))return {watts:null,quality:'invalid'};
+ if(watts<0)return {watts:null,quality:'negative'};
+ const updated=Date.parse(sensor.last_updated||sensor.last_changed||'');
+ if(!Number.isFinite(updated))return {watts:null,quality:'undated'};
+ if(updated>now+60*1000)return {watts:null,quality:'future'};
+ if(now-updated>maxAgeMs)return {watts:null,quality:'stale'};
+ return {watts,quality:'measured'};
+}
+function eh24ChargeLimit(opts={}){
+ // Houd deze zuivere UI-berekening aantoonbaar gelijk aan eh17Plan.
+ // De regressietest vergelijkt op een raster met de echte planneruitkomst.
+ const fuse=eh17N(opts.fuseAmp)??40,charger=eh17N(opts.chargerAmp)??32,reserve=eh17N(opts.reserveAmp)??2;
+ const house=eh17N(opts.houseW),houseKnown=house!==null;
+ const valid=fuse>0&&charger>=6&&reserve>=0&&reserve<fuse;
+ const maxAmp=valid?Math.min(charger,fuse-reserve-Math.max(0,house??2000)/230):null;
+ return {valid,houseKnown,maxKw:maxAmp===null?null:Math.max(0,maxAmp)*230/1000};
+}
+function eh24QualityLabel(quality,subject){
+ const reason={
+  missing:'ontbreekt',invalid:'heeft geen geldige waarde of eenheid',negative:'is negatief',
+  undated:'heeft geen betrouwbaar meettijdstip',future:'heeft een tijdstip in de toekomst',
+  stale:'is verouderd'
+ }[quality];
+ return reason?subject+' '+reason:'';
+}
 function eh23ChargePowerHtml(card,h,c,prices,need,opts={}){
  const result=card._eh17Sessions;
  if(card.isConnected&&!card._eh17SessionsLoading&&(!result||Date.now()-result.at>15*60000))card._eh17LoadSessions();
- const measured=ehW(h,c.laden),current=measured!==null&&measured>=1400?measured/1000:null;
+ const alfen=eh24ChargeReading(h,c.laden,{maxAgeMs:2*60*1000});
+ const measured=alfen.watts,current=measured!==null&&measured>=1400?measured/1000:null;
  const history=eh23ChargePowerSuggestion(result?.error?[]:result?.sessions);
- // Bereken dezelfde veiligheidsgrens als eh17Plan, maar onafhankelijk van
- // vertrekdatum, tariefbeschikbaarheid en andere planningsfouten.
- const fuse=eh17N(opts.fuseAmp)??40,charger=eh17N(opts.chargerAmp)??32,reserve=eh17N(opts.reserveAmp)??2;
- const house=eh17N(opts.houseW),houseKnown=house!==null;
- const validLimits=fuse>0&&charger>=6&&reserve>=0&&reserve<fuse;
- const maxAmp=validLimits?Math.min(charger,fuse-reserve-Math.max(0,house??2000)/230):null;
- const maxKw=maxAmp===null?null:Math.max(0,maxAmp)*230/1000;
+ // Planonafhankelijke grens; pariteit met eh17Plan wordt apart getest.
+ const {valid:validLimits,houseKnown,maxKw}=eh24ChargeLimit(opts);
  let hasUsable=false,capped=false;
  const choice=(kind,title,kw,count)=>{
   const usable=Number.isFinite(kw)&&kw>=1.4;
@@ -48,7 +75,8 @@ function eh23ChargePowerHtml(card,h,c,prices,need,opts={}){
    hasUsable=true;
    if(maxKw!==null&&maxKw>=1.38&&maxKw<input-.005)capped=true;
   }
-  return '<button type="button" class="eh23-power-choice" data-eh23-power="'+kind+'" '+(!usable?'disabled':'')+'><span>'+title+'</span><strong>'+(usable?ehFmt(kw,2)+' kW':kind==='current'?'Geen actieve laadmeting':'Onder 1,4 kW')+'</strong>'+(count?'<small>Mediaan uit '+count+' geschikte sessies</small>':'')+'</button>';
+  const selected=usable&&card._eh24PowerChoice===kind&&Math.abs((card._simPower??-1)-input)<.005;
+  return '<button type="button" class="eh23-power-choice'+(selected?' is-selected':'')+'" data-eh23-power="'+kind+'" aria-pressed="'+(selected?'true':'false')+'" '+(!usable?'disabled':'')+'><span>'+title+'</span><strong>'+(usable?ehFmt(kw,2)+' kW':kind==='current'?'Geen actieve laadmeting':'Onder 1,4 kW')+'</strong>'+(count?'<small>Mediaan uit '+count+' geschikte sessies</small>':'')+(selected?'<small>Gekozen voor simulatie</small>':'')+'</button>';
  };
  const choices=choice('current','Huidig laadvermogen',current)+
   (history?choice('history','Gemiddeld sessievermogen',history.kw,history.count):'');
@@ -56,9 +84,16 @@ function eh23ChargePowerHtml(card,h,c,prices,need,opts={}){
   maxKw<1.38?'Minder dan 6 A beschikbaar bij de gebruikte huisbelasting.':
   capped?'Aansluitgrens: '+ehFmt(maxKw,2)+' kW. Hogere keuzes rekent de simulatie tot dit vermogen.':
   'Aansluitgrens: '+ehFmt(maxKw,2)+' kW.';
- const houseNote=!houseKnown?' Huisbelasting onbekend (aanname 2000 W).':'';
+ const houseQuality=opts.houseQuality??(houseKnown?'measured':'missing');
+ const houseNote=houseKnown?'':houseQuality==='stale'?' Huisbelasting verouderd (aanname 2000 W).':
+  houseQuality==='negative'?' Huisbelasting negatief; niet gebruikt (aanname 2000 W).':
+  houseQuality==='undated'?' Huisbelasting zonder betrouwbaar meettijdstip (aanname 2000 W).':
+  houseQuality==='future'?' Huisbelasting met toekomstig meettijdstip (aanname 2000 W).':
+  ' Huisbelasting onbekend (aanname 2000 W).';
+ const alfenQuality=eh24QualityLabel(alfen.quality,'Alfen-meting');
+ const warning=alfenQuality?'<p class="subtle eh24-meter-warning" role="status">'+ehEsc(alfenQuality+'. Actueel laadvermogen niet als keuze beschikbaar.')+'</p>':'';
  return '<div class="eh23-power-suggestions" aria-label="Laadvermogen kiezen">'+choices+
-  (limitNote?'<p class="subtle eh23-power-limit">'+ehEsc(limitNote+houseNote+' Simulatiegrens; Alfen Active Load Balancing bepaalt het werkelijke vermogen.')+'</p>':'')+
+  (limitNote?'<p class="subtle eh23-power-limit">'+ehEsc(limitNote+houseNote+' Simulatiegrens; Alfen Active Load Balancing bepaalt het werkelijke vermogen.')+'</p>':'')+warning+
   '<p class="subtle">Kies zelf een gemeten waarde voor deze simulatie. Handmatige invoer blijft staan totdat je een knop kiest. Het actuele Alfen-vermogen is een momentopname; de sessiemediaan omvat ook langzamer laden en pauzes.</p></div>';
 }
 function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
