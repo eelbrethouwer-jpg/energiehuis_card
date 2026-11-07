@@ -1,0 +1,1065 @@
+{
+  "type": "observed-legacy-golden",
+  "warning": "Historical v1.24.1 battery engine outcomes; NOT a normative physical battery model.",
+  "source": {
+    "baseCommit": "ee17c8879f22ccac9fe2ce9dc3415c0a971ec4e6",
+    "sourceFile": "src/legacy/08-battery-core.js",
+    "helper": "eh17N in src/legacy/03-energy-intelligence.js"
+  },
+  "cases": [
+    {
+      "name": "solar-five-normal",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 8,
+            "price": 0.18
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 5,
+            "export": 0,
+            "price": 0.36
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 5,
+            "export": 0,
+            "price": 0.22
+          }
+        ],
+        "cap": 5,
+        "roundtrip": 0.81,
+        "power": 3,
+        "mode": "solar",
+        "buy": 0.25,
+        "sell": 0.08,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 5,
+        "usableCapacity": 5,
+        "usablePct": 100,
+        "chargeKw": 3,
+        "dischargeKw": 3,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 2.7,
+            "chargedSolar": 3,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 8,
+            "price": 0.18,
+            "fullRejected": 0,
+            "powerRejected": 5
+          },
+          {
+            "t": 1792890000000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2.43,
+            "import": 5,
+            "export": 0,
+            "price": 0.36,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 5,
+            "export": 0,
+            "price": 0.22,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 3,
+        "gridCharge": 0,
+        "served": 2.43,
+        "endingSoc": 0,
+        "peakSoc": 2.7,
+        "pvNotStored": 5,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 5,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 0.6348,
+        "avoidedPurchase": 0.8748,
+        "gridPurchase": 0,
+        "lostExport": 0.24,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 3,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "solar-missing-price-fallback",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 3,
+            "price": null
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 2,
+            "export": 0,
+            "price": null
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 3,
+            "export": 0,
+            "price": null
+          }
+        ],
+        "cap": 5,
+        "roundtrip": 0.9,
+        "power": 2.5,
+        "mode": "solar",
+        "buy": 0.32,
+        "sell": -0.05,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 5,
+        "usableCapacity": 5,
+        "usablePct": 100,
+        "chargeKw": 2.5,
+        "dischargeKw": 2.5,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 2.3717082451262845,
+            "chargedSolar": 2.5,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 3,
+            "price": null,
+            "fullRejected": 0,
+            "powerRejected": 0.5
+          },
+          {
+            "t": 1792890000000,
+            "soc": 0.26352313834736485,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2,
+            "import": 2,
+            "export": 0,
+            "price": null,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0.2499999999999999,
+            "import": 3,
+            "export": 0,
+            "price": null,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 2.5,
+        "gridCharge": 0,
+        "served": 2.25,
+        "endingSoc": 0,
+        "peakSoc": 2.3717082451262845,
+        "pvNotStored": 0.5,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 0.5,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 0.845,
+        "avoidedPurchase": 0.72,
+        "gridPurchase": 0,
+        "lostExport": -0.125,
+        "assumedPrices": true,
+        "priceComplete": false,
+        "hours": 3,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "solar-gaps-reset",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 3,
+            "price": 0.12
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": null,
+            "export": null,
+            "price": null
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 2,
+            "export": 0,
+            "price": 0.4
+          },
+          {
+            "t": 1792900800000,
+            "end": 1792904400000,
+            "import": 0,
+            "export": 4,
+            "price": 0.06
+          },
+          {
+            "t": 1792904400000,
+            "end": 1792908000000,
+            "import": 4,
+            "export": 0,
+            "price": 0.33
+          }
+        ],
+        "cap": 10,
+        "roundtrip": 0.81,
+        "power": 3,
+        "mode": "solar",
+        "buy": 0.23,
+        "sell": 0.07,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 10,
+        "usableCapacity": 10,
+        "usablePct": 100,
+        "chargeKw": 3,
+        "dischargeKw": 3,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 2.7,
+            "chargedSolar": 3,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 3,
+            "price": 0.12,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792890000000,
+            "soc": null
+          },
+          {
+            "t": 1792893600000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 2,
+            "export": 0,
+            "price": 0.4,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792900800000,
+            "soc": 2.7,
+            "chargedSolar": 3,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 4,
+            "price": 0.06,
+            "fullRejected": 0,
+            "powerRejected": 1
+          },
+          {
+            "t": 1792904400000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2.43,
+            "import": 4,
+            "export": 0,
+            "price": 0.33,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 6,
+        "gridCharge": 0,
+        "served": 2.43,
+        "endingSoc": 0,
+        "peakSoc": 2.7,
+        "pvNotStored": 1,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 1,
+        "fullHours": 0,
+        "unobservedResetKwh": 2.7,
+        "savings": 0.3819,
+        "avoidedPurchase": 0.8019000000000001,
+        "gridPurchase": 0,
+        "lostExport": 0.42000000000000004,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 4,
+        "missingHours": 1
+      }
+    },
+    {
+      "name": "smart-price-diff",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 0,
+            "price": 0.05
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 0,
+            "export": 0,
+            "price": 0.06
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 3,
+            "export": 0,
+            "price": 0.33
+          },
+          {
+            "t": 1792897200000,
+            "end": 1792900800000,
+            "import": 5,
+            "export": 0,
+            "price": 0.44
+          },
+          {
+            "t": 1792900800000,
+            "end": 1792904400000,
+            "import": 0,
+            "export": 0,
+            "price": 0.07
+          },
+          {
+            "t": 1792904400000,
+            "end": 1792908000000,
+            "import": 4,
+            "export": 0,
+            "price": 0.4
+          }
+        ],
+        "cap": 5,
+        "roundtrip": 0.81,
+        "power": 2.2,
+        "mode": "smart",
+        "buy": 0.29,
+        "sell": 0.08,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 5,
+        "usableCapacity": 5,
+        "usablePct": 100,
+        "chargeKw": 2.2,
+        "dischargeKw": 2.2,
+        "mode": "smart",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 1.9800000000000002,
+            "chargedSolar": 0,
+            "chargedGrid": 2.2,
+            "discharged": 0,
+            "import": 0,
+            "export": 0,
+            "price": 0.05,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792890000000,
+            "soc": 3.9600000000000004,
+            "chargedSolar": 0,
+            "chargedGrid": 2.2,
+            "discharged": 0,
+            "import": 0,
+            "export": 0,
+            "price": 0.06,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 1.5155555555555558,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2.2,
+            "import": 3,
+            "export": 0,
+            "price": 0.33,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792897200000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 1.3640000000000003,
+            "import": 5,
+            "export": 0,
+            "price": 0.44,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792900800000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 0,
+            "price": 0.07,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792904400000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 4,
+            "export": 0,
+            "price": 0.4,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 0,
+        "gridCharge": 4.4,
+        "served": 3.5640000000000005,
+        "endingSoc": 0,
+        "peakSoc": 3.9600000000000004,
+        "pvNotStored": 0,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 0,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 1.0841600000000002,
+        "avoidedPurchase": 1.3261600000000002,
+        "gridPurchase": 0.24200000000000002,
+        "lostExport": 0,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 6,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "smart-price-missing",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 0,
+            "price": 0.03
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 0,
+            "export": 0,
+            "price": null
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 4,
+            "export": 0,
+            "price": 0.4
+          }
+        ],
+        "cap": 10,
+        "roundtrip": 0.81,
+        "power": 3,
+        "mode": "smart",
+        "buy": 0.24,
+        "sell": 0.08,
+        "profile": null
+      },
+      "expected": null
+    },
+    {
+      "name": "solar-custom-profile",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 5,
+            "price": 0.1
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 0,
+            "export": 5,
+            "price": 0.11
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 3,
+            "export": 0,
+            "price": 0.3
+          },
+          {
+            "t": 1792897200000,
+            "end": 1792900800000,
+            "import": 4,
+            "export": 0,
+            "price": 0.28
+          }
+        ],
+        "cap": 5,
+        "roundtrip": 0.9,
+        "power": 3,
+        "mode": "solar",
+        "buy": 0.26,
+        "sell": 0.08,
+        "profile": {
+          "capacity": 5,
+          "usablePct": 70,
+          "usableCapacity": 3.5,
+          "chargeKw": 1,
+          "dischargeKw": 1.4
+        }
+      },
+      "expected": {
+        "capacity": 5,
+        "usableCapacity": 3.5,
+        "usablePct": 70,
+        "chargeKw": 1,
+        "dischargeKw": 1.4,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 0.9486832980505138,
+            "chargedSolar": 1,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 5,
+            "price": 0.1,
+            "fullRejected": 0,
+            "powerRejected": 4
+          },
+          {
+            "t": 1792890000000,
+            "soc": 1.8973665961010275,
+            "chargedSolar": 1,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 5,
+            "price": 0.11,
+            "fullRejected": 0,
+            "powerRejected": 4
+          },
+          {
+            "t": 1792893600000,
+            "soc": 0.42163702135578385,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 1.4,
+            "import": 3,
+            "export": 0,
+            "price": 0.3,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792897200000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0.3999999999999999,
+            "import": 4,
+            "export": 0,
+            "price": 0.28,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 2,
+        "gridCharge": 0,
+        "served": 1.7999999999999998,
+        "endingSoc": 0,
+        "peakSoc": 1.8973665961010275,
+        "pvNotStored": 8,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 8,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 0.372,
+        "avoidedPurchase": 0.532,
+        "gridPurchase": 0,
+        "lostExport": 0.16,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 4,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "solar-onehour-import-export",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 2,
+            "export": 2,
+            "price": 0.15
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 4,
+            "export": 0,
+            "price": 0.5
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 0,
+            "export": 2,
+            "price": 0.1
+          },
+          {
+            "t": 1792897200000,
+            "end": 1792900800000,
+            "import": 2,
+            "export": 0,
+            "price": 0.35
+          }
+        ],
+        "cap": 15,
+        "roundtrip": 1,
+        "power": 3,
+        "mode": "solar",
+        "buy": 0.22,
+        "sell": 0.08,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 15,
+        "usableCapacity": 15,
+        "usablePct": 100,
+        "chargeKw": 3,
+        "dischargeKw": 3,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 2,
+            "chargedSolar": 2,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 2,
+            "export": 2,
+            "price": 0.15,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792890000000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2,
+            "import": 4,
+            "export": 0,
+            "price": 0.5,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 2,
+            "chargedSolar": 2,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 2,
+            "price": 0.1,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792897200000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2,
+            "import": 2,
+            "export": 0,
+            "price": 0.35,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 4,
+        "gridCharge": 0,
+        "served": 4,
+        "endingSoc": 0,
+        "peakSoc": 2,
+        "pvNotStored": 0,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 0,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 1.38,
+        "avoidedPurchase": 1.7,
+        "gridPurchase": 0,
+        "lostExport": 0.32,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 4,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "solar-short-hour",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792888200000,
+            "import": 0,
+            "export": 4,
+            "price": 0.12
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792891800000,
+            "import": 3,
+            "export": 0,
+            "price": 0.38
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 0,
+            "export": 4,
+            "price": 0.1
+          }
+        ],
+        "cap": 5,
+        "roundtrip": 0.81,
+        "power": 3,
+        "mode": "solar",
+        "buy": 0.2,
+        "sell": 0.05,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 5,
+        "usableCapacity": 5,
+        "usablePct": 100,
+        "chargeKw": 3,
+        "dischargeKw": 3,
+        "mode": "solar",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 1.35,
+            "chargedSolar": 1.5,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 4,
+            "price": 0.12,
+            "fullRejected": 0,
+            "powerRejected": 2.5
+          },
+          {
+            "t": 1792890000000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 3,
+            "export": 0,
+            "price": 0.38,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 2.7,
+            "chargedSolar": 3,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 4,
+            "price": 0.1,
+            "fullRejected": 0,
+            "powerRejected": 1
+          }
+        ],
+        "pvCharge": 4.5,
+        "gridCharge": 0,
+        "served": 0,
+        "endingSoc": 2.7,
+        "peakSoc": 2.7,
+        "pvNotStored": 3.5,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 3.5,
+        "fullHours": 0,
+        "unobservedResetKwh": 1.35,
+        "savings": -0.22500000000000003,
+        "avoidedPurchase": 0,
+        "gridPurchase": 0,
+        "lostExport": 0.22500000000000003,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 3,
+        "missingHours": 0
+      }
+    },
+    {
+      "name": "smart-negative-export-tariff",
+      "args": {
+        "rows": [
+          {
+            "t": 1792886400000,
+            "end": 1792890000000,
+            "import": 0,
+            "export": 4,
+            "price": -0.06
+          },
+          {
+            "t": 1792890000000,
+            "end": 1792893600000,
+            "import": 0,
+            "export": 0,
+            "price": -0.05
+          },
+          {
+            "t": 1792893600000,
+            "end": 1792897200000,
+            "import": 4,
+            "export": 0,
+            "price": 0.3
+          },
+          {
+            "t": 1792897200000,
+            "end": 1792900800000,
+            "import": 3,
+            "export": 0,
+            "price": 0.4
+          }
+        ],
+        "cap": 10,
+        "roundtrip": 0.88,
+        "power": 3,
+        "mode": "smart",
+        "buy": 0.28,
+        "sell": -0.05,
+        "profile": null
+      },
+      "expected": {
+        "capacity": 10,
+        "usableCapacity": 10,
+        "usablePct": 100,
+        "chargeKw": 3,
+        "dischargeKw": 3,
+        "mode": "smart",
+        "points": [
+          {
+            "t": 1792886400000,
+            "soc": 2.814249455894058,
+            "chargedSolar": 3,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 4,
+            "price": -0.06,
+            "fullRejected": 0,
+            "powerRejected": 1
+          },
+          {
+            "t": 1792890000000,
+            "soc": 2.814249455894058,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 0,
+            "export": 0,
+            "price": -0.05,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792893600000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 2.64,
+            "import": 4,
+            "export": 0,
+            "price": 0.3,
+            "fullRejected": 0,
+            "powerRejected": 0
+          },
+          {
+            "t": 1792897200000,
+            "soc": 0,
+            "chargedSolar": 0,
+            "chargedGrid": 0,
+            "discharged": 0,
+            "import": 3,
+            "export": 0,
+            "price": 0.4,
+            "fullRejected": 0,
+            "powerRejected": 0
+          }
+        ],
+        "pvCharge": 3,
+        "gridCharge": 0,
+        "served": 2.64,
+        "endingSoc": 0,
+        "peakSoc": 2.814249455894058,
+        "pvNotStored": 1,
+        "pvLimitedCapacity": 0,
+        "pvLimitedPower": 1,
+        "fullHours": 0,
+        "unobservedResetKwh": 0,
+        "savings": 0.9420000000000001,
+        "avoidedPurchase": 0.792,
+        "gridPurchase": 0,
+        "lostExport": -0.15000000000000002,
+        "assumedPrices": false,
+        "priceComplete": true,
+        "hours": 4,
+        "missingHours": 0
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "cap": 5,
+      "config": {
+        "battery_sim_power_kw": "2,5",
+        "battery_5_usable_pct": 80,
+        "battery_5_charge_kw": "1,2",
+        "battery_5_discharge_kw": 2
+      },
+      "expected": {
+        "capacity": 5,
+        "usablePct": 80,
+        "usableCapacity": 4,
+        "chargeKw": 1.2,
+        "dischargeKw": 2
+      }
+    },
+    {
+      "cap": 15,
+      "config": {
+        "battery_sim_power_kw": 0,
+        "battery_15_usable_pct": 101,
+        "battery_15_charge_kw": 0,
+        "battery_15_discharge_kw": 99
+      },
+      "expected": {
+        "capacity": 15,
+        "usablePct": 100,
+        "usableCapacity": 15,
+        "chargeKw": 3,
+        "dischargeKw": 3
+      }
+    },
+    {
+      "cap": 10,
+      "config": {
+        "battery_sim_power_kw": "unknown",
+        "battery_10_usable_pct": 33
+      },
+      "expected": {
+        "capacity": 10,
+        "usablePct": 33,
+        "usableCapacity": 3.3,
+        "chargeKw": 3,
+        "dischargeKw": 3
+      }
+    }
+  ],
+  "percentiles": [
+    {
+      "values": [
+        1,
+        7,
+        4,
+        0
+      ],
+      "q": 0.25,
+      "expected": 0
+    },
+    {
+      "values": [
+        4,
+        2,
+        2,
+        8,
+        3
+      ],
+      "q": 0.8,
+      "expected": 4
+    },
+    {
+      "values": [],
+      "q": 0.25,
+      "expected": null
+    }
+  ]
+}
