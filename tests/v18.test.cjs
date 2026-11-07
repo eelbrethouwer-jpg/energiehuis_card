@@ -62,7 +62,7 @@ test('Slim laden 2.1 toont haalbaarheid en laat load balancing ongemoeid',()=>{
  card._departure=new Date(Date.now()+86400000).toISOString();
  const html=eh18Charge({states:{}},EH_DEFAULTS,card);
  assert.match(html,/Slim laden 2.1/);
- assert.match(html,/haalbaar|Geen volledige uren|prijsuren/i);
+ assert.match(html,/haalbaar|Geen tijdvakken|prijsuren/i);
  assert.match(html,/Active Load Balancing/);
  assert.match(html,/laadcommando/i);
 });

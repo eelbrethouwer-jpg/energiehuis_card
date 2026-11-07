@@ -1657,17 +1657,25 @@ function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
  if(allowedKw<1.38)return empty("Minder dan 6 A beschikbaar bij de gebruikte huisbelasting.");
  const solar=new Map((opts.solar||[]).map(v=>[v.t,v.pv]));
  const hourly=new Map();
- for(const v of prices||[]){const t=Date.parse(v?.t),p=eh17N(v?.p);if(Number.isFinite(t)&&t%3600000===0&&p!==null&&p>=-1&&p<=5)hourly.set(t,p);}
+ for(const v of prices||[]){
+   const t=Date.parse(v?.t),p=eh17N(v?.p);
+   if(!Number.isFinite(t)||t%3600000!==0||t+3600000<=start||t>=end||p===null)continue;
+   // The numeric range cannot prove a unit; never silently convert apparent cent prices.
+   if(p < -1 || p > 5)return empty("Controleer de prijseenheid: verwacht €/kWh tussen -1 en 5. Mogelijk zijn cent/kWh aangeleverd; er is niets omgerekend.");
+   hourly.set(t,p);
+ }
  const slots=[];
- for(let t=Math.ceil(start/3600000)*3600000;t+3600000<=end&&slots.length<72;t+=3600000){
+ for(let t=Math.floor(start/3600000)*3600000;t<end&&slots.length<72;t+=3600000){
    if(!hourly.has(t))continue;
+   const slotStart=Math.max(start,t),slotEnd=Math.min(end,t+3600000);
+   const hours=(slotEnd-slotStart)/3600000;
    const pv=solar.get(t);
    const surplus=Number.isFinite(pv)?Math.max(0,pv-Math.max(0,house??2000)/1000):null;
    const wallKw=mode==="sun"?(surplus===null?0:Math.min(allowedKw,surplus)):allowedKw;
    if(wallKw<1.38)continue;
-   slots.push({t,slotStart:t,slotEnd:t+3600000,price:hourly.get(t),capacity:wallKw*efficiency,wallKw,surplus});
+   slots.push({t,slotStart,slotEnd,price:hourly.get(t),capacity:hours*wallKw*efficiency,wallKw,surplus});
  }
- if(!slots.length)return empty(mode==="sun"?"Geen volledige uren met voldoende voorspeld zonne-overschot. Koppel eerst een betrouwbare PV-prognose.":"Geen volledige uren met geldige tarieven vóór vertrek.");
+ if(!slots.length)return empty(mode==="sun"?"Geen tijdvakken met voldoende voorspeld zonne-overschot. Koppel eerst een betrouwbare PV-prognose.":"Geen tijdvakken met geldige tarieven vóór vertrek.");
  slots.sort((a,b)=>mode==="direct"?a.t-b.t:mode==="sun"?(b.surplus-a.surplus||a.t-b.t):(a.price-b.price||a.t-b.t));
  let remaining=need,cost=0;const selected=[];
  for(const slot of slots){
