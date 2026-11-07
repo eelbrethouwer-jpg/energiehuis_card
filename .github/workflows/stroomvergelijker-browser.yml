@@ -29,6 +29,8 @@ jobs:
         run: node tests/browser/charging-suggestions.cjs
       - name: Mobile visual acceptance
         run: node tests/browser/mobile-visual.cjs
+      - name: EnergieRegisseur cockpit mobile & navigation
+        run: node tests/browser/regisseur-cockpit.cjs
       - run: node tests/browser/stroomvergelijker.cjs
         env:
           EH_TEST_LIVE_TARIFFS: '1'

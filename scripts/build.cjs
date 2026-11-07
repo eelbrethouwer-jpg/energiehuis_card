@@ -27,7 +27,8 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'12-battery-forecast-ui.js'},
   {kind:'legacy',name:'13-contracts.js'},
   {kind:'legacy',name:'14-detail-state.js'},
-  {kind:'legacy',name:'15-homewizard-history.js'}
+  {kind:'legacy',name:'15-homewizard-history.js'},
+  {kind:'legacy',name:'16-regisseur-cockpit.js'}
 ]);
 if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
  console.error('Build aborted: unknown build step kind.');
