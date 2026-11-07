@@ -50,7 +50,8 @@ const server=http.createServer((q,r)=>{r.setHeader('Content-Type',q.url==='/card
      spark:!!root.querySelector('.eh40-trend svg'),
      status:root.querySelector('.eh40-status')?.textContent,
      heading:root.querySelector('.eh40-top h3')?.textContent,
-     chargeLink:!!root.querySelector('.eh40-footer [data-eh-page="charge"]')
+     chargeLink:!!root.querySelector('.eh40-footer [data-eh-page="charge"]'),
+     touchTargets:[...root.querySelectorAll('.eh40-footer button')].map(btn=>Math.round(btn.getBoundingClientRect().height))
     };
    });
    console.log('Cockpit viewport '+width+': '+JSON.stringify(info));
@@ -60,12 +61,29 @@ const server=http.createServer((q,r)=>{r.setHeader('Content-Type',q.url==='/card
    assert.equal(info.status,'Alle bronnen actueel');
    assert.equal(info.heading,'Jouw energie, nu');
    assert.equal(info.chargeLink,true);
+   assert.equal(info.touchTargets.length,3);
+   assert.ok(info.touchTargets.every(height=>height>=44),'footer actions must be >=44px tall');
    assert.equal(info.overflow,false);
    assert.ok(info.cockpitRight<=info.viewport+2);
    if(width===390||width===320)await page.screenshot({path:'/tmp/eh-regisseur-'+width+'.png'});
   }
-  await page.locator('energiehuis-card').evaluate(card=>{card.shadowRoot.querySelector('.eh40-kpi[data-eh-detail="grid"]').click();});
-  assert.equal(await page.locator('energiehuis-card').evaluate(card=>card._detail),'grid');
+  await page.setViewportSize({width:390,height:850});
+  await page.locator('energiehuis-card').evaluate(card=>{
+   card.shadowRoot.querySelector('.eh40-kpi[data-eh-detail="grid"]').click();
+   // Simulate the scheduled frame; the production card already schedules it on click.
+   card._render();
+  });
+  const detail=await page.locator('energiehuis-card').evaluate(card=>{
+   const root=card.shadowRoot,pane=root.querySelector('.body > .detail-panel');
+   const cockpit=root.querySelector('.eh40-cockpit');
+   const rect=pane?.getBoundingClientRect();
+   return {selected:card._detail,pane:!!pane,nearCockpit:cockpit?.nextElementSibling===pane,
+    viewport:innerHeight,top:rect?.top,bottom:rect?.bottom};
+  });
+  assert.equal(detail.selected,'grid');
+  assert.equal(detail.pane,true);
+  assert.equal(detail.nearCockpit,true);
+  assert.ok(detail.top>=-8&&detail.top<detail.viewport/2,'new details must be scrolled into view: '+JSON.stringify(detail));
   await page.locator('energiehuis-card').evaluate(card=>{card.shadowRoot.querySelector('.eh40-footer [data-eh-page="charge"]').click();});
   assert.equal(await page.locator('energiehuis-card').evaluate(card=>card._view),'charge');
   await page.locator('energiehuis-card').evaluate(card=>{
@@ -75,6 +93,35 @@ const server=http.createServer((q,r)=>{r.setHeader('Content-Type',q.url==='/card
   });
   assert.match(await page.locator('energiehuis-card').evaluate(card=>card.shadowRoot.querySelector('.eh40-status').textContent),/5 van 6 bronnen actueel/);
   assert.match(await page.locator('energiehuis-card').evaluate(card=>card.shadowRoot.querySelector('.eh40-kpi[data-eh-detail="grid"]').textContent),/Verouderd/);
+  // Constant states: last_updated can be old while last_reported proves the sensor still reports.
+  const recent=await page.locator('energiehuis-card').evaluate(card=>{
+   const ids=[card.config.zonnepanelen,card.config.laden,card.config.cupra];
+   for(const [i,id] of ids.entries()){
+    const state=card._hass.states[id];
+    state.state=i===2?'54':'0';
+    state.last_updated=new Date(Date.now()-3*3600000).toISOString();
+    state.last_reported=new Date().toISOString();
+   }
+   card._hass.states[card.config.net].last_updated=new Date().toISOString();
+   card._render();
+   return card.shadowRoot.querySelector('.eh40-status').textContent;
+  });
+  assert.equal(recent,'Alle bronnen actueel');
+  const lastKnown=await page.locator('energiehuis-card').evaluate(card=>{
+   for(const id of [card.config.zonnepanelen,card.config.laden,card.config.cupra]){
+    card._hass.states[id].last_reported=new Date(Date.now()-3*3600000).toISOString();
+   }
+   card._render();
+   const root=card.shadowRoot;
+   return {status:root.querySelector('.eh40-status').textContent,
+    pv:root.querySelector('.eh40-kpi[data-eh-detail="sun"]').textContent,
+    alfen:root.querySelector('.eh40-kpi[data-eh-page="charge"]').textContent,
+    cupra:root.querySelector('.eh40-kpi[data-eh-page="cupra"]').textContent};
+  });
+  assert.equal(lastKnown.status,'3 van 6 bronnen actueel');
+  assert.match(lastKnown.pv,/0 W.*Laatste stand · niet recent bevestigd/s);
+  assert.match(lastKnown.alfen,/0 W.*Laatste stand · niet recent bevestigd/s);
+  assert.match(lastKnown.cupra,/54%.*Laatste stand · niet recent bevestigd/s);
   assert.deepEqual(errors,[]);
   console.log('PR4 read-only cockpit browser acceptance passed');
  }finally{await browser.close();server.close();}
