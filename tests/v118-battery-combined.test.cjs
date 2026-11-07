@@ -9,19 +9,23 @@ const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,
  customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
 vm.runInNewContext(source+'\n;globalThis.CHART={eh24BatteryWindows,eh20Limits,eh24BatteryBuckets,eh24AreaPath,eh24SocPath,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile};',ctx);
 const {eh24BatteryWindows,eh20Limits,eh24BatteryBuckets,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile}=ctx.CHART;
-const base=Date.parse('2026-10-01T00:00:00Z');
+const from=new Date(2026,9,1),to=new Date(2026,9,31);
+const windows=eh24BatteryWindows({from,to});
+const base=from.getTime();
 const hour=(i,imp,exp,price=.25)=>({t:base+i*3600000,end:base+(i+1)*3600000,import:imp,export:exp,price});
-const rows=Array.from({length:720},(_,i)=>hour(i,i%24>=12?2:0,i%24<12?3:0));
+const rows=Array.from({length:windows.length},(_,i)=>hour(i,i%24>=12?2:0,i%24<12?3:0));
 const sim=(data=rows)=>eh20Simulate(data,10,.81,3,'solar',.25,.08,eh21BatteryProfile(10,{}));
 const fNum=(a,b)=>Math.abs(a-b)<1e-7;
 
 test('30 kalenderdagen batterijhistorie is niet langer tot 400 uur afgekapt, inclusief DST',()=>{
- const ordinary=eh24BatteryWindows({from:new Date('2026-08-01T00:00:00Z'),to:new Date('2026-08-31T00:00:00Z')});
+ const ordinary=eh24BatteryWindows({from:new Date(2026,7,1),to:new Date(2026,7,31)});
  assert.equal(ordinary.length,720);
- assert.equal(ordinary[0].t,Date.parse('2026-08-01T00:00:00Z'));
- assert.equal(ordinary.at(-1).end,Date.parse('2026-08-31T00:00:00Z'));
+ assert.equal(ordinary[0].t,new Date(2026,7,1).getTime());
+ assert.equal(ordinary.at(-1).end,new Date(2026,7,31).getTime());
  const dst=eh24BatteryWindows(eh20Limits(new Date(2026,10,1,12),30));
- assert.ok(dst.length>=719&&dst.length<=721);
+ assert.equal(dst.length,Intl.DateTimeFormat().resolvedOptions().timeZone==='Europe/Amsterdam'?721:720);
+ const spring=eh24BatteryWindows(eh20Limits(new Date(2026,3,1,12),30));
+ assert.equal(spring.length,Intl.DateTimeFormat().resolvedOptions().timeZone==='Europe/Amsterdam'?719:720);
  assert.ok(dst.length>400);
 });
 test('HomeWizard-stijl: paars boven nul, groen onder nul en witte SOC-stippellijn in één grafiek',()=>{
@@ -61,7 +65,8 @@ test('week is 7 dagtotalen en maand maximaal 30 dagtotalen, nooit kunstmatige kw
  assert.equal(month.buckets.reduce((t,b)=>t+b.missingHours,0),0);
 });
 test('meetgaten: geen nulwaarde uitgevonden en SOC-lijn wordt onderbroken',()=>{
- const broken=rows.map((r,i)=>i===706?{...r,import:null,export:null}:r);
+ const lastDayStart=eh24BatteryBuckets({},sim(),rows,'day').buckets[0].hour;
+ const broken=rows.map((r,i)=>i===lastDayStart+10?{...r,import:null,export:null}:r);
  const simulation=sim(broken),day=eh24BatteryBuckets({},simulation,broken,'day');
  assert.equal(day.buckets[10].valid,false);
  assert.equal(day.buckets[10].soc,null);
@@ -77,7 +82,20 @@ test('week/maand bereikbaar; dagdrilldown gebruikt bestaande uurselectie en schr
  const month=eh23BatteryFlowChart({_eh24GraphPeriod:'month'},sim(),rows);
  assert.match(week,/data-eh24-day="29"/);
  assert.match(month,/data-eh24-day="0"/);
- assert.doesNotMatch(week,/data-eh23-hour="719"/);
+ assert.doesNotMatch(week,/data-eh23-hour=/);
  assert.match(source,/this\._eh24GraphPeriod='day'/);
  assert.doesNotMatch(source,/callService\s*\(\s*['"](?:alfen|cupra|switch|number)/);
+});
+
+test('zomer- en wintertijd gebruiken de echte lokale daglengte zonder meetgaten',()=>{
+ for(const [month,day] of [[2,29],[9,25]]){
+  const from=new Date(2026,month,day),to=new Date(2026,month,day+1);
+  const bins=eh24BatteryWindows({from,to});
+  const data=Array.from(bins,(b,i)=>({t:b.t,end:b.end,import:1,export:0,price:.25}));
+  const result=eh24BatteryBuckets({},sim(data),data,'day');
+  assert.equal(result.buckets.length,(to-from)/3600000);
+  assert.equal(new Set(result.buckets.map(b=>b.t)).size,bins.length);
+  const total=eh24BatteryBuckets({},sim(data),data,'month').buckets[0];
+  assert.equal(total.missing,false);assert.equal(total.missingHours,0);
+ }
 });

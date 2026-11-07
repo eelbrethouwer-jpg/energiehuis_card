@@ -14,6 +14,12 @@ permissions:
 jobs:
   frontend-regression:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, Europe/Amsterdam]
+    env:
+      TZ: ${{ matrix.timezone }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

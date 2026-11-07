@@ -10,7 +10,7 @@ const ctx={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,
  customElements:{get:n=>registry.get(n),define:(n,c)=>registry.set(n,c)},HTMLElement:FakeElement};
 vm.runInNewContext(source+'\n;globalThis.B17={eh23BatteryDays,eh23BatteryDay,eh23BatterySelectedHour,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile,EnergiehuisCard,EH_DEFAULTS};',ctx);
 const {eh23BatteryDays,eh23BatteryDay,eh23BatterySelectedHour,eh23BatteryFlowChart,eh20Simulate,eh21BatteryProfile,EnergiehuisCard,EH_DEFAULTS}=ctx.B17;
-const start=Date.parse('2026-10-20T00:00:00Z');
+const start=new Date(2026,9,20).getTime();
 const hour=(n,imp,exp,price=.25)=>({t:start+n*3600000,end:start+(n+1)*3600000,import:imp,export:exp,price});
 const rows=Array.from({length:72},(_,i)=>hour(i,i%24>=12?2:0,i%24<12?3:0));
 const sim=(series=rows)=>eh20Simulate(series,10,.81,3,'solar',.25,.08,eh21BatteryProfile(10,{}));

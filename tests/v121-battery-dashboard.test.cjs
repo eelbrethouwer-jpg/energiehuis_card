@@ -9,7 +9,7 @@ const sandbox={console,Date,Math,Map,Set,Array,Object,Number,String,JSON,
  HTMLElement:class{attachShadow(){return {addEventListener(){}};}}};
 vm.runInNewContext(source+'\n;globalThis.EH27={EH_VERSION,eh26ForecastHtml,eh23BatteryFlowChart,eh22BatteryFinancialHtml,eh20Simulate,eh21BatteryProfile,eh26BatteryCss};',sandbox);
 const {EH_VERSION,eh26ForecastHtml,eh23BatteryFlowChart,eh22BatteryFinancialHtml,eh20Simulate,eh21BatteryProfile,eh26BatteryCss}=sandbox.EH27;
-const start=Date.parse('2026-06-01T00:00:00Z');
+const start=new Date(2026,5,1).getTime();
 const rows=Array.from({length:168},(_,i)=>({t:start+i*3600000,end:start+(i+1)*3600000,import:i%24>=12?2:0,export:i%24<12?2:0,price:.20+i%9*.01}));
 const simulate=(cap)=>eh20Simulate(rows,cap,.88,3,'solar',.25,.08,eh21BatteryProfile(cap,{}));
 const future=Array.from({length:24},(_,i)=>({start:new Date(Date.parse('2026-11-02T00:00:00Z')+i*3600000).toISOString(),price:i%6===0?.08:.21+i*.004}));
