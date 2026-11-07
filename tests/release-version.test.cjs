@@ -6,7 +6,7 @@ const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'..','energiehuis-card.js'),'utf8');
 
 test('v1.25.0 release heeft correct intern versielabel',()=>{
- assert.match(source,/const EH_VERSION = '1\.24\.1';/);
+ assert.match(source,/const EH_VERSION = '1\.25\.0';/);
  assert.doesNotMatch(source,/const EH_VERSION = '1\.13\.0-rc\.2';/);
 });
 
