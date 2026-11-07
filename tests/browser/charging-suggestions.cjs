@@ -40,7 +40,12 @@ let browser;
  assert.doesNotMatch(await page.locator('.eh17-option').last().innerText(),/Geen tijdvakken met voldoende/);
  assert.match(await page.locator('.eh23-window-note').innerText(),/geen berekende actieve laadtijd/);
  await page.locator('[data-eh23-power="current"]').click();
- await page.waitForFunction(()=>document.querySelector('energiehuis-card')._simPower===7.36);
+ await page.waitForFunction(()=>{
+  const c=document.querySelector('energiehuis-card');
+  return c._simPower===7.36 &&
+   c.shadowRoot?.querySelector('[data-eh-kw]')?.value==='7.36' &&
+   c.shadowRoot?.querySelector('[data-eh23-power="current"]')?.getAttribute('aria-pressed')==='true';
+ });
  assert.equal(await page.locator('[data-eh-kw]').inputValue(),'7.36');
  assert.equal(await page.locator('[data-eh23-power="current"]').getAttribute('aria-pressed'),'true');
  // Manual input stays authoritative across sensor updates and rerendering.
