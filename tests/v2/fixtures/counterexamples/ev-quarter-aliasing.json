@@ -68,6 +68,9 @@
     "batterySavingsA": 0,
     "batterySavingsB": 0.25,
     "endingSocKwh": 1,
-    "conclusion": "not-identifiable-from-p1-hour-alone"
+    "conclusion": "not-identifiable-from-p1-hour-alone",
+    "lossyRoundtripEfficiency": 0.81,
+    "lossySavingsB": 0.22,
+    "lossyEndingSocKwh": 0.9
   }
 }
