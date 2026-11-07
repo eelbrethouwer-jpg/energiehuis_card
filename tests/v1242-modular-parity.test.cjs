@@ -29,7 +29,8 @@ test('PR41 integratie: historische veiligheids- en HACS-contracten blijven intac
 test('PR2 extractie: engine bestaat exact eenmaal in standalone bron en HACS-bundel',()=>{
  const src=bundle.toString('utf8'),engine=fs.readFileSync(engineFile,'utf8');
  for(const name of ['eh20Percentile','eh21BatteryProfile','eh20Simulate']){
-  assert.equal((src.match(new RegExp('\\\\bfunction '+name+'\\\\s*\\\\(','g'))||[]).length,1,name);
-  assert.match(engine,new RegExp('\\\\bfunction '+name+'\\\\s*\\\\('));
+  const declaration='function '+name+'(';
+  assert.equal(src.split(declaration).length-1,1,name+' not exactly once in bundled script');
+  assert.ok(engine.includes(declaration),name+' missing from standalone engine');
  }
 });
