@@ -70,3 +70,16 @@ De historische PR41-blob was vóór deze refactor exact gecontroleerd; na extrac
 - Elke engine wordt nu afzonderlijk als CommonJS in een `vm.Script` geparseerd, **en** daarna wordt de volledig gecombineerde HACS-bundel geparseerd. De build voert de engines niet uit en vervangt het HACS-bestand pas nadat de controles zijn geslaagd.
 - Extra regressies controleren standalone/embedded/golden-pariteit, niet-muteren van invoer, bevroren hostexports, gemaskeerde syntaxfouten over fragmentgrenzen en atomair bouwen.
 - Veiligheidsgrens: geen wijzigingen aan Home Assistant-commando's, localStorage, Alfen, P1-meetbron, stroomprijzen, laadadviseur of batterijmodel. `EH_VERSION`, `hacs.json` en de vrijgegeven versie blijven ongewijzigd. PR 3 blijft een draft tot externe review en gebruikersakkoord; geen release.
+
+## PR 4 — Eerste zichtbare EnergieRegisseur-cockpit
+
+Deze eerste **read-only** UI-upgrade voegt een nieuwe cockpit toe **boven** de bestaande meetkaarten op het overzicht. De bestaande tabs, grafiek, details en mobiele navigatie blijven behouden.
+
+- Bronbestand: `src/legacy/16-regisseur-cockpit.js`; vaste laatste stap in het buildmanifest.
+- De zes actuele signalen zijn P1-net, GoodWe PV, huisvermogen, Alfen laadvermogen, Cupra-SOC en Zonneplan-prijs. De cockpit gebruikt uitsluitend reeds aan Home Assistant gekoppelde entiteiten; onbekende of verouderde waarden worden niet als live gepresenteerd. Broncontrole gebruikt de bestaande last_updated/last_changed-tijdstippen, geen extra netwerkverzoek.
+- Netstroomrichting volgt het **teken van de P1-sensor**. Grafiek en vermogensbalken zijn momentopnames/aanwezige historie, geen economische prognoses of exacte energiebalans. Onvolledige historiedata leveren geen verzonnen grafiek op.
+- De knoppen hergebruiken bestaande `data-eh-page` / `data-eh-detail` navigatie; er worden geen nieuwe listeners of opslagkeys gemaakt.
+- Mobiele indeling vanaf 320 px. Expliciete regressietests en Chromium-acceptatie op 320, 390 en 768 px.
+- Geen wijziging aan `EH_VERSION`, `hacs.json`, batterijberekeningen, energietarieven, Alfen/HA-servicecalls of opt-in laadbediening.
+
+De branch is **geen vrijgegeven versie**. Een zichtbaar verschil in de geïnstalleerde Home Assistant-kaart volgt pas na afzonderlijke merge, review, release en HACS-update. `--write` alleen is geen vrijgave.
