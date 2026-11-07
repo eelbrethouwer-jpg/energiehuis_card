@@ -1,8 +1,8 @@
-/* Energiehuis v1.24.0 — Gemeten laadvermogensuggesties en tijdzonevaste validatie.
+/* Energiehuis v1.24.1 — Gemeten laadvermogensuggesties en tijdzonevaste validatie.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.24.0';
+const EH_VERSION = '1.24.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1642,7 +1642,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.24.0',description:'Slim laden, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.24.1',description:'Slim laden, energiecoach, budget, laadgeschiedenis, batterijsimulatie en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -1675,24 +1675,39 @@ function eh23ChargePowerSuggestion(sessions,{minKwh=5,minMinutes=30,minSessions=
  const middle=Math.floor(powers.length/2);
  return {kw:powers.length%2?powers[middle]:(powers[middle-1]+powers[middle])/2,count:powers.length};
 }
-function eh23ChargePowerHtml(card,h,c,prices,need,opts){
+function eh23ChargePowerHtml(card,h,c,prices,need,opts={}){
  const result=card._eh17Sessions;
  if(card.isConnected&&!card._eh17SessionsLoading&&(!result||Date.now()-result.at>15*60000))card._eh17LoadSessions();
  const measured=ehW(h,c.laden),current=measured!==null&&measured>=1400?measured/1000:null;
  const history=eh23ChargePowerSuggestion(result?.error?[]:result?.sessions);
+ // Bereken dezelfde veiligheidsgrens als eh17Plan, maar onafhankelijk van
+ // vertrekdatum, tariefbeschikbaarheid en andere planningsfouten.
+ const fuse=eh17N(opts.fuseAmp)??40,charger=eh17N(opts.chargerAmp)??32,reserve=eh17N(opts.reserveAmp)??2;
+ const house=eh17N(opts.houseW),houseKnown=house!==null;
+ const validLimits=fuse>0&&charger>=6&&reserve>=0&&reserve<fuse;
+ const maxAmp=validLimits?Math.min(charger,fuse-reserve-Math.max(0,house??2000)/230):null;
+ const maxKw=maxAmp===null?null:Math.max(0,maxAmp)*230/1000;
+ let hasUsable=false,capped=false;
  const choice=(kind,title,kw,count)=>{
   const usable=Number.isFinite(kw)&&kw>=1.4;
   const input=usable?Math.min(7.4,Number(kw.toFixed(2))):null;
-  const plan=usable?eh17Plan(prices,new Date(),card._departure,need>0?need:1,input,'direct',opts):null;
-  const capped=Number.isFinite(plan?.allowedKw)&&plan.allowedKw<kw-.005;
-  const note=capped?'Voor dit scenario begrensd tot '+ehFmt(plan.allowedKw,2)+' kW.':usable&&!Number.isFinite(plan?.allowedKw)?'Vermogensgrens zichtbaar zodra er een geldig laadplan is.':'';
-  return '<button type="button" class="eh23-power-choice" data-eh23-power="'+kind+'" '+(!usable?'disabled':'')+'><span>'+title+'</span><strong>'+(usable?ehFmt(kw,2)+' kW':kind==='current'?'Geen actieve laadmeting':'Onder 1,4 kW')+'</strong>'+(count?'<small>Mediaan uit '+count+' geschikte sessies</small>':'')+(note?'<small>'+ehEsc(note)+'</small>':'')+'</button>';
+  if(usable){
+   hasUsable=true;
+   if(maxKw!==null&&maxKw>=1.38&&maxKw<input-.005)capped=true;
+  }
+  return '<button type="button" class="eh23-power-choice" data-eh23-power="'+kind+'" '+(!usable?'disabled':'')+'><span>'+title+'</span><strong>'+(usable?ehFmt(kw,2)+' kW':kind==='current'?'Geen actieve laadmeting':'Onder 1,4 kW')+'</strong>'+(count?'<small>Mediaan uit '+count+' geschikte sessies</small>':'')+'</button>';
  };
- return '<div class="eh23-power-suggestions" aria-label="Laadvermogen kiezen">'+choice('current','Huidig laadvermogen',current)+
-  (history?choice('history','Gemiddeld sessievermogen',history.kw,history.count):'')+
+ const choices=choice('current','Huidig laadvermogen',current)+
+  (history?choice('history','Gemiddeld sessievermogen',history.kw,history.count):'');
+ const limitNote=!hasUsable?'':!validLimits?'Controleer de ingestelde veiligheidsgrenzen.':
+  maxKw<1.38?'Minder dan 6 A beschikbaar bij de gebruikte huisbelasting.':
+  capped?'Aansluitgrens: '+ehFmt(maxKw,2)+' kW. Hogere keuzes rekent de simulatie tot dit vermogen.':
+  'Aansluitgrens: '+ehFmt(maxKw,2)+' kW.';
+ const houseNote=!houseKnown?' Huisbelasting onbekend (aanname 2000 W).':'';
+ return '<div class="eh23-power-suggestions" aria-label="Laadvermogen kiezen">'+choices+
+  (limitNote?'<p class="subtle eh23-power-limit">'+ehEsc(limitNote+houseNote+' Simulatiegrens; Alfen Active Load Balancing bepaalt het werkelijke vermogen.')+'</p>':'')+
   '<p class="subtle">Kies zelf een gemeten waarde voor deze simulatie. Handmatige invoer blijft staan totdat je een knop kiest. Het actuele Alfen-vermogen is een momentopname; de sessiemediaan omvat ook langzamer laden en pauzes.</p></div>';
 }
-
 function eh17Plan(prices,now,departure,needKwh,requestedKw,mode,opts={}){
  const end=Date.parse(departure),start=now.getTime(),need=eh17N(needKwh),requested=eh17N(requestedKw);
  const empty=(error)=>({error,selected:[],totalKwh:0,remaining:Math.max(0,need||0),cost:null,mode});

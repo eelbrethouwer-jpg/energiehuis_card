@@ -47,14 +47,62 @@ test('suggesties tonen Alfen eerst en de plannerbegrenzing, zonder automatische 
  assert.ok(html.indexOf('data-eh23-power="current"')<html.indexOf('data-eh23-power="history"'));
  const plan=ctx.REVIEW.eh17Plan(prices,now,c._departure,20.7,7.36,'direct',opts);
  assert.ok(Math.abs(plan.allowedKw-4.74)<1e-10);
- assert.match(html,/begrensd tot 4,74 kW/);assert.match(html,/Mediaan uit 3/);
- assert.match(powerHtml(c,h,conf,[],20.7,opts),/Vermogensgrens zichtbaar zodra er een geldig laadplan is/);
+ assert.match(html,/Aansluitgrens: 4,74 kW/);assert.match(html,/Mediaan uit 3/);
+ assert.match(powerHtml(c,h,conf,[],20.7,opts),/Aansluitgrens: 4,74 kW/);
+ assert.equal((html.match(/Aansluitgrens: 4,74 kW/g)||[]).length,1,'Two capped suggestions share one limit note');
  assert.equal(c._simPower,3.7);
  h.states[conf.laden].state='0';
  assert.match(powerHtml(c,h,conf,prices,20.7,opts),/data-eh23-power="current" disabled/);
  c._eh17Sessions.sessions=[session(6),session(7),session(8,2,{estimated:true})];
  assert.doesNotMatch(powerHtml(c,h,conf,prices,20.7,opts),/data-eh23-power="history"/);
 });
+test('huisbelasting 9000 W benoemt minder dan 6 A zonder een geldig plannerresultaat',()=>{
+ const c=card(),conf={...EH_DEFAULTS};
+ c._eh17Sessions={at:Date.now(),sessions:[session(6),session(7),session(8)]};
+ const h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const html=powerHtml(c,h,conf,[],20.7,{fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:9000});
+ assert.match(html,/Minder dan 6 A beschikbaar bij de gebruikte huisbelasting/);
+ assert.equal((html.match(/Minder dan 6 A/g)||[]).length,1);
+ assert.doesNotMatch(html,/Vermogensgrens zichtbaar zodra er een geldig laadplan is/);
+});
+
+test('limietmelding werkt zonder tarieven, met ongeldige prijseenheid en bij verstreken vertrektijd',()=>{
+ const c=card(),conf={...EH_DEFAULTS};
+ const h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000};
+ const invalidPrices=[{t:new Date(Math.ceil(Date.now()/3600000)*3600000).toISOString(),p:41}];
+ for(const prices of [[],invalidPrices]){
+  const html=powerHtml(c,h,conf,prices,20.7,opts);
+  assert.match(html,/Aansluitgrens: 4,74 kW/);
+  assert.doesNotMatch(html,/Vermogensgrens zichtbaar zodra er een geldig laadplan is/);
+ }
+ c._departure=new Date(Date.now()-3600000).toISOString();
+ assert.match(powerHtml(c,h,conf,[],20.7,opts),/Aansluitgrens: 4,74 kW/);
+});
+
+test('onbekende huisbelasting meldt expliciet aanname 2000 W bij 7,2 kW',()=>{
+ const c=card(),conf={...EH_DEFAULTS};
+ const h={states:{[conf.laden]:{state:'7200',attributes:{unit_of_measurement:'W'}}}};
+ const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:null};
+ const html=powerHtml(c,h,conf,[],20.7,opts);
+ assert.match(html,/Aansluitgrens: 6,74 kW/);
+ assert.match(html,/aanname 2000 W/);
+ assert.equal((html.match(/aanname 2000 W/g)||[]).length,1);
+ assert.doesNotMatch(powerHtml(c,h,conf,[],20.7,{...opts,houseW:0}),/aanname 2000 W/);
+});
+
+test('handmatige 3,7 kW is niet begrensd ondanks hogere vermogenssuggesties',()=>{
+ const c=card();c._simPower=3.7;
+ const conf={...EH_DEFAULTS},h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000};
+ const html=powerHtml(c,h,conf,[],20.7,opts);
+ assert.match(html,/Aansluitgrens: 4,74 kW/);
+ assert.match(html,/Hogere keuzes rekent de simulatie tot dit vermogen/);
+ assert.match(html,/Simulatiegrens; Alfen Active Load Balancing bepaalt het werkelijke vermogen/);
+ assert.doesNotMatch(html,/Voor dit scenario begrensd/);
+ assert.equal(c._simPower,3.7);
+});
+
 test('een klik verandert uitsluitend het tijdelijke scenario en leest de actuele bron opnieuw',()=>{
  const c=new EnergiehuisCard();c.config={...EH_DEFAULTS};c._schedule=()=>{};
  let calls=0;c._hass={states:{[c.config.laden]:{state:'4200',attributes:{unit_of_measurement:'W'}}},callService(){calls++;}};
