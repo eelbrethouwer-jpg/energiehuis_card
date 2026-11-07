@@ -1,0 +1,60 @@
+{
+  "schema": "energie-regisseur-fixture-v1",
+  "type": "normative",
+  "provenance": "SYNTHETIC - independent arithmetic, never live household measurements",
+  "chargeLoss": {
+    "batteryKwh": 38,
+    "efficiency": 0.9,
+    "priceEurPerWallKwh": 0.3,
+    "wallKwh": 42.22222222222222,
+    "costEur": 12.666666666666666,
+    "naiveWithoutLossEur": 11.4
+  },
+  "weightedContract": {
+    "intervals": [
+      {
+        "importKwh": 1,
+        "priceEurPerKwh": 0.1
+      },
+      {
+        "importKwh": 9,
+        "priceEurPerKwh": 0.5
+      }
+    ],
+    "correctEur": 4.6,
+    "incorrectAverageEur": 3
+  },
+  "negativeExport": {
+    "exportKwh": 1,
+    "exportPriceEurPerKwh": -0.05,
+    "netChargeEur": 0.05
+  },
+  "residual": {
+    "p1Kwh": 1,
+    "acceptedIndependentPartsKwh": [
+      0.5,
+      0.492
+    ],
+    "rejectedIndependentPartsKwh": [
+      0.5,
+      0.47
+    ],
+    "toleranceKwh": 0.01,
+    "requiresIndependentMeters": true
+  },
+  "unknownPrice": {
+    "intervals": [
+      {
+        "start": "2026-11-07T23:00:00Z",
+        "priceEurPerKwh": null
+      }
+    ],
+    "allowZeroFill": false,
+    "allowUnvalidatedPredictionBand": false
+  },
+  "quality": {
+    "provenance": "measured",
+    "quality": "stale",
+    "currentSafeChargingChoiceAllowed": false
+  }
+}
