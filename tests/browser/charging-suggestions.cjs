@@ -10,7 +10,8 @@ let browser;
  browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:390,height:900},timezoneId:'Europe/Amsterdam',locale:'nl-NL'});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.clock.install({time:new Date('2026-11-07T18:00:00Z')});
+ // Keep synthetic wall-clock time fixed, but allow real requestAnimationFrame for _schedule().
+ await page.clock.setFixedTime(new Date('2026-11-07T18:00:00Z'));
  await page.goto('http://127.0.0.1:'+server.address().port);
  await page.evaluate(()=>{
   const c=document.querySelector('energiehuis-card');c.setConfig({mobile_fixed_navigation:false,ev_charge_efficiency:.8});
