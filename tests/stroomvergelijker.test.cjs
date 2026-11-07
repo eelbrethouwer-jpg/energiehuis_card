@@ -68,7 +68,7 @@ test('periode is afgerond, begrensd en inclusieve einddatum',()=>{
 test('Kosten toont direct leveranciersvergelijking; Vattenfall-tabellen en oude grafiek zijn weg',()=>{
  const card=Object.create(C.EnergiehuisCard.prototype);card._ehcmpContracts=[];
  const html=card._costsHtml({states:{}},C.EH_DEFAULTS);
- assert.match(html,/<h2>Leveranciers vergelijken/);
+ assert.match(html,/<h3>Leveranciers vergelijken/);
  assert.match(html,/Zonneplan vandaag/);
  assert.match(html,/Maandprognose en budget/);
  assert.doesNotMatch(html,/Vattenfall 1 jaar deze maand|Vattenfall 3 jaar dit jaar|data-eh-cost-period|data-ehcmp-action="open"/);
