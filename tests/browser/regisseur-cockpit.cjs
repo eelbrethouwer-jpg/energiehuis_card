@@ -116,12 +116,27 @@ const server=http.createServer((q,r)=>{r.setHeader('Content-Type',q.url==='/card
    return {status:root.querySelector('.eh40-status').textContent,
     pv:root.querySelector('.eh40-kpi[data-eh-detail="sun"]').textContent,
     alfen:root.querySelector('.eh40-kpi[data-eh-page="charge"]').textContent,
-    cupra:root.querySelector('.eh40-kpi[data-eh-page="cupra"]').textContent};
+    cupra:root.querySelector('.eh40-kpi[data-eh-page="cupra"]').textContent,
+    flowHeader:root.querySelector('.eh40-flows .eh40-panel-head strong').textContent,
+    oldBars:[...root.querySelectorAll('.eh40-flow-row.eh40-flow-old')].map(x=>x.textContent)};
   });
   assert.equal(lastKnown.status,'3 van 6 bronnen actueel');
   assert.match(lastKnown.pv,/0 W.*Laatste stand · niet recent bevestigd/s);
   assert.match(lastKnown.alfen,/0 W.*Laatste stand · niet recent bevestigd/s);
   assert.match(lastKnown.cupra,/54%.*Laatste stand · niet recent bevestigd/s);
+  assert.equal(lastKnown.flowHeader,'Vermogen en laatste standen');
+  assert.equal(lastKnown.oldBars.length,2,'PV and Alfen are explicitly last known');
+  assert.ok(lastKnown.oldBars.every(x=>/Laatste · \d+ uur geleden/.test(x)),
+   'historical bars must include age: '+JSON.stringify(lastKnown.oldBars));
+  const oldSoc=await page.locator('energiehuis-card').evaluate(card=>{
+   const state=card._hass.states[card.config.cupra];
+   state.last_reported=new Date(Date.now()-3*86400000).toISOString();
+   card._render();
+   return {text:card.shadowRoot.querySelector('.eh40-kpi[data-eh-page="cupra"]').textContent,
+    status:card.shadowRoot.querySelector('.eh40-status').textContent};
+  });
+  assert.match(oldSoc.text,/Laatste stand · niet recent bevestigd · 3 dagen geleden/);
+  assert.equal(oldSoc.status,'3 van 6 bronnen actueel');
   assert.deepEqual(errors,[]);
   console.log('PR4 read-only cockpit browser acceptance passed');
  }finally{await browser.close();server.close();}
