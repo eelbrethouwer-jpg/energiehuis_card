@@ -2,3 +2,4 @@ energiehuis-card.js text eol=lf
 src/legacy/*.js text eol=lf
 scripts/build.cjs text eol=lf
 tests/v2-build-parity.test.cjs text eol=lf
+src/engines/*.cjs text eol=lf

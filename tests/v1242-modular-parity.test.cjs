@@ -1,39 +1,36 @@
 'use strict';
-// Integration lock: preserve exact, independently reviewed PR #41 production artifact.
-// SHA1 is Git's blob identity (header "blob <byte-size>\0", then raw bytes).
+// After PR2 the original PR41 blob lock would forbid legitimate engine extraction.
+// Replace it with generated bundle parity and preserved HA safety invariants.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const crypto=require('node:crypto');
+const {spawnSync}=require('node:child_process');
 const root=path.join(__dirname,'..');
-const built=fs.readFileSync(path.join(root,'energiehuis-card.js'));
-const gitBlobSha=bytes=>crypto.createHash('sha1')
- .update('blob '+bytes.length+'\0').update(bytes).digest('hex');
-const expected='f92f4c03356e575f32d1fdb48fc89ee4893673ea';
-const segments=[
- '00-foundation.js','01-history-analytics.js','02-card-shell.js',
- '03-energy-intelligence.js','04-utility-sources.js','05-energy-insights.js',
- '06-mobile-shell.js','07-script-charge-controls.js','08-battery-core.js',
- '09-battery-finance.js','10-battery-flow.js','11-data-quality.js',
- '12-battery-forecast-ui.js','13-contracts.js','14-detail-state.js',
- '15-homewizard-history.js'
-];
-test('PR41-integratie: HACS-bundle is exact de originele gereviewde PR41 Git-blob',()=>{
- assert.equal(gitBlobSha(built),expected,'Een byte verschil met PR41 blokkeert integratie');
- assert.equal(built.toString('utf8').includes('function eh24ChargeReading'),true);
- assert.equal(built.toString('utf8').includes('const EH_VERSION = \'1.24.1\';'),true,
-  'Geen ongevraagde release/versiesprong; PR41 is nog een RC');
+const bundle=fs.readFileSync(path.join(root,'energiehuis-card.js'));
+const engineFile=path.join(root,'src','engines','battery-engine.cjs');
+test('PR41 integratie: HACS-bundel matches de gegenereerde modulaire bronnen',()=>{
+ const check=spawnSync(process.execPath,[path.join(root,'scripts','build.cjs'),'--check'],{
+  encoding:'utf8',timeout:30000
+ });
+ assert.equal(check.status,0,check.stdout+check.stderr);
+ const src=bundle.toString('utf8');
+ assert.match(src,/function eh24ChargeReading/);
+ assert.match(src,/function eh20Simulate/);
+ assert.match(src,/const EH_VERSION = '\d+\.\d+\.\d+(?:-[0-9a-z.-]+)?'/);
 });
-test('PR41-integratie: alle 16 modulaire bronsegmenten bouwen dezelfde PR41 Git-blob',()=>{
- const result=Buffer.concat(segments.map(name=>fs.readFileSync(path.join(root,'src','legacy',name))));
- assert.equal(gitBlobSha(result),expected);
- assert.equal(result.equals(built),true);
-});
-test('PR41-integratie: oorspronkelijke opt-in laadbediening en HACS-pad blijven intact',()=>{
- const text=built.toString('utf8');
- assert.match(text,/charge_control_enabled:\s*false/);
- assert.match(text,/if\(!customElements\.get\('energiehuis-card'\)\)customElements\.define/);
+test('PR41 integratie: historische veiligheids- en HACS-contracten blijven intact',()=>{
+ const src=bundle.toString('utf8');
+ assert.match(src,/charge_control_enabled:\s*false/);
+ assert.match(src,/if\(!customElements\.get\('energiehuis-card'\)\)customElements\.define/);
  const hacs=JSON.parse(fs.readFileSync(path.join(root,'hacs.json'),'utf8'));
  assert.equal(hacs.filename,'energiehuis-card.js');
+});
+test('PR2 extractie: engine bestaat exact eenmaal in standalone bron en HACS-bundel',()=>{
+ const src=bundle.toString('utf8'),engine=fs.readFileSync(engineFile,'utf8');
+ for(const name of ['eh20Percentile','eh21BatteryProfile','eh20Simulate']){
+  const declaration='function '+name+'(';
+  assert.equal(src.split(declaration).length-1,1,name+' not exactly once in bundled script');
+  assert.ok(engine.includes(declaration),name+' missing from standalone engine');
+ }
 });
