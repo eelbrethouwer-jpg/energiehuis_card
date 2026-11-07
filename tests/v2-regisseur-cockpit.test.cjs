@@ -40,7 +40,8 @@ function setup(){
  return {h,card};
 }
 test('PR4: cockpit is pure read-only UI without new HA/storage handlers',()=>{
- assert.doesNotMatch(source,/\.callService\s*\(|\.callWS\s*\(|localStorage|setItem\s*\(|addEventListener\s*\(/);
+ assert.doesNotMatch(source,/\.callService\s*\(|\.callWS\s*\(|localStorage|setItem\s*\(/);
+ assert.match(source,/root\.addEventListener\('click'/);
  assert.match(source,/metrics\.insertAdjacentHTML\('beforebegin'/);
  assert.match(source,/previous\.call\(this\)/);
 });
@@ -66,13 +67,13 @@ test('PR4: stale, missing or unknown readings never become fabricated live numbe
  h.states[ids.huis]=st(90,'kWh');
  h.states[ids.prijs].last_updated='not-a-date';
  assert.equal(api.eh40Fresh(h,ids.net,'power',5,Date.now()).reason,'Verouderd');
- assert.equal(api.eh40Fresh(h,ids.cupra,'number',90,Date.now()).reason,'Niet gekoppeld');
+ assert.equal(api.eh40Fresh(h,ids.cupra,'number',90,Date.now()).reason,'Niet beschikbaar');
  assert.equal(api.eh40Fresh(h,ids.huis,'power',5,Date.now()).reason,'Geen geldige waarde');
  assert.equal(api.eh40Fresh(h,ids.prijs,'price',95,Date.now()).reason,'Tijd onbekend');
  const markup=api.eh40Cockpit(card,h,ids);
  assert.match(markup,/2 van 6 bronnen actueel/);
  assert.match(markup,/Verouderd/);
- assert.match(markup,/Niet gekoppeld/);
+ assert.match(markup,/Niet beschikbaar/);
  assert.doesNotMatch(markup,/1.6 kW/);
 });
 test('PR4: historical gaps and absent history are represented safely',()=>{
@@ -87,7 +88,7 @@ test('PR4: existing render chain and non-overview pages remain untouched',()=>{
  const {h,card}=setup();
  let injected='',css='';
  const metrics={insertAdjacentHTML:(where,text)=>{assert.equal(where,'beforebegin');injected=text;}};
- const root={querySelector:q=>q==='.body .metrics'?metrics:q==='style'?{get textContent(){return css;},set textContent(v){css=v;}}:null};
+ const root={addEventListener:()=>{},querySelector:q=>q==='.body .metrics'?metrics:q==='style'?{get textContent(){return css;},set textContent(v){css=v;}}:null};
  card.shadowRoot=root;
  card._render();
  assert.equal(card._priorRenderCount,1);
@@ -98,4 +99,60 @@ test('PR4: existing render chain and non-overview pages remain untouched',()=>{
  card._render();
  assert.equal(card._priorRenderCount,2);
  assert.equal(injected,'');
+});
+
+test('PR4 B1: unchanged zero PV and idle Alfen use recent last_reported without false stale warning',()=>{
+ const {h,card}=setup(),old=new Date(Date.now()-3*3600000).toISOString(),recent=new Date().toISOString();
+ for(const id of [ids.zonnepanelen,ids.laden]){
+  h.states[id].state='0';h.states[id].last_updated=old;h.states[id].last_reported=recent;
+  const reading=api.eh40Fresh(h,id,'power',35,Date.now(),true);
+  assert.equal(reading.ok,true);
+  assert.equal(reading.value,0);
+  assert.equal(reading.reason,'Actueel');
+ }
+ h.states[ids.cupra].last_updated=old;h.states[ids.cupra].last_reported=recent;
+ assert.equal(api.eh40Fresh(h,ids.cupra,'number',90,Date.now(),true).ok,true);
+ const html=api.eh40Cockpit(card,h,ids);
+ assert.match(html,/Alle bronnen actueel/);
+ assert.doesNotMatch(html,/Verouderd/);
+});
+test('PR4 B1: last known stable values remain visible but are never counted as current',()=>{
+ const {h,card}=setup(),old=new Date(Date.now()-3*3600000).toISOString();
+ for(const [id,reading,unit] of [[ids.zonnepanelen,'0','W'],[ids.laden,'0','W'],[ids.cupra,'52','%']]){
+  h.states[id].state=reading;h.states[id].last_updated=old;
+ }
+ const html=api.eh40Cockpit(card,h,ids);
+ assert.match(html,/3 van 6 bronnen actueel/);
+ assert.equal((html.match(/Laatste stand · niet recent bevestigd/g)||[]).length>=3,true);
+ assert.match(html,/0 W/);
+ assert.match(html,/52%/);
+ assert.equal(api.eh40Fresh(h,ids.zonnepanelen,'power',35,Date.now(),true).retained,true);
+ h.states[ids.zonnepanelen].state='800';
+ assert.equal(api.eh40Fresh(h,ids.zonnepanelen,'power',35,Date.now(),false).value,null);
+ h.states[ids.cupra].last_updated='not-a-date';
+ assert.equal(api.eh40Fresh(h,ids.cupra,'number',90,Date.now(),true).retained,undefined);
+});
+test('PR4 B2: cockpit-opened detail is moved directly below cockpit and revealed once',()=>{
+ const {h,card}=setup();
+ let inserted='',scrolled=0,placed=0,callback=null,css='';
+ const pane={scrollIntoView:arg=>{scrolled++;assert.equal(arg.block,'start');}};
+ const cockpit={insertAdjacentElement:(where,node)=>{assert.equal(where,'afterend');assert.equal(node,pane);placed++;}};
+ const metrics={insertAdjacentHTML:(where,html)=>{assert.equal(where,'beforebegin');inserted=html;}};
+ const root={addEventListener:(name,fn)=>{assert.equal(name,'click');callback=fn;},
+  querySelector:selector=>selector==='.body .metrics'?metrics:selector==='style'?
+   {get textContent(){return css;},set textContent(v){css=v;}}:
+   selector==='.body > .detail-panel'?pane:selector==='.eh40-cockpit'?cockpit:null};
+ card.shadowRoot=root;card._render();
+ assert.match(inserted,/eh40-cockpit/);
+ assert.equal(typeof callback,'function');
+ card._detail='grid';
+ callback({target:{closest:selector=>selector==='.eh40-cockpit [data-eh-detail]'?{dataset:{ehDetail:'grid'}}:null}});
+ card._render();assert.equal(placed,1);assert.equal(scrolled,1);
+ card._render();assert.equal(placed,2);assert.equal(scrolled,1);
+ card._detail=null;
+ callback({target:{closest:selector=>selector==='.eh40-cockpit [data-eh-detail]'?null:{dataset:{}}}});
+ card._render();assert.equal(scrolled,1);
+});
+test('PR4 B3: cockpit footer actions meet 44px mobile touch target',()=>{
+ assert.match(api.eh40Css(),/\.eh40-footer button\{[^}]*min-height:44px/);
 });
