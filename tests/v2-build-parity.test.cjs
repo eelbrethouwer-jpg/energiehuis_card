@@ -68,3 +68,50 @@ test('PR1: HACS package keeps the same entrypoint name; no build-time dependency
  const script=fs.readFileSync(build,'utf8');
  assert.doesNotMatch(script,/require\(['"](?:playwright|vite|esbuild|rollup|webpack)['"]\)/);
 });
+
+test('PR1: hidden, non-JS and other unexpected entries fail closed',()=>fixture(dir=>{
+ const sourceDir=path.join(dir,'src','legacy');
+ for(const name of ['notes.txt','unlisted.mjs','unlisted.cjs','.surprise']){
+  const other=path.join(sourceDir,name);
+  fs.writeFileSync(other,'// synthetic unexpected fixture\n');
+  const fail=run('--check',dir);
+  assert.notEqual(fail.status,0,'Unexpected '+name+' must fail');
+  assert.match(fail.stderr,/fragment list differs/);
+  fs.unlinkSync(other);
+ }
+}));
+test('PR1: a non-existent --root fails gracefully, without a stack trace',()=>fixture(dir=>{
+ const unknown=path.join(dir,'does-not-exist');
+ const failure=run('--check',unknown);
+ assert.notEqual(failure.status,0);
+ assert.match(failure.stderr,/missing or unreadable source directory/);
+ assert.doesNotMatch(failure.stderr,/node:fs|at Object\./);
+}));
+test('PR1: failure message identifies first byte difference and does not mutate source or HACS artifact',()=>fixture(dir=>{
+ const file=path.join(dir,'energiehuis-card.js');
+ const before=fs.readFileSync(file);
+ const altered=Buffer.from(before);altered[0]=altered[0]===65?66:65;
+ fs.writeFileSync(file,altered);
+ const check=run('--check',dir);
+ assert.notEqual(check.status,0);
+ assert.match(check.stderr,/Eerste byteverschil op offset 0, bronregel 1/);
+ assert.match(check.stderr,/Hint:/);
+ assert.equal(fs.readFileSync(file).equals(altered),true);
+ assert.equal(fs.readFileSync(path.join(dir,'src','legacy','00-foundation.js'))
+  .equals(fs.readFileSync(path.join(root,'src','legacy','00-foundation.js'))),true);
+}));
+test('PR1: --write atomically replaces only the HACS output and cleans temporary file',()=>fixture(dir=>{
+ const file=path.join(dir,'energiehuis-card.js');
+ const before=fs.readFileSync(file);
+ fs.writeFileSync(file,'// a manually changed artifact\n');
+ const write=run('--write',dir);
+ assert.equal(write.status,0,write.stderr);
+ assert.match(write.stderr,/NOTICE: --write vervangt/);
+ assert.equal(fs.readFileSync(file).equals(before),true);
+ assert.equal(fs.readdirSync(dir).filter(n=>n.includes('.tmp-')).length,0);
+}));
+test('PR1: git attributes explicitly pin HACS and fragment EOLs to LF',()=>{
+ const attrs=fs.readFileSync(path.join(root,'.gitattributes'),'utf8');
+ assert.match(attrs,/^energiehuis-card\.js text eol=lf$/m);
+ assert.match(attrs,/^src\/legacy\/\*\.js text eol=lf$/m);
+});

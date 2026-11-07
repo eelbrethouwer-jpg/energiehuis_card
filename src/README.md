@@ -11,7 +11,7 @@ node --check energiehuis-card.js
 node --test tests/*.test.cjs
 ```
 
-`--check` is read-only en faalt als het geproduceerde bestand ook maar één byte afwijkt. `--write` schrijft uitsluitend het gegenereerde `energiehuis-card.js` wanneer er een verschil is. Geen npm-installatie of netwerk nodig.
+`--check` is read-only en faalt als het geproduceerde bestand ook maar één byte afwijkt, met de eerste afwijkende byte en bronregel. `--write` meldt expliciet een overschrijving en vervangt uitsluitend `energiehuis-card.js` via een tijdelijk bestand en rename. Onbekende bestanden (ook `.mjs`, `.txt` of verborgen bestanden) in `src/legacy/` blokkeren de build. Geen npm-installatie of netwerk nodig.
 
 ## Bronindeling
 
@@ -39,3 +39,9 @@ De bestanden onder `src/legacy` moeten strikt in de volgorde uit `scripts/build.
 ## Integratie bij latere PR #41
 
 Bij een eventuele merge van PR #41 zal het HACS-bestand veranderen, maar de PR1-bronfragmenten nog niet. De `--check` hoort dan bewust te **falen**. Verwerk die wijziging eerst in de juiste `src/legacy/`-bronsegmenten en genereer de bundel opnieuw. Dit is gewenst fail-closed gedrag, geen regressie.
+
+## Open voor opvolgende PR's
+
+- Publicatieworkflows expliciet van `node scripts/build.cjs --check` voorzien (voorlopig alleen de algemene validate- en browser-workflow + Node-pariteitstest in CI).
+- Het vaste `EH_VERSION`-criterium in `tests/v2-build-parity.test.cjs` aanpassen wanneer PR #41 later een versieverhoging doorvoert; niet stilzwijgend loslaten.
+- America/New_York heeft drie bestaande testproblemen op `main`; deze staan los van de PR1-bronopdeling.
