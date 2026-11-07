@@ -98,8 +98,8 @@ for(const engineName of engineNames){
  // A syntactically invalid engine must fail even when another fragment accidentally balances it.
  // This parses as CommonJS without executing or importing a module in the HACS runtime.
  try{
-  new vm.Script('(function(exports, require, module, __filename, __dirname){\\n'+
-   buffer.toString('utf8')+'\\n})',{filename:engineName});
+  new vm.Script('(function(exports, require, module, __filename, __dirname){\n'+
+   buffer.toString('utf8')+'\n})',{filename:engineName});
  }catch(error){
   console.error('Build aborted: standalone engine syntax invalid in '+engineName+': '+error.message);
   process.exit(1);
