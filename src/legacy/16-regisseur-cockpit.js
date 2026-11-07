@@ -54,7 +54,8 @@ function eh40Cockpit(card,h,c){
  const tile=(label,key,format,subtitle,link)=>{
   const reading=v[key],value=text(key,format);
   const state=reading.ok?subtitle:reading.reason;
-  return '<button type="button" class="eh40-kpi'+(reading.ok?'':' eh40-unavailable')+'" data-eh-page="'+link+'" aria-label="'+ehEsc(label+': '+value+'. '+state)+'. Bekijk details">'+
+  const destination=link.startsWith('detail:')?'data-eh-detail="'+link.slice(7)+'" aria-expanded="'+(card._detail===link.slice(7))+'"':'data-eh-page="'+link+'"';
+  return '<button type="button" class="eh40-kpi'+(reading.ok?'':' eh40-unavailable')+'" '+destination+' aria-label="'+ehEsc(label+': '+value+'. '+state)+'. Bekijk details">'+
    '<span class="eh40-kpi-label">'+ehEsc(label)+'</span><strong>'+ehEsc(value)+'</strong><small>'+ehEsc(state)+'</small></button>';
  };
  const spark=eh40History(card,c.net);
@@ -68,9 +69,9 @@ function eh40Cockpit(card,h,c){
   '<header class="eh40-top"><div><span class="eh40-kicker">ENERGIEREGISSEUR · LIVE INZICHT</span><h3>Jouw energie, nu</h3><p>Actuele metingen, geen voorspelde besparing of laadopdracht.</p></div>'+
   '<span class="eh40-status'+(ready===count?' eh40-status-ok':'')+'" role="status">'+ehEsc(status)+'</span></header>'+
   '<div class="eh40-kpis">'+
-   tile('Net','net',ehPower,direction,'costs')+
-   tile('Zon','pv',ehPower,'PV-opwek','battery')+
-   tile('Huis','home',ehPower,'Exclusief Cupra','more')+
+   tile('Net','net',ehPower,direction,'detail:grid')+
+   tile('Zon','pv',ehPower,'PV-opwek','detail:sun')+
+   tile('Huis','home',ehPower,'Exclusief Cupra','detail:home')+
    tile('Cupra','soc',n=>ehFmt(n,0)+'%','Accustand','cupra')+
    tile('Alfen','ev',ehPower,'Laadvermogen','charge')+
    tile('Tarief','price',n=>ehMoney(n)+'/kWh','Actuele stroomprijs','costs')+'</div>'+
