@@ -20,6 +20,7 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'08-battery-core.js'},
   {kind:'engine',name:'battery-engine.cjs'},
   {kind:'legacy',name:'08-battery-chart.js'},
+  {kind:'engine',name:'personal-evidence-engine.cjs'},
   {kind:'legacy',name:'09-battery-finance.js'},
   {kind:'legacy',name:'10-battery-flow.js'},
   {kind:'legacy',name:'11-data-quality.js'},
@@ -28,6 +29,10 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'14-detail-state.js'},
   {kind:'legacy',name:'15-homewizard-history.js'}
 ]);
+if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
+ console.error('Build aborted: unknown build step kind.');
+ process.exit(1);
+}
 const manifest=Object.freeze(buildSteps.filter(s=>s.kind==='legacy').map(s=>s.name));
 const engineNames=Object.freeze(buildSteps.filter(s=>s.kind==='engine').map(s=>s.name));
 
@@ -65,10 +70,12 @@ for(const name of manifest){
   process.exit(1);
  }
 }
-// PR2: exactly one self-contained CommonJS-compatible engine, inserted before legacy chart code.
+// PR3: all engine files must be explicitly listed in buildSteps; never auto-discover an engine.
 const engineDir=path.join(root,'src','engines');
-if(engineNames.length!==1){console.error('Build aborted: expected exactly one battery engine');process.exit(1);}
-const engineName=engineNames[0];
+if(!engineNames.length||new Set(engineNames).size!==engineNames.length){
+ console.error('Build aborted: engine manifest must contain unique names.');
+ process.exit(1);
+}
 let engineEntries;
 try{
  if(!fs.statSync(engineDir).isDirectory())throw Error('Not a directory');
@@ -77,17 +84,31 @@ try{
  console.error('Build aborted: missing or unreadable source directory: '+engineDir);
  process.exit(1);
 }
-if(JSON.stringify(engineEntries)!==JSON.stringify([engineName])){
+if(JSON.stringify(engineEntries)!==JSON.stringify(engineNames.slice().sort())){
  console.error('Build aborted: engine source list differs from manifest: '+engineEntries.join(', '));
  process.exit(1);
 }
-const engineFile=path.join(engineDir,engineName);
-if(!fs.lstatSync(engineFile).isFile()){
- console.error('Build aborted: engine source is not a regular file: '+engineFile);
- process.exit(1);
+const engineBuffers=new Map();
+for(const engineName of engineNames){
+ const engineFile=path.join(engineDir,engineName);
+ if(!fs.lstatSync(engineFile).isFile()){
+  console.error('Build aborted: engine source is not a regular file: '+engineFile);
+  process.exit(1);
+ }
+ const buffer=fs.readFileSync(engineFile);
+ // A syntactically invalid engine must fail even when another fragment accidentally balances it.
+ // This parses as CommonJS without executing or importing a module in the HACS runtime.
+ try{
+  new vm.Script('(function(exports, require, module, __filename, __dirname){\n'+
+   buffer.toString('utf8')+'\n})',{filename:engineName});
+ }catch(error){
+  console.error('Build aborted: standalone engine syntax invalid in '+engineName+': '+error.message);
+  process.exit(1);
+ }
+ engineBuffers.set(engineName,buffer);
 }
 const output=Buffer.concat(buildSteps.map(({kind,name})=>
- fs.readFileSync(kind==='engine'?path.join(engineDir,name):path.join(sourceDir,name))
+ kind==='engine'?engineBuffers.get(name):fs.readFileSync(path.join(sourceDir,name))
 ));
 // Reject invalid JavaScript before either --check or --write; never replace a working bundle
 // with a syntactically invalid generated script.

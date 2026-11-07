@@ -141,7 +141,7 @@ test('PR2: invalid generated JavaScript is rejected BEFORE --write and leaves ex
  fs.appendFileSync(invalid,'\nfunction (\n');
  const attempted=run('--write',dir);
  assert.notEqual(attempted.status,0,'Invalid engine must never exit successfully');
- assert.match(attempted.stderr,/generated HACS JavaScript syntax invalid/);
+ assert.match(attempted.stderr,/standalone engine syntax invalid/);
  assert.equal(fs.readFileSync(artifact).equals(before),true,'Valid existing HACS must stay byte-identical');
  assert.equal(fs.readdirSync(dir).filter(n=>n.includes('.tmp-')).length,0,'No partially-written HACS files');
  const checked=run('--check',dir);

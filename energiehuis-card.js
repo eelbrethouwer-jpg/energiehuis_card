@@ -2778,9 +2778,6 @@ function eh20Chart(result,pickedIndex){
   '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
 }
 
-/* Battery 4.0: finance is a read-only scenario over exactly the simulated hour rows.
-   Capex is never inferred from a battery capacity or hidden in the savings model. */
-/* Personal comparison foundation: report evidence, never infer appliance use from P1. */
 function eh30PersonalEvidence(rows){
  const sorted=(Array.isArray(rows)?rows:[]).filter(r=>Number.isFinite(r?.t)).slice().sort((a,b)=>a.t-b.t);
  const unique=new Map();let duplicates=0;
@@ -2796,6 +2793,15 @@ function eh30PersonalEvidence(rows){
   missing:Math.max(0,expected-valid.length),coverage:expected?Math.min(1,valid.length/expected):0,
   imported,exported,months};
 }
+// PR3: preserve global function declaration in HACS classic script; export for standalone Node only.
+if(typeof module !== 'undefined' && module){
+ try{
+  if(module.exports)Object.assign(module.exports,{eh30PersonalEvidence});
+ }catch(_){}
+}
+/* Battery 4.0: finance is a read-only scenario over exactly the simulated hour rows.
+   Capex is never inferred from a battery capacity or hidden in the savings model. */
+/* Personal comparison foundation: report evidence, never infer appliance use from P1. */
 function eh30PersonalEvidenceHtml(rows){
  const q=eh30PersonalEvidence(rows);
  const period=q.start===null?'Geen meetperiode':new Date(q.start).toLocaleDateString('nl-NL')+' – '+new Date(q.end-1).toLocaleDateString('nl-NL');

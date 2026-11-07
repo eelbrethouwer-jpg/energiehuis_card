@@ -1,0 +1,571 @@
+{
+  "type": "observed-legacy-golden",
+  "warning": "Characterization only; NOT normative economic or physical validation",
+  "source": {
+    "baseCommit": "c22eabd4310288136d08d60c1f46258fa6e58102",
+    "legacyBlobSha": "abf33ba2748bfa2db6e059ef9a0a8fd4b490f8ee",
+    "function": "eh30PersonalEvidence",
+    "capturedBeforeExtraction": true
+  },
+  "cases": [
+    {
+      "name": "empty-array",
+      "rows": [],
+      "expected": {
+        "start": null,
+        "end": null,
+        "expected": 0,
+        "valid": 0,
+        "priced": 0,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 0,
+        "imported": 0,
+        "exported": 0,
+        "months": 0
+      }
+    },
+    {
+      "name": "null-input",
+      "rows": null,
+      "expected": {
+        "start": null,
+        "end": null,
+        "expected": 0,
+        "valid": 0,
+        "priced": 0,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 0,
+        "imported": 0,
+        "exported": 0,
+        "months": 0
+      }
+    },
+    {
+      "name": "single-priced-hour",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 1.25,
+          "export": 0,
+          "price": 0.23
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780304400000,
+        "expected": 1,
+        "valid": 1,
+        "priced": 1,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 1,
+        "imported": 1.25,
+        "exported": 0,
+        "months": 1
+      }
+    },
+    {
+      "name": "unsorted-gap-and-export",
+      "rows": [
+        {
+          "t": 1780311600000,
+          "end": 1780315200000,
+          "import": 3,
+          "export": 0,
+          "price": 0.4
+        },
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 1.2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1780304400000,
+          "end": 1780308000000,
+          "import": 0,
+          "export": 2.5,
+          "price": null
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780315200000,
+        "expected": 4,
+        "valid": 3,
+        "priced": 2,
+        "duplicates": 0,
+        "missing": 1,
+        "coverage": 0.75,
+        "imported": 4.2,
+        "exported": 2.5,
+        "months": 1
+      }
+    },
+    {
+      "name": "duplicate-first-valid-wins",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 999,
+          "export": 999,
+          "price": 0.4
+        },
+        {
+          "t": 1780304400000,
+          "end": 1780308000000,
+          "import": 0,
+          "export": 3,
+          "price": 0.1
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780308000000,
+        "expected": 2,
+        "valid": 2,
+        "priced": 2,
+        "duplicates": 1,
+        "missing": 0,
+        "coverage": 1,
+        "imported": 1,
+        "exported": 3,
+        "months": 1
+      }
+    },
+    {
+      "name": "duplicate-first-invalid-wins",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": -1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 1,
+          "export": 1,
+          "price": 0.3
+        },
+        {
+          "t": 1780304400000,
+          "end": 1780308000000,
+          "import": 2,
+          "export": 0,
+          "price": 0.4
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780308000000,
+        "expected": 2,
+        "valid": 1,
+        "priced": 1,
+        "duplicates": 1,
+        "missing": 1,
+        "coverage": 0.5,
+        "imported": 2,
+        "exported": 0,
+        "months": 1
+      }
+    },
+    {
+      "name": "bad-interval-and-unpriced",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "end": 1780302600000,
+          "import": 2,
+          "export": 1,
+          "price": null
+        },
+        {
+          "t": 1780304400000,
+          "end": 1780308000000,
+          "import": 1,
+          "export": 0,
+          "price": null
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780308000000,
+        "expected": 2,
+        "valid": 1,
+        "priced": 0,
+        "duplicates": 0,
+        "missing": 1,
+        "coverage": 0.5,
+        "imported": 1,
+        "exported": 0,
+        "months": 1
+      }
+    },
+    {
+      "name": "negative-import-no-reliable-coverage",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": -1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1780304400000,
+          "end": 1780308000000,
+          "import": 0,
+          "export": -2,
+          "price": 0.4
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780308000000,
+        "expected": 2,
+        "valid": 0,
+        "priced": 0,
+        "duplicates": 0,
+        "missing": 2,
+        "coverage": 0,
+        "imported": 0,
+        "exported": 0,
+        "months": 0
+      }
+    },
+    {
+      "name": "missing-end-disables-span",
+      "rows": [
+        {
+          "t": 1780300800000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "expected": 0,
+        "valid": 0,
+        "priced": 0,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 0,
+        "imported": 0,
+        "exported": 0,
+        "months": 0
+      }
+    },
+    {
+      "name": "month-boundary",
+      "rows": [
+        {
+          "t": 1780268400000,
+          "end": 1780272000000,
+          "import": 1,
+          "export": 2,
+          "price": 0.19
+        },
+        {
+          "t": 1780272000000,
+          "end": 1780275600000,
+          "import": 2,
+          "export": 0,
+          "price": 0.21
+        }
+      ],
+      "expected": {
+        "start": 1780268400000,
+        "end": 1780275600000,
+        "expected": 2,
+        "valid": 2,
+        "priced": 2,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 1,
+        "imported": 3,
+        "exported": 2,
+        "months": 2
+      }
+    },
+    {
+      "name": "dst-fall-25-distinct-utc-hours",
+      "rows": [
+        {
+          "t": 1792879200000,
+          "end": 1792882800000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792882800000,
+          "end": 1792886400000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792886400000,
+          "end": 1792890000000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792890000000,
+          "end": 1792893600000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792893600000,
+          "end": 1792897200000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792897200000,
+          "end": 1792900800000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792900800000,
+          "end": 1792904400000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792904400000,
+          "end": 1792908000000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792908000000,
+          "end": 1792911600000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792911600000,
+          "end": 1792915200000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792915200000,
+          "end": 1792918800000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792918800000,
+          "end": 1792922400000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792922400000,
+          "end": 1792926000000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792926000000,
+          "end": 1792929600000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792929600000,
+          "end": 1792933200000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792933200000,
+          "end": 1792936800000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792936800000,
+          "end": 1792940400000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792940400000,
+          "end": 1792944000000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792944000000,
+          "end": 1792947600000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792947600000,
+          "end": 1792951200000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792951200000,
+          "end": 1792954800000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792954800000,
+          "end": 1792958400000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792958400000,
+          "end": 1792962000000,
+          "import": 2,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792962000000,
+          "end": 1792965600000,
+          "import": 3,
+          "export": 0,
+          "price": 0.2
+        },
+        {
+          "t": 1792965600000,
+          "end": 1792969200000,
+          "import": 1,
+          "export": 0,
+          "price": 0.2
+        }
+      ],
+      "expected": {
+        "start": 1792879200000,
+        "end": 1792969200000,
+        "expected": 25,
+        "valid": 25,
+        "priced": 25,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 1,
+        "imported": 49,
+        "exported": 0,
+        "months": 1
+      }
+    },
+    {
+      "name": "null-and-nonfinite-time-values",
+      "rows": [
+        {
+          "t": null,
+          "end": null,
+          "import": 1,
+          "export": 2,
+          "price": 0.3
+        },
+        {
+          "t": "2026-06-01",
+          "end": 0,
+          "import": 1,
+          "export": 2,
+          "price": 0.3
+        },
+        {
+          "t": 1780300800000,
+          "end": 1780304400000,
+          "import": 0,
+          "export": 0,
+          "price": 0
+        }
+      ],
+      "expected": {
+        "start": 1780300800000,
+        "end": 1780304400000,
+        "expected": 1,
+        "valid": 1,
+        "priced": 1,
+        "duplicates": 0,
+        "missing": 0,
+        "coverage": 1,
+        "imported": 0,
+        "exported": 0,
+        "months": 1
+      }
+    },
+    {
+      "name": "sparse-years-no-annual-inference",
+      "rows": [
+        {
+          "t": 1748772000000,
+          "end": 1748775600000,
+          "import": 1,
+          "export": 0,
+          "price": 0.3
+        },
+        {
+          "t": 1780308000000,
+          "end": 1780311600000,
+          "import": 2,
+          "export": 0,
+          "price": 0.1
+        }
+      ],
+      "expected": {
+        "start": 1748772000000,
+        "end": 1780311600000,
+        "expected": 8761,
+        "valid": 2,
+        "priced": 2,
+        "duplicates": 0,
+        "missing": 8759,
+        "coverage": 0.0002282844424152494,
+        "imported": 3,
+        "exported": 0,
+        "months": 2
+      }
+    }
+  ]
+}
