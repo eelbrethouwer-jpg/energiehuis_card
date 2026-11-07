@@ -71,7 +71,7 @@ test('geklikte Alfenkeuze controleert sensorversheid opnieuw; handmatige invoer 
  c._hass.states[conf.laden].state='6800';
  click('current');assert.equal(c._simPower,4.2,'Verouderde sensor mag gekozen vermogen niet overschrijven');
  const inp={value:'5.5',matches:selector=>selector==='[data-eh-kw]'};
- for(const cb of c.shadowRoot.listeners.input)cb({target:inp});
+ for(const cb of c.shadowRoot.listeners.change)cb({target:inp});
  assert.equal(c._simPower,5.5);assert.equal(c._eh24PowerChoice,null);
  assert.equal(calls,0);
 });

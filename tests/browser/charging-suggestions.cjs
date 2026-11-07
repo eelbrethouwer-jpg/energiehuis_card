@@ -46,11 +46,13 @@ let browser;
  // Manual input stays authoritative across sensor updates and rerendering.
  await page.locator('[data-eh-kw]').fill('5.5');await page.locator('[data-eh-kw]').blur();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._simPower===5.5);
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh23-power="current"]')?.getAttribute('aria-pressed')==='false');
  assert.equal(await page.locator('[data-eh23-power="current"]').getAttribute('aria-pressed'),'false','Handmatig vermogen verwijdert selectie');
  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');c._hass.states[c.config.laden].state='4200';c._render();});
  assert.equal(await page.locator('[data-eh-kw]').inputValue(),'5.5');
  await page.locator('[data-eh23-power="history"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._simPower===7);
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh23-power="history"]')?.getAttribute('aria-pressed')==='true');
  assert.equal(await page.locator('[data-eh23-power="history"]').getAttribute('aria-pressed'),'true');
  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');c._hass.states[c.config.laden].state='0';c._eh17Sessions.sessions[2].estimated=true;c._render();});
  assert.equal(await page.locator('[data-eh23-power="current"]').isDisabled(),true);

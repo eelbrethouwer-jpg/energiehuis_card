@@ -53,7 +53,7 @@ test('suggesties tonen Alfen eerst en de plannerbegrenzing, zonder automatische 
  assert.equal((html.match(/Aansluitgrens: 4,74 kW/g)||[]).length,1,'Two capped suggestions share one limit note');
  assert.equal(c._simPower,3.7);
  h.states[conf.laden].state='0';
- assert.match(powerHtml(c,h,conf,prices,20.7,opts),/data-eh23-power="current" disabled/);
+ assert.match(powerHtml(c,h,conf,prices,20.7,opts),/data-eh23-power="current" aria-pressed="false" disabled/);
  c._eh17Sessions.sessions=[session(6),session(7),session(8,2,{estimated:true})];
  assert.doesNotMatch(powerHtml(c,h,conf,prices,20.7,opts),/data-eh23-power="history"/);
 });
