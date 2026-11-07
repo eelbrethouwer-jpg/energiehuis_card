@@ -42,6 +42,8 @@ let browser;
  assert.match(await page.locator('.eh23-window-note').innerText(),/geen berekende actieve laadtijd/);
  await page.locator('[data-eh23-power="current"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._simPower===7.36);
+ // _schedule() uses requestAnimationFrame; await actual DOM commit, not only in-memory state.
+ await page.waitForFunction(()=>document.querySelector('energiehuis-card')?.shadowRoot?.querySelector('[data-eh-kw]')?.value==='7.36');
  assert.equal(await page.locator('[data-eh-kw]').inputValue(),'7.36');
  assert.equal(await page.locator('[data-eh23-power="current"]').getAttribute('aria-pressed'),'true');
  // Manual input stays authoritative across sensor updates and rerendering.

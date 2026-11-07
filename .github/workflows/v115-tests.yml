@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
       - name: JavaScript syntax check
         run: node --check energiehuis-card.js
+      - name: Check standalone battery engine syntax
+        run: node --check src/engines/battery-engine.cjs
       - name: All Node regression tests
         run: node --test tests/*.test.cjs
       - name: Validate HACS configuration

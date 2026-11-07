@@ -2665,6 +2665,10 @@ function eh20HourlyRows(stats,c,h,lim,prices){
  });
  return {rows,bins,error:null};
 }
+/* EnergieRegisseur PR2: browser-safe, standalone Node battery calculation core.
+ * Historical numeric decisions remain unchanged. No HA, DOM, storage or network APIs.
+ */
+function ehBatteryNumber(v){if(v===null||v===undefined||v==="")return null;const n=typeof v==="number"?v:Number(String(v).replace(",","."));return Number.isFinite(n)?n:null;}
 function eh20Percentile(values,q){
  if(!values.length)return null;
  const arr=values.slice().sort((a,b)=>a-b);
@@ -2672,10 +2676,10 @@ function eh20Percentile(values,q){
 }
 function eh21BatteryProfile(cap,config={}){
  const size=[5,10,15].includes(Number(cap))?Number(cap):10;
- const defaultPower=eh17N(config.battery_sim_power_kw);
+ const defaultPower=ehBatteryNumber(config.battery_sim_power_kw);
  const power=defaultPower!==null&&defaultPower>0?defaultPower:3;
  const option=(key,def,min,max)=>{
-  const n=eh17N(config['battery_'+size+'_'+key]);
+  const n=ehBatteryNumber(config['battery_'+size+'_'+key]);
   return n!==null&&n>=min&&n<=max?n:def;
  };
  const usablePct=option('usable_pct',100,1,100);
@@ -2746,6 +2750,13 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
   savings:benefit-lostExport,avoidedPurchase,gridPurchase,lostExport,
   assumedPrices:!pricesComplete,priceComplete:pricesComplete,
   hours:valid.length,missingHours:rows.length-valid.length};
+}
+// Classic-script global functions remain available to Energiehuis; CommonJS exports for isolated tests.
+if(typeof module !== 'undefined' && module){
+ // Immutable host exports must not prevent the classic-script card from registering.
+ try{
+  if(module.exports)Object.assign(module.exports,{eh20Percentile,eh21BatteryProfile,eh20Simulate});
+ }catch(_){}
 }
 function eh20Chart(result,pickedIndex){
  if(!result||!result.points?.length)return '<p class="subtle">Geen betrouwbare uurpunten voor de grafiek.</p>';
