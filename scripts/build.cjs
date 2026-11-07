@@ -20,6 +20,7 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'08-battery-core.js'},
   {kind:'engine',name:'battery-engine.cjs'},
   {kind:'legacy',name:'08-battery-chart.js'},
+  {kind:'engine',name:'personal-evidence-engine.cjs'},
   {kind:'legacy',name:'09-battery-finance.js'},
   {kind:'legacy',name:'10-battery-flow.js'},
   {kind:'legacy',name:'11-data-quality.js'},
