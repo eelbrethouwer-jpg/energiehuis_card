@@ -1,0 +1,87 @@
+name: Publish Energiehuis v1.25.0 — manual approval only
+
+# Intentionally NO push/pull_request trigger. Merging preparation cannot publish.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type PUBLISH_v1.25.0 after explicit user release approval"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-energiehuis-v1.25.0
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirmation == 'PUBLISH_v1.25.0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release identity and required notes
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          grep -Fq "const EH_VERSION = '1.25.0';" energiehuis-card.js
+          grep -Fq "name:'Energiehuis v1.25.0'" energiehuis-card.js
+          grep -Fq "function eh40Cockpit" energiehuis-card.js
+          test -s RELEASE_NOTES_v1.25.0.md
+          python -m json.tool hacs.json > /dev/null
+      - name: Check deterministic build and standalone JavaScript engines
+        run: |
+          node --check energiehuis-card.js
+          node --check src/engines/battery-engine.cjs
+          node --check src/engines/personal-evidence-engine.cjs
+          node scripts/build.cjs --check
+      - name: Run full Node regressions in two timezones
+        run: |
+          TZ=UTC node --test tests/*.test.cjs
+          TZ=Europe/Amsterdam node --test tests/*.test.cjs
+      - name: Install pinned Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Run all existing and cockpit browser tests
+        run: |
+          node tests/browser/charging-suggestions.cjs
+          node tests/browser/mobile-visual.cjs
+          node tests/browser/regisseur-cockpit.cjs
+          EH_TEST_LIVE_TARIFFS=1 node tests/browser/stroomvergelijker.cjs
+          node tests/browser/battery-finance.cjs
+          node tests/browser/personal-battery-comparison.cjs
+
+  publish:
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirmation == 'PUBLISH_v1.25.0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to overwrite an existing tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.25.0 >/dev/null 2>&1; then
+            echo "::error::Release v1.25.0 already exists; refusing to republish."
+            exit 1
+          fi
+          if test -n "$(git ls-remote --tags origin refs/tags/v1.25.0)"; then
+            echo "::error::Git tag v1.25.0 already exists; refusing to overwrite."
+            exit 1
+          fi
+      - name: Publish exactly the manually validated main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.25.0 --target "$GITHUB_SHA" \
+            --title "Energiehuis v1.25.0 – EnergieRegisseur Cockpit" \
+            --notes-file RELEASE_NOTES_v1.25.0.md --latest

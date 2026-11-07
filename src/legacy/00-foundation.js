@@ -1,8 +1,8 @@
-/* Energiehuis v1.24.1 — Gemeten laadvermogensuggesties en tijdzonevaste validatie.
+/* Energiehuis v1.25.0 — Eerste zichtbare EnergieRegisseur-cockpit.
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.24.1';
+const EH_VERSION = '1.25.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
