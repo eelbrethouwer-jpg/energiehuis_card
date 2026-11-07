@@ -18,6 +18,7 @@ test('laadkostentekst toont het ingestelde effectieve rendement en rekent laadve
 });
 
 const {eh23ChargePowerSuggestion:suggest,eh23ChargePowerHtml:powerHtml}=ctx.REVIEW;
+const liveW=(n)=>({state:String(n),last_updated:new Date().toISOString(),attributes:{unit_of_measurement:'W'}});
 const session=(kw,hours=2,extra={})=>({start:1700000000000,end:1700000000000+hours*3600000,kwh:kw*hours,estimated:false,...extra});
 test('sessiemediaan vereist standaard drie geschikte gemeten sessies',()=>{
  assert.equal(suggest([]),null);assert.equal(suggest([session(4),session(6)]),null);
@@ -39,7 +40,7 @@ test('even aantal sessies gebruikt het gemiddelde van de twee middelste vermogen
 });
 test('suggesties tonen Alfen eerst en de plannerbegrenzing, zonder automatische invoer',()=>{
  const c=card();c._eh17Sessions={at:Date.now(),sessions:[session(6),session(7),session(8)]};
- const conf={...EH_DEFAULTS},h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const conf={...EH_DEFAULTS},h={states:{[conf.laden]:liveW(7360)}};
  const now=new Date(),start=Math.ceil(now.getTime()/3600000)*3600000;
  const prices=Array.from({length:12},(_,i)=>({t:new Date(start+i*3600000).toISOString(),p:.2}));
  const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000,efficiency:.9};
@@ -59,7 +60,7 @@ test('suggesties tonen Alfen eerst en de plannerbegrenzing, zonder automatische 
 test('huisbelasting 9000 W benoemt minder dan 6 A zonder een geldig plannerresultaat',()=>{
  const c=card(),conf={...EH_DEFAULTS};
  c._eh17Sessions={at:Date.now(),sessions:[session(6),session(7),session(8)]};
- const h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const h={states:{[conf.laden]:liveW(7360)}};
  const html=powerHtml(c,h,conf,[],20.7,{fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:9000});
  assert.match(html,/Minder dan 6 A beschikbaar bij de gebruikte huisbelasting/);
  assert.equal((html.match(/Minder dan 6 A/g)||[]).length,1);
@@ -68,7 +69,7 @@ test('huisbelasting 9000 W benoemt minder dan 6 A zonder een geldig plannerresul
 
 test('limietmelding werkt zonder tarieven, met ongeldige prijseenheid en bij verstreken vertrektijd',()=>{
  const c=card(),conf={...EH_DEFAULTS};
- const h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const h={states:{[conf.laden]:liveW(7360)}};
  const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000};
  const invalidPrices=[{t:new Date(Math.ceil(Date.now()/3600000)*3600000).toISOString(),p:41}];
  for(const prices of [[],invalidPrices]){
@@ -82,7 +83,7 @@ test('limietmelding werkt zonder tarieven, met ongeldige prijseenheid en bij ver
 
 test('onbekende huisbelasting meldt expliciet aanname 2000 W bij 7,2 kW',()=>{
  const c=card(),conf={...EH_DEFAULTS};
- const h={states:{[conf.laden]:{state:'7200',attributes:{unit_of_measurement:'W'}}}};
+ const h={states:{[conf.laden]:liveW(7200)}};
  const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:null};
  const html=powerHtml(c,h,conf,[],20.7,opts);
  assert.match(html,/Aansluitgrens: 6,74 kW/);
@@ -93,7 +94,7 @@ test('onbekende huisbelasting meldt expliciet aanname 2000 W bij 7,2 kW',()=>{
 
 test('handmatige 3,7 kW is niet begrensd ondanks hogere vermogenssuggesties',()=>{
  const c=card();c._simPower=3.7;
- const conf={...EH_DEFAULTS},h={states:{[conf.laden]:{state:'7360',attributes:{unit_of_measurement:'W'}}}};
+ const conf={...EH_DEFAULTS},h={states:{[conf.laden]:liveW(7360)}};
  const opts={fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000};
  const html=powerHtml(c,h,conf,[],20.7,opts);
  assert.match(html,/Aansluitgrens: 4,74 kW/);
@@ -105,7 +106,7 @@ test('handmatige 3,7 kW is niet begrensd ondanks hogere vermogenssuggesties',()=
 
 test('een klik verandert uitsluitend het tijdelijke scenario en leest de actuele bron opnieuw',()=>{
  const c=new EnergiehuisCard();c.config={...EH_DEFAULTS};c._schedule=()=>{};
- let calls=0;c._hass={states:{[c.config.laden]:{state:'4200',attributes:{unit_of_measurement:'W'}}},callService(){calls++;}};
+ let calls=0;c._hass={states:{[c.config.laden]:liveW(4200)},callService(){calls++;}};
  c._simPower=3.7;c._eh17Sessions={sessions:[session(5),session(6),session(7)]};
  const before=JSON.stringify(c.config);
  const click=kind=>{const button={disabled:false,dataset:{eh23Power:kind}};const event={target:{closest:selector=>selector==='[data-eh23-power]'?button:null}};for(const fn of c.shadowRoot.listeners.click)fn(event);};
