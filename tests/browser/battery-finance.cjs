@@ -178,7 +178,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
   assert.equal(await page.locator('.eh30-evidence').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow evidence '+width);
  }
  // Cupra's custom expand/collapse uses model state, which must also survive HA rerenders.
- await page.locator('[data-eh-page="cupra"]').click();
+ await page.locator('[data-eh26-insights]').click();
+ await page.locator('.eh26-insight-menu [data-eh-page="cupra"]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._view==='cupra');
  await page.locator('[data-eh-cupra-details]').click();
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.vehicle-details')?.classList.contains('open'));
