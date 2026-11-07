@@ -19,7 +19,7 @@ const ctx={EnergiehuisCard:FakeCard,Date,Math,Number,String,Object,Array,
  ehPower:n=>n===null?'—':Math.abs(n)>=1000?(n/1000).toFixed(1)+' kW':n.toFixed(0)+' W',
  ehFmt:(n,d)=>Number(n).toFixed(d),ehMoney:n=>'€ '+n.toFixed(3)
 };
-vm.runInNewContext(source+';globalThis.TEST={eh40Fresh,eh40Cockpit,eh40History,eh40Css};',ctx);
+vm.runInNewContext(source+';globalThis.TEST={eh40Fresh,eh40Cockpit,eh40History,eh40Css,eh40AgeLabel};',ctx);
 const api=ctx.TEST;
 const ids={net:'sensor.net',zonnepanelen:'sensor.pv',huis:'sensor.home',laden:'sensor.alfen',cupra:'sensor.cupra',prijs:'sensor.price'};
 const st=(value,unit,ageMinutes=0)=>({
@@ -155,4 +155,37 @@ test('PR4 B2: cockpit-opened detail is moved directly below cockpit and revealed
 });
 test('PR4 B3: cockpit footer actions meet 44px mobile touch target',()=>{
  assert.match(api.eh40Css(),/\.eh40-footer button\{[^}]*min-height:44px/);
+});
+
+test('PR4 R2: stale power bars show LAST-KNOWN and age, not an unqualified live header',()=>{
+ const {h,card}=setup(),now=Date.now(),old=new Date(now-2*3600000).toISOString();
+ for(const id of [ids.zonnepanelen,ids.laden]){
+  h.states[id].state='0';
+  h.states[id].last_updated=old;
+ }
+ const markup=api.eh40Cockpit(card,h,ids);
+ assert.match(markup,/Vermogen en laatste standen/);
+ assert.doesNotMatch(markup,/<strong>Vermogen nu<\/strong>/);
+ assert.match(markup,/eh40-flow-row eh40-flow-old/);
+ assert.match(markup,/0 W<small>Laatste · 2 uur geleden<\/small>/);
+ assert.equal((markup.match(/Laatste · 2 uur geleden/g)||[]).length>=2,true);
+ assert.match(markup,/4 van 6 bronnen actueel/);
+ const allFresh=setup(),freshMarkup=api.eh40Cockpit(allFresh.card,allFresh.h,ids);
+ assert.match(freshMarkup,/<strong>Vermogen nu<\/strong>/);
+ assert.doesNotMatch(freshMarkup,/eh40-flow-row eh40-flow-old/);
+});
+test('PR4 R3: old Cupra SOC includes age but never counts as a current reading',()=>{
+ const {h,card}=setup(),now=Date.now();
+ h.states[ids.cupra].last_updated=new Date(now-3*86400000).toISOString();
+ const reading=api.eh40Fresh(h,ids.cupra,'number',90,now,true);
+ assert.equal(reading.ok,false);
+ assert.equal(reading.retained,true);
+ assert.match(reading.reason,/Laatste stand · niet recent bevestigd · 3 dagen geleden/);
+ const markup=api.eh40Cockpit(card,h,ids);
+ assert.match(markup,/52%/);
+ assert.match(markup,/3 dagen geleden/);
+ assert.match(markup,/5 van 6 bronnen actueel/);
+ assert.equal(api.eh40AgeLabel(60*1000),'1 min geleden');
+ assert.equal(api.eh40AgeLabel(86400000),'1 dag geleden');
+ assert.equal(api.eh40AgeLabel(Number.NaN),'tijd onbekend');
 });
