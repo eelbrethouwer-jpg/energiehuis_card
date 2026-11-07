@@ -43,6 +43,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  await page.locator('.eh30-evidence-details > summary').click();
  await page.evaluate(()=>document.querySelector('energiehuis-card')._render());
  assert.equal(await page.locator('.eh30-evidence-details').evaluate(e=>e.open),true);
+ assert.equal(await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),rows=c._eh20Battery.rows;c._eh20Battery.rows=rows.slice(1);c._render();const open=c.shadowRoot.querySelector('.eh30-evidence').open;c._eh20Battery.rows=rows;c._render();return open;}),true,'Data quality must stay open when coverage changes');
  assert.equal(await page.locator('[data-eh26-tab="today"]').getAttribute('aria-pressed'),'true');
  assert.equal(await page.locator('.eh26-forecast-svg').count(),1);
  assert.ok(await page.locator('.eh26-forecast-svg [data-eh27-price-hour]').count()>=3);
