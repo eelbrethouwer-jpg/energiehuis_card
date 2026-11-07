@@ -35,10 +35,10 @@ class EnergiehuisCard extends HTMLElement {
    const powerChoice=e.target.closest('[data-eh23-power]');
    if(powerChoice){
      if(powerChoice.disabled)return;
-     const current=ehW(this._hass,this.config.laden);
+     const current=eh24ChargeReading(this._hass,this.config.laden,{maxAgeMs:2*60*1000}).watts;
      const suggestion=powerChoice.dataset.eh23Power==='current'?(current!==null&&current>=1400?current/1000:null):
        powerChoice.dataset.eh23Power==='history'?eh23ChargePowerSuggestion(this._eh17Sessions?.error?[]:this._eh17Sessions?.sessions)?.kw:null;
-     if(Number.isFinite(suggestion)&&suggestion>=1.4){this._simPower=Math.min(7.4,Number(suggestion.toFixed(2)));this._schedule();}
+     if(Number.isFinite(suggestion)&&suggestion>=1.4){this._simPower=Math.min(7.4,Number(suggestion.toFixed(2)));this._eh24PowerChoice=powerChoice.dataset.eh23Power;this._schedule();}
      return;
    }
    const mode=e.target.closest('[data-eh-mode]');
@@ -98,7 +98,7 @@ class EnergiehuisCard extends HTMLElement {
      }
      if(t.matches('[data-eh-kw]')){
        const n=Number(t.value.replace(',','.'));
-       if(Number.isFinite(n)&&n>=1.4&&n<=7.4)this._simPower=n;
+       if(Number.isFinite(n)&&n>=1.4&&n<=7.4){this._simPower=n;this._eh24PowerChoice=null;}
        this._schedule();
      }
    });
@@ -554,9 +554,10 @@ class EnergiehuisCard extends HTMLElement {
   const tariff=ehPricesForDay(h,c,new Date());
   const forecast=ehHourlyFromPrices(tariff.quarters,tariff.hourly.length?tariff.hourly:ehForecast(h,c.prijs));
   const prices=forecast.filter(x=>x.t&&Number.isFinite(Date.parse(x.t))).sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
+  const houseReading=eh24ChargeReading(h,c.huis);
   const planOpts={
      fuseAmp:eh17N(c.fuse_amp)??40,chargerAmp:eh17N(c.charger_amp)??32,
-     reserveAmp:eh17N(c.reserve_amp)??2,houseW:ehW(h,c.huis),
+     reserveAmp:eh17N(c.reserve_amp)??2,houseW:houseReading.watts,houseQuality:houseReading.quality,
      efficiency:eh17N(c.ev_charge_efficiency)??.9,
      solar:eh17Solar(h,c.pv_forecast),
      exportCompensation:eh17N(c.export_compensation_eur_kwh)
@@ -847,7 +848,7 @@ class EnergiehuisCard extends HTMLElement {
 .eh23-legacy-content .subpage-head{display:none}.eh20-panel>h3{display:none}.subgrid.three{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.shell .cupra-price-slot,.shell .cupra-price-bars.is-quarter .cupra-price-slot{min-width:0;flex:1 1 0}.metric-copy{min-width:0}.metric-value{overflow-wrap:anywhere}.shell .metric-euro .metric-value{font-size:16px;white-space:nowrap}.ehcmp h3,.ehcat h3{font-size:17px;margin:0}
 @media(max-width:720px){.shell .metrics>.metric:last-child:nth-child(odd),.body>.eh17-panel .eh17-grid>div:last-child:nth-child(odd){grid-column:1/-1}.shell .eh26-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}.shell .eh26-tabs button{font-size:10px;padding:6px 3px}.shell .eh19-appbar .eh19-connection{display:inline-block;max-width:130px;font-size:9px}.shell .eh19-density{font-size:10px}.shell .hero{height:76px}.shell .title{font-size:24px}.shell .cupra-head,.shell .subpage-head{padding:2px 0}.shell .cupra-page,.shell .subpage{padding-top:10px}.shell .subpage-head p{display:none}.eh26-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.eh26-overview strong{font-size:16px}.planning-inputs>label{grid-column:1/-1}.shell .cupra-safety{font-size:10px;line-height:1.5}.shell .eh17-option{border-radius:10px}.shell .eh17-option strong{font-size:17px}.charge-page .eh17-panel>.cupra-safety{display:none}}
 
-.eh23-power-suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 0}.eh23-power-suggestions>p{grid-column:1/-1;margin:0}.eh23-power-choice{font:inherit;font-size:12px;text-align:left;min-width:0;min-height:44px;padding:11px;border:1px solid #7295aa;border-radius:10px;color:#e5f5fc;background:#123449;cursor:pointer;display:flex;flex-direction:column;gap:6px}.eh23-power-choice[data-eh23-power="current"]{border-color:#49cfa5;background:#124638}.eh23-power-choice:disabled{opacity:.5;cursor:not-allowed}.eh23-power-choice:focus-visible{outline:2px solid white;outline-offset:2px}.eh23-power-choice strong{font-size:16px;overflow-wrap:anywhere}.eh23-power-choice small{font-size:10px;line-height:1.5;color:#c7dfe7}.eh23-window-note{font-size:10px;color:#b0cedb;line-height:1.5;margin:8px 0}.charge-page .eh20-actions{display:flex;gap:10px;flex-wrap:wrap}.charge-page .eh20-actions button{min-height:44px;min-width:90px}.charge-page .eh20-state{display:inline-flex;align-items:center;border:1px solid #8fbbba80;border-radius:999px;padding:5px 8px;font-size:10px}.charge-page .eh20-control .section-title{flex-wrap:wrap;gap:8px}
+.eh23-power-suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 0}.eh23-power-suggestions>p{grid-column:1/-1;margin:0}.eh23-power-choice{font:inherit;font-size:12px;text-align:left;min-width:0;min-height:44px;padding:11px;border:1px solid #7295aa;border-radius:10px;color:#e5f5fc;background:#123449;cursor:pointer;display:flex;flex-direction:column;gap:6px}.eh23-power-choice.is-selected{border-color:#49cfa5;background:#124638;box-shadow:inset 0 0 0 1px #49cfa5}.eh23-power-choice:disabled{opacity:.5;cursor:not-allowed}.eh23-power-choice:focus-visible{outline:2px solid white;outline-offset:2px}.eh23-power-choice strong{font-size:16px;overflow-wrap:anywhere}.eh23-power-choice small{font-size:10px;line-height:1.5;color:#c7dfe7}.eh23-window-note{font-size:10px;color:#b0cedb;line-height:1.5;margin:8px 0}.charge-page .eh20-actions{display:flex;gap:10px;flex-wrap:wrap}.charge-page .eh20-actions button{min-height:44px;min-width:90px}.charge-page .eh20-state{display:inline-flex;align-items:center;border:1px solid #8fbbba80;border-radius:999px;padding:5px 8px;font-size:10px}.charge-page .eh20-control .section-title{flex-wrap:wrap;gap:8px}
 @media(max-width:360px){.eh23-power-suggestions{grid-template-columns:1fr}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
