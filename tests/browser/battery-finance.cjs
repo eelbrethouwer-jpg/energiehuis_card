@@ -36,6 +36,8 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  });
  await page.waitForFunction(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh22-invest="10"]'));
  assert.equal(await page.locator('.eh30-evidence').count(),1);
+ assert.equal(await page.locator('.eh30-evidence').evaluate(e=>e.open),false);
+ await page.locator('.eh30-evidence > summary').click();
  assert.match(await page.locator('.eh30-evidence').innerText(),/Gemeten netafname/);
  assert.match(await page.locator('.eh30-evidence').innerText(),/Nog geen persoonlijk aankoopadvies/);
  await page.locator('.eh30-evidence-details > summary').click();
