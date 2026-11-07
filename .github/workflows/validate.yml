@@ -26,6 +26,9 @@ jobs:
       - name: JavaScript controleren
         run: node --check energiehuis-card.js
 
+      - name: Broncode exact koppelen aan het HACS-bestand
+        run: node scripts/build.cjs --check
+
       - name: HACS repository controleren
         uses: hacs/action@main
         with:
