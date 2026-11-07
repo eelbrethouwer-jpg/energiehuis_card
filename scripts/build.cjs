@@ -4,15 +4,33 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const vm=require('node:vm');
 
-const manifest=Object.freeze([
-  '00-foundation.js','01-history-analytics.js','02-card-shell.js',
-  '03-energy-intelligence.js','04-utility-sources.js','05-energy-insights.js',
-  '06-mobile-shell.js','07-script-charge-controls.js','08-battery-core.js','08-battery-chart.js',
-  '09-battery-finance.js','10-battery-flow.js','11-data-quality.js',
-  '12-battery-forecast-ui.js','13-contracts.js','14-detail-state.js',
-  '15-homewizard-history.js'
+// Declarative build order: legacy source fragments with the portable engine
+// placed explicitly between battery input processing and chart rendering.
+const buildSteps=Object.freeze([
+  {kind:'legacy',name:'00-foundation.js'},
+  {kind:'legacy',name:'01-history-analytics.js'},
+  {kind:'legacy',name:'02-card-shell.js'},
+  {kind:'legacy',name:'03-energy-intelligence.js'},
+  {kind:'legacy',name:'04-utility-sources.js'},
+  {kind:'legacy',name:'05-energy-insights.js'},
+  {kind:'legacy',name:'06-mobile-shell.js'},
+  {kind:'legacy',name:'07-script-charge-controls.js'},
+  {kind:'legacy',name:'08-battery-core.js'},
+  {kind:'engine',name:'battery-engine.cjs'},
+  {kind:'legacy',name:'08-battery-chart.js'},
+  {kind:'legacy',name:'09-battery-finance.js'},
+  {kind:'legacy',name:'10-battery-flow.js'},
+  {kind:'legacy',name:'11-data-quality.js'},
+  {kind:'legacy',name:'12-battery-forecast-ui.js'},
+  {kind:'legacy',name:'13-contracts.js'},
+  {kind:'legacy',name:'14-detail-state.js'},
+  {kind:'legacy',name:'15-homewizard-history.js'}
 ]);
+const manifest=Object.freeze(buildSteps.filter(s=>s.kind==='legacy').map(s=>s.name));
+const engineNames=Object.freeze(buildSteps.filter(s=>s.kind==='engine').map(s=>s.name));
+
 const args=process.argv.slice(2),mode=args[0]||'--check';
 if(!['--check','--write'].includes(mode)||args.length>2||
    (args[1]&&!args[1].startsWith('--root='))||
@@ -49,7 +67,8 @@ for(const name of manifest){
 }
 // PR2: exactly one self-contained CommonJS-compatible engine, inserted before legacy chart code.
 const engineDir=path.join(root,'src','engines');
-const engineName='battery-engine.cjs';
+if(engineNames.length!==1){console.error('Build aborted: expected exactly one battery engine');process.exit(1);}
+const engineName=engineNames[0];
 let engineEntries;
 try{
  if(!fs.statSync(engineDir).isDirectory())throw Error('Not a directory');
@@ -67,10 +86,17 @@ if(!fs.lstatSync(engineFile).isFile()){
  console.error('Build aborted: engine source is not a regular file: '+engineFile);
  process.exit(1);
 }
-const output=Buffer.concat(manifest.flatMap(name=>[
- ...(name==='08-battery-chart.js'?[fs.readFileSync(engineFile)]:[]),
- fs.readFileSync(path.join(sourceDir,name))
-]));
+const output=Buffer.concat(buildSteps.map(({kind,name})=>
+ fs.readFileSync(kind==='engine'?path.join(engineDir,name):path.join(sourceDir,name))
+));
+// Reject invalid JavaScript before either --check or --write; never replace a working bundle
+// with a syntactically invalid generated script.
+try{
+ new vm.Script(output.toString('utf8'),{filename:'energiehuis-card.js'});
+}catch(error){
+ console.error('Build aborted: generated HACS JavaScript syntax invalid: '+error.message);
+ process.exit(1);
+}
 const hash=crypto.createHash('sha256').update(output).digest('hex');
 const previous=fs.existsSync(artifact)?fs.readFileSync(artifact):null;
 function difference(expectedBytes,actualBytes){

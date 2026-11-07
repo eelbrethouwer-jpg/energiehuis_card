@@ -86,5 +86,5 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
 }
 // Classic-script global functions remain available to Energiehuis; CommonJS exports for isolated tests.
 if(typeof module !== 'undefined' && module && module.exports){
- module.exports={eh20Percentile,eh21BatteryProfile,eh20Simulate};
+ Object.assign(module.exports,{eh20Percentile,eh21BatteryProfile,eh20Simulate});
 }

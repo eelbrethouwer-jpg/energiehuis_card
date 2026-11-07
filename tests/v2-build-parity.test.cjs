@@ -133,3 +133,26 @@ test('PR2: standalone engine manifest rejects missing or extra engine sources',(
  assert.equal(fs.readFileSync(path.join(dir,'energiehuis-card.js'))
   .equals(fs.readFileSync(path.join(root,'energiehuis-card.js'))),true);
 }));
+
+test('PR2: invalid generated JavaScript is rejected BEFORE --write and leaves existing HACS intact',()=>fixture(dir=>{
+ const artifact=path.join(dir,'energiehuis-card.js');
+ const before=fs.readFileSync(artifact);
+ const invalid=path.join(dir,'src','engines','battery-engine.cjs');
+ fs.appendFileSync(invalid,'\nfunction (\n');
+ const attempted=run('--write',dir);
+ assert.notEqual(attempted.status,0,'Invalid engine must never exit successfully');
+ assert.match(attempted.stderr,/generated HACS JavaScript syntax invalid/);
+ assert.equal(fs.readFileSync(artifact).equals(before),true,'Valid existing HACS must stay byte-identical');
+ assert.equal(fs.readdirSync(dir).filter(n=>n.includes('.tmp-')).length,0,'No partially-written HACS files');
+ const checked=run('--check',dir);
+ assert.notEqual(checked.status,0);
+ assert.equal(fs.readFileSync(artifact).equals(before),true,'--check must be read-only on invalid JS');
+}));
+test('PR2: engine appears between battery inputs and chart in explicit build steps',()=>{
+ const script=fs.readFileSync(build,'utf8');
+ const a=script.indexOf("{kind:'legacy',name:'08-battery-core.js'}");
+ const b=script.indexOf("{kind:'engine',name:'battery-engine.cjs'}");
+ const c=script.indexOf("{kind:'legacy',name:'08-battery-chart.js'}");
+ assert.ok(a>=0&&b>a&&c>b,'Engine build order must be explicit');
+ assert.doesNotMatch(script,/name==='08-battery-chart.js'\?/);
+});
