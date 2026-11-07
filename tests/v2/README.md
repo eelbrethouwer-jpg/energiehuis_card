@@ -2,7 +2,7 @@
 
 All inputs in this directory are **synthetic**. No live HA measurements, tokens, personal usage profiles or contract details are included.
 
-- `fixtures/normative/`: correct physical / temporal / monetary arithmetic defined independently of v1 implementation.
+- `fixtures/normative/`: arithmetic reference contracts, NOT tests of a v2 engine. Normative/DST/counterexample tests pass without `energiehuis-card.js`; only the legacy characterization loads production code.
 - `fixtures/legacy-characterization/`: observed main v1.24.1 behaviour, **not** future normative requirements.
 - `fixtures/counterexamples/`: constructive cases that disprove unjustified exact EV-exclusive battery calculations.
 - `tests/v2.test.cjs`: CI loader for existing `node --test tests/*.test.cjs` workflow glob; no workflow changes.
@@ -26,3 +26,12 @@ UTC is the canonical instant axis. Local Europe/Amsterdam labels are formatting-
     EH_V2_TEST_FAIL_PROBE=1 node --test tests/v2.test.cjs
 
 Fixture review checklist for Claude: arithmetic; units; quarter profiles; DST instants; legacy output reproducibility; absence of production changes; loader actually exercised in CI.
+
+## Claude review corrections
+- O1: Passing pure normative fixtures is **not evidence of correct v2 engine code**; no v2 engine exists yet.
+- O2: Residual thresholds are **10 whole Wh inclusive per hour**, requiring independent aligned meters. This says nothing about sub-hour order.
+- O3: Provenance 'measured' plus quality 'stale' remain separate; whether stale values may be selected for a charging suggestion is an **open policy decision**. PR #41 is independent.
+- O5: On spring DST day there are no local 02:xx values. Autumn 02:30 occurs exactly twice.
+- O7: The CI test loader has an explicit five-module manifest; adding/removing one requires updating the manifest.
+- E3 historical figures (€6.14 / €5.01 / €1.13) remain unverified by PR0: the complete 72-hour fixture table was not supplied.
+- Claude reported 3 pre-existing America/New_York test failures on main and PR0, outside this tests-only scope.

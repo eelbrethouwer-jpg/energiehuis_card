@@ -31,6 +31,10 @@
   },
   "residual": {
     "p1Kwh": 1,
+    "boundaryAcceptedPartsKwh": [
+      0.5,
+      0.49
+    ],
     "acceptedIndependentPartsKwh": [
       0.5,
       0.492
@@ -39,8 +43,10 @@
       0.5,
       0.47
     ],
-    "toleranceKwh": 0.01,
-    "requiresIndependentMeters": true
+    "toleranceWh": 10,
+    "intervalMinutes": 60,
+    "requiresIndependentMeters": true,
+    "note": "Per-hour independent aligned meter residual in whole Wh; cannot establish quarter ordering"
   },
   "unknownPrice": {
     "intervals": [
@@ -54,7 +60,6 @@
   },
   "quality": {
     "provenance": "measured",
-    "quality": "stale",
-    "currentSafeChargingChoiceAllowed": false
+    "quality": "stale"
   }
 }

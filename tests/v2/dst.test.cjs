@@ -39,3 +39,15 @@ test('PR0 E6: nonexistent spring 02:30 has no matching CEST/CET candidate',()=>{
  const naiveUtc=Date.UTC(y,m-1,d,h,mm);
  for(const offset of [1,2])assert.notEqual(wall(new Date(naiveUtc-offset*hour).toISOString()),f.spring.nonexistentWall);
 });
+test('PR0 E6: autumn 02:30 occurs twice in the 25-hour local day',()=>{
+ const x=f.autumn;
+ const halfHours=Array.from({length:x.hours*2},(_,i)=>new Date(Date.parse(x.fromUtc)+i*hour/2).toISOString());
+ assert.equal(halfHours.filter(t=>wall(t)===x.duplicateWall).length,2);
+ assert.equal(new Set(halfHours).size,halfHours.length);
+});
+test('PR0 E6: spring local day never displays 02:xx',()=>{
+ const x=f.spring;
+ const halfHours=Array.from({length:x.hours*2},(_,i)=>new Date(Date.parse(x.fromUtc)+i*hour/2).toISOString());
+ assert.equal(halfHours.length,46);
+ assert.equal(halfHours.filter(t=>wall(t).slice(11,13)==='02').length,0);
+});

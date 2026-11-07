@@ -24,9 +24,14 @@ test('PR0: negative export remuneration is a charge, not a free credit',()=>{
 });
 test('PR0 E4: residual threshold requires independent aligned meters',()=>{
  const x=f.residual;
- const residual=parts=>Math.abs(parts.reduce((sum,v)=>sum+v,0)-x.p1Kwh);
- assert.ok(residual(x.acceptedIndependentPartsKwh)<=x.toleranceKwh);
- assert.ok(residual(x.rejectedIndependentPartsKwh)>x.toleranceKwh);
+ const toWh=kwh=>Math.round(kwh*1000);
+ const residualWh=parts=>Math.abs(parts.reduce((sum,v)=>sum+toWh(v),0)-toWh(x.p1Kwh));
+ assert.equal(x.intervalMinutes,60,'Only an hourly balance; this does not establish sub-hour event ordering');
+ assert.equal(x.toleranceWh,10);
+ assert.equal(residualWh(x.boundaryAcceptedPartsKwh),10);
+ assert.ok(residualWh(x.boundaryAcceptedPartsKwh)<=x.toleranceWh);
+ assert.ok(residualWh(x.acceptedIndependentPartsKwh)<=x.toleranceWh);
+ assert.ok(residualWh(x.rejectedIndependentPartsKwh)>x.toleranceWh);
  assert.equal(x.requiresIndependentMeters,true);
 });
 test('PR0 E3: unpriced intervals remain unknown; no unvalidated price band',()=>{
@@ -36,5 +41,6 @@ test('PR0 E3: unpriced intervals remain unknown; no unvalidated price band',()=>
 });
 test('PR0 E5: provenance measured and quality stale remain independent',()=>{
  const x=f.quality;assert.equal(x.provenance,'measured');assert.equal(x.quality,'stale');
- assert.equal(x.currentSafeChargingChoiceAllowed,false);
+ assert.equal(Object.hasOwn(x,'currentSafeChargingChoiceAllowed'),false,
+  'Charging policy on stale measurements remains open; this fixture is not v2 behavior');
 });
