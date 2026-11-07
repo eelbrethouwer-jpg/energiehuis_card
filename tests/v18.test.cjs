@@ -56,13 +56,14 @@ test('kosten geven voor contractstart geen gerealiseerde Zonneplan-kosten aan',(
  assert.match(html,/Engie/);
  assert.match(html,/Leveranciersvergelijking/);
 });
-test('Slim laden 2.1 toont haalbaarheid en laat load balancing ongemoeid',()=>{
+test('Slim laden toont haalbaarheid en laat load balancing ongemoeid',()=>{
  const card=Object.create(EnergiehuisCard.prototype);
  card._view='charge';card._targetSoc=80;card._simNeed=30;card._simPower=3.7;
  card._departure=new Date(Date.now()+86400000).toISOString();
  const html=eh18Charge({states:{}},EH_DEFAULTS,card);
- assert.match(html,/Slim laden 2.1/);
- assert.match(html,/haalbaar|Geen volledige uren|prijsuren/i);
+ assert.match(html,/Haalbaarheid en vermogensgrenzen/);
+ assert.doesNotMatch(html,/Slim laden 2\.[01]/);
+ assert.match(html,/haalbaar|Geen tijdvakken|prijsuren/i);
  assert.match(html,/Active Load Balancing/);
  assert.match(html,/laadcommando/i);
 });

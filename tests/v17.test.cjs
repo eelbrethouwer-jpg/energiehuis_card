@@ -27,14 +27,64 @@ test('Slim selecteert goedkope volledige uren; Direct selecteert chronologisch',
   assert.equal(slim.selected[0].slotStart%3600000,0);
   for(const v of slim.selected)assert.equal(v.slotEnd-v.slotStart,3600000);
 });
-test('Geen onvolledige huidige uren of fictieve prijzen',()=>{
+test('Huidig deeluur gebruikt alleen resterende tijd met bekend uurtarief',()=>{
   const p=eh17Plan([{t:hour(0),p:.1}],new Date('2026-10-22T00:25:00Z'),departure,4,3.7,'slim');
-  assert.ok(p.error);assert.equal(p.totalKwh,0);
+  assert.equal(p.error,null);
+  assert.ok(Math.abs(p.totalKwh-35/60*3.7*.9)<1e-10);
+  assert.equal(p.selected[0].slotStart,Date.parse('2026-10-22T00:25:00Z'));
+  assert.equal(p.selected[0].slotEnd,Date.parse(hour(1)));
+  const missing=eh17Plan([],new Date(hour(0)),departure,4,3.7,'slim');
+  assert.ok(missing.error);assert.equal(missing.totalKwh,0);
 });
 test('1x40 A reserve en huislast beperken theoretisch vermogen',()=>{
   const p=eh17Plan(prices,now,departure,5,7.4,'direct',{fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000});
   assert.ok(p.allowedKw<5);
   assert.ok(p.allowedKw>=1.38);
+});
+test('Vertrek om 06:30 benut een half uur meer dan vertrek om 06:00',()=>{
+  const rows=[4,5,6].map(i=>({t:hour(i),p:.2}));
+  const start=new Date(hour(4)),opts={houseW:0,efficiency:.9};
+  const early=eh17Plan(rows,start,hour(6),30,3.7,'slim',opts);
+  const late=eh17Plan(rows,start,'2026-10-22T06:30:00Z',30,3.7,'slim',opts);
+  assert.equal(late.error,null);
+  assert.ok(Math.abs(late.totalKwh-early.totalKwh-.5*3.7*.9)<1e-10);
+  assert.equal(late.selected.at(-1).slotEnd,Date.parse('2026-10-22T06:30:00Z'));
+});
+test('Venster van 90 minuten begrenst beide deeluren en berekent netenergie en kosten',()=>{
+  for(const mode of ['direct','slim']){
+    const p=eh17Plan([{t:hour(0),p:.2},{t:hour(1),p:.4}],new Date('2026-10-22T00:15:00Z'),'2026-10-22T01:45:00Z',20,4,mode,{houseW:0,efficiency:.9});
+    assert.equal(p.error,null);
+    assert.ok(Math.abs(p.totalKwh-5.4)<1e-10);
+    assert.ok(Math.abs(p.cost-1.8)<1e-10);
+    assert.equal(p.selected.length,2);
+    assert.equal(p.selected[0].slotEnd-p.selected[0].slotStart,45*60000);
+    assert.equal(p.selected[1].slotEnd-p.selected[1].slotStart,45*60000);
+    assert.ok(Math.abs(p.selected.reduce((sum,s)=>sum+s.wallKwh,0)-6)<1e-10);
+  }
+});
+test('Kort deeluur respecteert laadbehoefte, negatieve tarieven en aansluitgrens',()=>{
+  const p=eh17Plan([{t:hour(0),p:-.1}],new Date('2026-10-22T00:10:00Z'),'2026-10-22T00:40:00Z',.2,22,'slim',{fuseAmp:40,chargerAmp:32,reserveAmp:2,houseW:4000,efficiency:.9});
+  assert.equal(p.error,null);assert.equal(p.totalKwh,.2);assert.equal(p.remaining,0);
+  assert.ok(Math.abs(p.allowedKw-4.74)<1e-10);
+  assert.ok(Math.abs(p.cost-(-.2/.9*.1))<1e-10);
+  assert.ok(p.selected[0].kWh<=p.selected[0].capacity);
+});
+test('Centprijzen en gemengde ongeldige tarieven geven een eenheidsmelding zonder deelplan',()=>{
+  for(const rows of [[{t:hour(0),p:25}],[{t:hour(0),p:.2},{t:hour(1),p:25}],[{t:hour(0),p:-10}]]){
+    const p=eh17Plan(rows,new Date(hour(0)),hour(2),4,3.7,'slim');
+    assert.match(p.error,/prijseenheid.*€\/kWh.*cent\/kWh/);
+    assert.equal(p.selected.length,0);assert.equal(p.cost,null);
+  }
+});
+test('Tariefcontrole negeert prijzen buiten het laadvenster en behoudt nulprijzen',()=>{
+  const p=eh17Plan([{t:hour(0),p:25},{t:hour(1),p:0},{t:hour(2),p:25}],new Date(hour(1)),hour(2),1,3.7,'direct');
+  assert.equal(p.error,null);assert.equal(p.cost,0);assert.equal(p.totalKwh,1);
+});
+test('Deeluur met zon gebruikt dezelfde vermogensgrens en rendement',()=>{
+  const p=eh17Plan([{t:hour(0),p:.2}],new Date('2026-10-22T00:30:00Z'),hour(1),20,7.36,'sun',{houseW:1000,efficiency:.9,solar:[{t:Date.parse(hour(0)),pv:4}],exportCompensation:.08});
+  assert.equal(p.error,null);
+  assert.ok(Math.abs(p.totalKwh-1.35)<1e-10);
+  assert.ok(Math.abs(p.cost-.12)<1e-10);
 });
 test('Zon vereist zonneforecast met voldoende 6A vermogen',()=>{
   const without=eh17Plan(prices,now,departure,2,3.7,'sun',{houseW:800});
@@ -103,7 +153,8 @@ test('Laadpagina bevat scenariovergelijking en blijft een veilige simulatie',()=
  const dep=new Date(Date.now()+2*86400000);card._departure=dep.toISOString().slice(0,16);
  const h={states:{}};
  const html=card._cupraHtml(h,c);
- assert.match(html,/Slim laden 2.0/);
+ assert.match(html,/Laadverwachting/);
+ assert.doesNotMatch(html,/Slim laden 2\.[01]/);
  assert.match(html,/geen laadcommando’s|geen laadcommando's|geen laadopdrachten/i);
  assert.match(html,/Zonneladen/);
 });
