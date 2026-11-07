@@ -61,3 +61,12 @@ De historische PR41-blob was vóór deze refactor exact gecontroleerd; na extrac
 - B5: het buildplan benoemt expliciet de volgorde input → engine → grafiek. Bestandsnamen behouden om bestaande integraties en herkenbaarheid niet onnodig te verstoren.
 
 **Geen nieuwe versie of publicatie.** Bestaande UI, historische opslagkeys en laadbediening ongemoeid.
+
+## PR 3 — Tweede pure rekenmotor: P1-meetkwaliteit
+
+- `eh30PersonalEvidence` is exact uit `src/legacy/09-battery-finance.js` gehaald en staat in `src/engines/personal-evidence-engine.cjs`. De oorspronkelijke HTML-rendering en alle openbare functies blijven beschikbaar in de HACS classic-script-bundel.
+- De 13 goldens in `tests/v2/fixtures/personal-evidence-v1241.json` zijn vóór extractie berekend met ongewijzigde main `c22eabd4310288136d08d60c1f46258fa6e58102`; source blob `abf33ba2748bfa2db6e059ef9a0a8fd4b490f8ee`. Het zijn geobserveerde uitkomsten, geen compleetheidscertificaat voor P1-data.
+- `buildSteps` geeft per engine expliciet de positie aan. Alle verwachte engine-bestanden moeten exact aanwezig zijn; extra bestanden, ontbrekende bestanden of symlinks blokkeren de build.
+- Elke engine wordt nu afzonderlijk als CommonJS in een `vm.Script` geparseerd, **en** daarna wordt de volledig gecombineerde HACS-bundel geparseerd. De build voert de engines niet uit en vervangt het HACS-bestand pas nadat de controles zijn geslaagd.
+- Extra regressies controleren standalone/embedded/golden-pariteit, niet-muteren van invoer, bevroren hostexports, gemaskeerde syntaxfouten over fragmentgrenzen en atomair bouwen.
+- Veiligheidsgrens: geen wijzigingen aan Home Assistant-commando's, localStorage, Alfen, P1-meetbron, stroomprijzen, laadadviseur of batterijmodel. `EH_VERSION`, `hacs.json` en de vrijgegeven versie blijven ongewijzigd. PR 3 blijft een draft tot externe review en gebruikersakkoord; geen release.
