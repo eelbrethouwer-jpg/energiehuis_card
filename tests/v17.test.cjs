@@ -153,7 +153,8 @@ test('Laadpagina bevat scenariovergelijking en blijft een veilige simulatie',()=
  const dep=new Date(Date.now()+2*86400000);card._departure=dep.toISOString().slice(0,16);
  const h={states:{}};
  const html=card._cupraHtml(h,c);
- assert.match(html,/Slim laden 2.0/);
+ assert.match(html,/Laadverwachting/);
+ assert.doesNotMatch(html,/Slim laden 2\.[01]/);
  assert.match(html,/geen laadcommando’s|geen laadcommando's|geen laadopdrachten/i);
  assert.match(html,/Zonneladen/);
 });
