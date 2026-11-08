@@ -85,5 +85,124 @@ assert.equal(legacy.directChild,true,'Legacy detail is directly after meter card
 assert.equal(legacy.net,true,'Legacy meter buttons remain available');
 assert.equal(legacy.chart,true,'Legacy historical graph remains available');
 
+
+// N2: collapsing a legacy detail clears hidden state and the next cockpit click opens it.
+await page.locator('.eh26-legacy > summary').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
+const collapsed=await page.locator('energiehuis-card').evaluate(c=>({
+ open:c.shadowRoot.querySelector('.eh26-legacy')?.open,detail:c._detail,
+ legacyDetail:c._eh26LegacyDetail
+}));
+assert.equal(collapsed.open,false,'All measurements can be collapsed');
+assert.equal(collapsed.detail,null,'Closing legacy details clears hidden selected meter');
+assert.equal(collapsed.legacyDetail,null,'Legacy marker is cleared with collapse');
+await page.locator('.eh40-kpi[data-eh-detail="grid"]').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
+const reopened=await page.locator('energiehuis-card').evaluate(c=>({
+ detail:c._detail,
+ cockpitPane:c.shadowRoot.querySelector('.eh40-cockpit')?.nextElementSibling?.classList.contains('detail-panel')
+}));
+assert.equal(reopened.detail,'grid','First cockpit tap after legacy collapse opens detail');
+assert.equal(reopened.cockpitPane,true,'Detail is shown at cockpit');
+
+// N3: inspect actual computed labels (not font-size declarations on parent buttons).
+for(const width of [320,390]){
+ await page.setViewportSize({width,height:900});
+ await page.locator('energiehuis-card').evaluate(c=>{c._view='overview';c._render();});
+ const typography=await page.locator('energiehuis-card').evaluate(c=>{
+  const root=c.shadowRoot;
+  const measure=selector=>[...root.querySelectorAll(selector)].map(el=>({
+    text:el.textContent.trim(),font:parseFloat(getComputedStyle(el).fontSize)
+   }));
+  return {
+   nav:measure('.nav .eh26-navitem > span'),
+   shortcuts:measure('.eh40-footer nav button')
+  };
+ });
+ assert.equal(typography.nav.length,4,'Four mobile navigation labels');
+ assert.equal(typography.shortcuts.length,3,'Three cockpit shortcuts');
+ assert.ok(typography.nav.every(v=>v.font>=11),
+  'At '+width+'px nav labels need >=11px computed font: '+JSON.stringify(typography.nav));
+ assert.ok(typography.shortcuts.every(v=>v.font>=11),
+  'At '+width+'px quicklinks need >=11px computed font: '+JSON.stringify(typography.shortcuts));
+}
+
+// N1: real custom-element disconnect lifecycle, 10 separate instances,
+// document listener accounting, recreation and genuine rAF-driven hass update.
+const lifecycle=await page.evaluate(async()=>{
+ const original=document.querySelector('energiehuis-card');
+ const add=document.addEventListener.bind(document);
+ const remove=document.removeEventListener.bind(document);
+ const types=new Set(['pointerdown','focusin','keydown']);
+ const added=[],removed=[];
+ document.addEventListener=function(type,fn,capture){
+  if(types.has(type)&&capture===true)added.push([type,fn]);
+  return add(type,fn,capture);
+ };
+ document.removeEventListener=function(type,fn,capture){
+  if(types.has(type)&&capture===true)removed.push([type,fn]);
+  return remove(type,fn,capture);
+ };
+ const raf=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+ const container=document.createElement('div');
+ container.id='eh26-ten-card-lifecycle';
+ document.body.appendChild(container);
+ const created=[];
+ const create=()=>{
+  const card=document.createElement('energiehuis-card');
+  card._loadHistory=()=>{};
+  card._loadMetricData=()=>{};
+  card._loadCostCompare=()=>{};
+  card._loadCupraInsights=()=>{};
+  // Do not stub _schedule: exercise the actual requestAnimationFrame path.
+  card.setConfig({mobile_fixed_navigation:false});
+  card.hass=original._hass;
+  container.appendChild(card);
+  created.push(card);
+  return card;
+ };
+ try{
+  for(let i=0;i<10;i++)create();
+  await raf();await raf();
+  const mounted=created.filter(c=>!!c._eh26DocumentHandlers).length;
+  const first=created[0],id=first.config.net;
+  const before=first.shadowRoot.querySelector('.eh40-kpi[data-eh-detail="grid"] strong')?.textContent;
+  const state=first._hass.states[id];
+  first.hass={...first._hass,states:{...first._hass.states,[id]:{
+   ...state,state:'321',last_updated:new Date().toISOString()
+  }}};
+  await raf();await raf();
+  const after=first.shadowRoot.querySelector('.eh40-kpi[data-eh-detail="grid"] strong')?.textContent;
+  container.replaceChildren();
+  await raf();
+  const detached=created.filter(c=>c._eh26DocumentHandlers===null).length;
+  const countAfterTen={added:added.length,removed:removed.length};
+  const another=create();
+  await raf();await raf();
+  another.remove();
+  await raf();
+  return {
+   mounted,detached,countAfterTen,
+   added:added.length,removed:removed.length,
+   exactPairs:added.every(([type,fn])=>removed.some(([kind,cb])=>kind===type&&cb===fn)),
+   before,after,liveConnected:first.isConnected
+  };
+ }finally{
+  container.remove();
+  document.addEventListener=add;
+  document.removeEventListener=remove;
+ }
+});
+assert.equal(lifecycle.mounted,10,'All ten live cards install document handlers');
+assert.equal(lifecycle.detached,10,'Disconnect clears all document handler references');
+assert.deepEqual(lifecycle.countAfterTen,{added:30,removed:30},
+ '10 removed cards must unregister all three listeners each');
+assert.equal(lifecycle.added,33,'Recreated card attaches three listeners');
+assert.equal(lifecycle.removed,33,'Recreated card removes all three listeners');
+assert.equal(lifecycle.exactPairs,true,'Every listener is removed with the original callback');
+assert.equal(lifecycle.liveConnected,false,'Removed cards are disconnected');
+assert.notEqual(lifecycle.before,lifecycle.after,'Live hass update must rerender via native rAF');
+assert.match(lifecycle.after,/321/,'P1 sensor change visible after actual rAF rerender');
+
 assert.deepEqual(errors,[]);console.log('Visual checks OK');
 }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1;});
