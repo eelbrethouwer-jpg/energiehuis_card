@@ -4504,7 +4504,8 @@ function eh26ReviewCss(){
     this._eh26LegacyReveal=null;
    }
   }
-  const remembered=active?.matches?.('[data-eh26-insights]')?'trigger':
+  const remembered=active?.matches?.('.eh26-legacy > summary')?'legacy-summary':
+   active?.matches?.('[data-eh26-insights]')?'trigger':
    active?.matches?.('.eh26-insight-menu [data-eh-page]')?'menu:'+active.dataset.ehPage:
    active?.matches?.('.eh26-navitem[data-eh-page]')?'nav:'+active.dataset.ehPage:null;
   previous.call(this);
@@ -4533,7 +4534,8 @@ function eh26ReviewCss(){
   let key=this._eh26RestoreFocus||remembered;
   this._eh26RestoreFocus=null;
   if(key){
-   let target=key==='trigger'?trigger:
+   let target=key==='legacy-summary'?root.querySelector('.eh26-legacy > summary'):
+    key==='trigger'?trigger:
     key==='first'?menu?.querySelector('[data-eh-page]'):
     key.startsWith('menu:')?menu?.querySelector('[data-eh-page="'+key.slice(5)+'"]'):
     key.startsWith('nav:')?nav.querySelector('.eh26-navitem[data-eh-page="'+key.slice(4)+'"]'):null;
@@ -4545,6 +4547,9 @@ function eh26ReviewCss(){
    root.addEventListener('click',e=>{
     const summary=e.target?.closest?.('.eh26-legacy > summary');
     if(summary){
+     // Native Enter/Space activation re-creates the DOM on the next frame.
+     // Return focus to the replacement summary, not to the removed element.
+     if(root.activeElement===summary)this._eh26RestoreFocus='legacy-summary';
      const wasOpen=summary.parentElement.open;
      this._eh26LegacyOpen=!wasOpen;
      if(wasOpen&&this._eh26LegacyDetail&&this._eh26LegacyDetail===this._detail){
@@ -4561,6 +4566,12 @@ function eh26ReviewCss(){
      this._eh26LegacyOpen=true;
      this._eh26LegacyDetail=this._detail===meter.dataset.ehDetail?this._detail:null;
      this._eh26LegacyReveal=this._eh26LegacyDetail;
+    }
+    // A cockpit tile supersedes any legacy meter selection. Otherwise the
+    // stale legacy marker could clear a valid cockpit detail on the next render.
+    if(e.target?.closest?.('.eh40-cockpit [data-eh-detail]')){
+     this._eh26LegacyDetail=null;
+     this._eh26LegacyReveal=null;
     }
     if(e.target?.closest?.('[data-eh26-insights]')){
      this._eh26RestoreFocus=this._eh26MenuOpen?'first':'trigger';
