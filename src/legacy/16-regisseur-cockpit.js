@@ -296,26 +296,26 @@ function eh26ReviewCss(){
   '.shell .eh40-kpi small,.shell .eh40-top p,.shell .eh26-insight-menu button small{font-size:12px}',
   '.eh26-legacy .detail-panel{scroll-margin-top:95px}',
   '.eh40-trend-button svg{aspect-ratio:300 / 64}',
+  '.shell .nav .eh26-navitem > span{font-size:12px!important;line-height:1.25}',
+  '.shell .eh40-footer nav button{font-size:11px!important;line-height:1.3}',
+  '@media(max-width:360px){.shell .nav .eh26-navitem > span{font-size:11px!important}}',
   '@media(max-width:360px){.shell .eh26-navitem{font-size:11px}}'
  ].join('\n');
 }
 (function eh26ReviewInstall(){
- const P=EnergiehuisCard.prototype,previous=P._render,disconnect=P.disconnectedCallback;
- P.disconnectedCallback=function(){
-  if(this._eh26DocumentHandlers){
-   const {pointer,focus,key}=this._eh26DocumentHandlers;
-   document.removeEventListener('pointerdown',pointer,true);
-   document.removeEventListener('focusin',focus,true);
-   document.removeEventListener('keydown',key,true);
-   this._eh26DocumentHandlers=null;
-  }
-  this._eh26MenuOpen=false;
-  if(typeof disconnect==='function')disconnect.call(this);
- };
+ const P=EnergiehuisCard.prototype,previous=P._render;
  P._render=function(){
   const prior=this.shadowRoot,active=prior?.activeElement;
   const oldLegacy=prior?.querySelector('.eh26-legacy');
-  if(oldLegacy)this._eh26LegacyOpen=oldLegacy.open;
+  if(oldLegacy){
+   this._eh26LegacyOpen=oldLegacy.open;
+   // A hidden detail must not consume the next cockpit tile click.
+   if(!oldLegacy.open&&this._eh26LegacyDetail&&this._eh26LegacyDetail===this._detail){
+    this._detail=null;
+    this._eh26LegacyDetail=null;
+    this._eh26LegacyReveal=null;
+   }
+  }
   const remembered=active?.matches?.('[data-eh26-insights]')?'trigger':
    active?.matches?.('.eh26-insight-menu [data-eh-page]')?'menu:'+active.dataset.ehPage:
    active?.matches?.('.eh26-navitem[data-eh-page]')?'nav:'+active.dataset.ehPage:null;
@@ -355,10 +355,24 @@ function eh26ReviewCss(){
   if(!this._eh26ReviewEvents){
    this._eh26ReviewEvents=true;
    root.addEventListener('click',e=>{
+    const summary=e.target?.closest?.('.eh26-legacy > summary');
+    if(summary){
+     const wasOpen=summary.parentElement.open;
+     this._eh26LegacyOpen=!wasOpen;
+     if(wasOpen&&this._eh26LegacyDetail&&this._eh26LegacyDetail===this._detail){
+      this._detail=null;
+      this._metricSelectedTime=null;
+      this._eh26LegacyDetail=null;
+      this._eh26LegacyReveal=null;
+     }
+     this._schedule();
+     return;
+    }
     const meter=e.target?.closest?.('.eh26-legacy .metric[data-eh-detail]');
     if(meter){
      this._eh26LegacyOpen=true;
-     this._eh26LegacyReveal=this._detail===meter.dataset.ehDetail?this._detail:null;
+     this._eh26LegacyDetail=this._detail===meter.dataset.ehDetail?this._detail:null;
+     this._eh26LegacyReveal=this._eh26LegacyDetail;
     }
     if(e.target?.closest?.('[data-eh26-insights]')){
      this._eh26RestoreFocus=this._eh26MenuOpen?'first':'trigger';
