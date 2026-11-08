@@ -77,7 +77,7 @@ await page.waitForFunction(()=>{
 await page.locator('energiehuis-card').evaluate(c=>c._render());
 const legacy=await page.locator('energiehuis-card').evaluate(c=>{
  const r=c.shadowRoot,details=r.querySelector('.eh26-legacy'),pane=details.querySelector('.detail-panel');
- return {expanded:details.open,inside:!!pane,directChild:pane?.parentElement===details,net:!!details.querySelector('.metric-grid .metric'),chart:!!details.querySelector('.chart-panel')};
+ return {expanded:details.open,inside:!!pane,directChild:pane?.parentElement===details,net:!!details.querySelector('.metrics .metric[data-eh-detail="grid"]'),chart:!!details.querySelector('.chart-panel')};
 });
 assert.equal(legacy.expanded,true,'Legacy details stay open through synchronous rerender');
 assert.equal(legacy.inside,true,'Legacy detail is inside expanded section');
