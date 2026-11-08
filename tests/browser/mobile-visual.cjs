@@ -15,5 +15,67 @@ const insights=await page.locator('energiehuis-card').evaluate(card=>{card._view
 assert.deepEqual(insights.destinations,['cupra','battery','costs'],'All historical insight destinations remain accessible');
 assert.equal(insights.view,'costs','Cost page opens from Inzicht menu');
 assert.equal(insights.open,false,'Menu closes after navigation');
+
+// Claude review regression suite: use actual keyboard, pointer and DOM interactions.
+await page.setViewportSize({width:390,height:900});
+await page.locator('energiehuis-card').evaluate(c=>{c._view='overview';c._eh26MenuOpen=false;c._render();});
+await page.locator('[data-eh26-insights]').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
+ return !!r.querySelector('.eh26-insight-menu')&&r.activeElement?.dataset.ehPage==='cupra';
+});
+assert.equal(await page.locator('[data-eh26-insights]').getAttribute('aria-haspopup'),'dialog','Insights controls have popup semantics');
+assert.equal(await page.locator('.eh26-insight-menu').getAttribute('role'),'dialog','Insights list has dialog role');
+await page.locator('energiehuis-card').evaluate(c=>c._render());
+assert.equal(await page.locator('energiehuis-card').evaluate(c=>c.shadowRoot.activeElement?.dataset.ehPage),'cupra','Focused menu item survives synchronous HA rerender');
+await page.keyboard.press('Escape');
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
+ return !r.querySelector('.eh26-insight-menu')&&r.activeElement?.dataset.eh26Insights==='1';
+});
+await page.evaluate(()=>{
+ document.body.tabIndex=-1;document.body.focus();
+ const c=document.querySelector('energiehuis-card');
+ c._eh26MenuOpen=true;c._render();
+});
+assert.equal(await page.locator('.eh26-insight-menu').count(),1,'Fixture opens menu with body focused');
+await page.keyboard.press('Escape');
+await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
+assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Escape on document body closes menu');
+await page.evaluate(()=>{
+ const outside=document.createElement('button');
+ outside.id='eh26-external-focus';outside.textContent='Outside Home Assistant';
+ document.body.appendChild(outside);
+});
+await page.locator('[data-eh26-insights]').click();
+await page.waitForFunction(()=>!!document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'));
+await page.locator('#eh26-external-focus').click();
+await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
+assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Outside pointer closes insights menu');
+await page.locator('[data-eh26-insights]').click();
+await page.waitForFunction(()=>!!document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'));
+await page.locator('#eh26-external-focus').focus();
+await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
+assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Outside focus closes insights menu');
+await page.locator('energiehuis-card').evaluate(c=>{
+ c._view='overview';c._detail=null;c._eh40PinnedDetail=null;c._render();
+ c.shadowRoot.querySelector('.eh26-legacy').open=true;
+});
+await page.locator('.eh26-legacy .metric[data-eh-detail="grid"]').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
+ return c._detail==='grid'&&r.querySelector('.eh26-legacy')?.open&&!!r.querySelector('.eh26-legacy .detail-panel');
+});
+await page.locator('energiehuis-card').evaluate(c=>c._render());
+const legacy=await page.locator('energiehuis-card').evaluate(c=>{
+ const r=c.shadowRoot,details=r.querySelector('.eh26-legacy'),pane=details.querySelector('.detail-panel');
+ return {expanded:details.open,inside:!!pane,directChild:pane?.parentElement===details,net:!!details.querySelector('.metric-grid .metric'),chart:!!details.querySelector('.chart-panel')};
+});
+assert.equal(legacy.expanded,true,'Legacy details stay open through synchronous rerender');
+assert.equal(legacy.inside,true,'Legacy detail is inside expanded section');
+assert.equal(legacy.directChild,true,'Legacy detail is directly after meter cards');
+assert.equal(legacy.net,true,'Legacy meter buttons remain available');
+assert.equal(legacy.chart,true,'Legacy historical graph remains available');
+
 assert.deepEqual(errors,[]);console.log('Visual checks OK');
 }finally{await browser.close();server.close();}})().catch(e=>{console.error(e);server.close();process.exitCode=1;});
