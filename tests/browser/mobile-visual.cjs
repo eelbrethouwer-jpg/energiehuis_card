@@ -20,6 +20,7 @@ assert.equal(insights.open,false,'Menu closes after navigation');
 await page.setViewportSize({width:390,height:900});
 await page.locator('energiehuis-card').evaluate(c=>{c._view='overview';c._eh26MenuOpen=false;c._render();});
 await page.locator('[data-eh26-insights]').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>{
  const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
  return !!r.querySelector('.eh26-insight-menu')&&r.activeElement?.dataset.ehPage==='cupra';
@@ -29,6 +30,7 @@ assert.equal(await page.locator('.eh26-insight-menu').getAttribute('role'),'dial
 await page.locator('energiehuis-card').evaluate(c=>c._render());
 assert.equal(await page.locator('energiehuis-card').evaluate(c=>c.shadowRoot.activeElement?.dataset.ehPage),'cupra','Focused menu item survives synchronous HA rerender');
 await page.keyboard.press('Escape');
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>{
  const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
  return !r.querySelector('.eh26-insight-menu')&&r.activeElement?.dataset.eh26Insights==='1';
@@ -40,6 +42,7 @@ await page.evaluate(()=>{
 });
 assert.equal(await page.locator('.eh26-insight-menu').count(),1,'Fixture opens menu with body focused');
 await page.keyboard.press('Escape');
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
 assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Escape on document body closes menu');
 await page.evaluate(()=>{
@@ -48,13 +51,17 @@ await page.evaluate(()=>{
  document.body.appendChild(outside);
 });
 await page.locator('[data-eh26-insights]').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>!!document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'));
 await page.locator('#eh26-external-focus').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
 assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Outside pointer closes insights menu');
 await page.locator('[data-eh26-insights]').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>!!document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'));
 await page.locator('#eh26-external-focus').focus();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>!document.querySelector('energiehuis-card')._eh26MenuOpen);
 assert.equal(await page.locator('.eh26-insight-menu').count(),0,'Outside focus closes insights menu');
 await page.locator('energiehuis-card').evaluate(c=>{
@@ -62,6 +69,7 @@ await page.locator('energiehuis-card').evaluate(c=>{
  c.shadowRoot.querySelector('.eh26-legacy').open=true;
 });
 await page.locator('.eh26-legacy .metric[data-eh-detail="grid"]').click();
+await page.locator('energiehuis-card').evaluate(c=>c._render());
 await page.waitForFunction(()=>{
  const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
  return c._detail==='grid'&&r.querySelector('.eh26-legacy')?.open&&!!r.querySelector('.eh26-legacy .detail-panel');
