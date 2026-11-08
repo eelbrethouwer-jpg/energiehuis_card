@@ -127,6 +127,61 @@ for(const width of [320,390]){
   'At '+width+'px quicklinks need >=11px computed font: '+JSON.stringify(typography.shortcuts));
 }
 
+// Claude N8/N7: real rAF, actual mouse + keyboard (no mocked scheduler).
+await page.setViewportSize({width:390,height:900});
+await page.locator('energiehuis-card').evaluate(c=>{
+ c._view='overview';c._detail=null;c._eh40PinnedDetail=null;
+ c._eh26LegacyDetail=null;c._eh26LegacyReveal=null;c._eh26MenuOpen=false;
+ c._render();
+ c.shadowRoot.querySelector('.eh26-legacy').open=false;
+ c._render();
+ // Restore the class scheduler. All interactions below rely on actual rAF.
+ delete c._schedule;
+});
+await page.locator('.eh26-legacy > summary').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card');
+ return c.shadowRoot.querySelector('.eh26-legacy')?.open===true;
+});
+await page.locator('.eh26-legacy .metric[data-eh-detail="grid"]').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card');
+ return c._detail==='grid'&&c._eh26LegacyDetail==='grid';
+});
+await page.locator('.eh40-kpi[data-eh-detail="sun"]').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card');
+ return c._detail==='sun'&&c._eh26LegacyDetail===null
+  &&c.shadowRoot.querySelector('.eh40-cockpit')?.nextElementSibling?.classList.contains('detail-panel');
+});
+await page.locator('.eh26-legacy > summary').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card');
+ return !c.shadowRoot.querySelector('.eh26-legacy')?.open&&c._detail==='sun';
+});
+await page.locator('.eh40-kpi[data-eh-detail="grid"]').click();
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card');
+ return c._detail==='grid'&&c._eh26LegacyDetail===null
+  &&c.shadowRoot.querySelector('.eh40-cockpit')?.nextElementSibling?.classList.contains('detail-panel');
+});
+await page.locator('.eh26-legacy > summary').focus();
+await page.keyboard.press('Enter');
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
+ return r.querySelector('.eh26-legacy')?.open===true
+  &&r.activeElement?.matches?.('.eh26-legacy > summary');
+});
+await page.keyboard.press('Space');
+await page.waitForFunction(()=>{
+ const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;
+ return r.querySelector('.eh26-legacy')?.open===false
+  &&r.activeElement?.matches?.('.eh26-legacy > summary');
+});
+assert.equal(await page.locator('energiehuis-card').evaluate(c=>c._detail),'grid',
+ 'Keyboard collapse of legacy section does not clear current cockpit detail');
+await page.locator('energiehuis-card').evaluate(c=>{c._schedule=()=>{};});
+
 // N1: real custom-element disconnect lifecycle, 10 separate instances,
 // document listener accounting, recreation and genuine rAF-driven hass update.
 const lifecycle=await page.evaluate(async()=>{
