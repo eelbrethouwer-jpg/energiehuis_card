@@ -1124,6 +1124,16 @@ class EnergiehuisCard extends HTMLElement {
   }
  }
  disconnectedCallback(){
+  // Native custom-element lifecycle: post-define prototype overrides are ignored.
+  if(this._eh26DocumentHandlers){
+   const {pointer,focus,key}=this._eh26DocumentHandlers;
+   this._eh26DocumentHandlers=null;
+   document.removeEventListener('pointerdown',pointer,true);
+   document.removeEventListener('focusin',focus,true);
+   document.removeEventListener('keydown',key,true);
+  }
+  this._eh26MenuOpen=false;
+  this._eh26RestoreFocus=null;
   if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}
   if(this._eh19Observer){this._eh19Observer.disconnect();this._eh19Observer=null;}
   if(this._eh19NetworkListener){
@@ -4315,6 +4325,284 @@ function eh40Css(){
      this._eh40PinnedDetail=null;this._eh40RevealPending=false;
     }
    });
+  }
+ };
+})();
+
+/* v1.26.0-rc Visual Experience: presentation only, no data or charging changes.
+ * Four visible navigation destinations; secondary views remain available in Inzicht.
+ * This appends to the final source fragment, preserving deterministic HACS assembly.
+ */
+function eh26Navigation(view,open){
+ const chosen=['cupra','battery','costs'].includes(view);
+ const tabs=[
+  ['Home','home','overview'],
+  ['Laden','bolt','charge'],
+  ['Inzicht','chart',null],
+  ['Meer','dots','more']
+ ];
+ const buttons=tabs.map(([name,icon,page])=>{
+  const active=page?view===page:chosen;
+  const action=page?'data-eh-page="'+page+'"':'data-eh26-insights="1" aria-expanded="'+(open?'true':'false')+'" aria-controls="eh26-insight-menu"';
+  return '<button type="button" class="navitem eh26-navitem'+(active?' active':'')+'" '+action+' aria-label="'+name+'" '+(active?'aria-current="page"':'')+'>'+ehIcon(icon)+'<span>'+name+'</span></button>';
+ }).join('');
+ const menu=open?'<div class="eh26-insight-menu" id="eh26-insight-menu" role="group" aria-label="Inzicht onderdelen">'+
+  '<span class="eh26-menu-label">Verdiep je inzicht</span>'+
+  '<button type="button" data-eh-page="cupra">'+ehIcon('car')+'<span><strong>Cupra inzichten</strong><small>Ritten, efficiëntie en laden</small></span></button>'+
+  '<button type="button" data-eh-page="battery">'+ehIcon('battery')+'<span><strong>Thuisbatterij</strong><small>Simulatie en rendement</small></span></button>'+
+  '<button type="button" data-eh-page="costs">'+ehIcon('euro')+'<span><strong>Kosten & vergelijken</strong><small>Budget, leveranciers en historie</small></span></button>'+
+  '</div>':'';
+ return buttons+menu;
+}
+function eh26Css(){
+ return [
+  '/* EH26 VISUAL: mobile-first presentation, retained original controls and readings. */',
+  ':host{--eh26-ink:#f1fbff;--eh26-border:#ffffff19;--eh26-surface:#0a2234;--eh26-muted:#a1bece}',
+  '.shell{background:radial-gradient(ellipse 80% 28% at 60% 0%,#18456055,transparent 92%),linear-gradient(180deg,#071725,#091d2c 55%,#071522);border-color:#ffffff10;box-shadow:0 18px 46px #0004}',
+  '.shell>.eh19-appbar{padding:11px 16px;background:#071b2be8;border-bottom:1px solid #ffffff12}',
+  '.shell .hero{height:66px!important;min-height:66px;border-radius:0;overflow:hidden}',
+  '.shell .hero:before{background:linear-gradient(90deg,#071a29dc,#13354b55);z-index:0}',
+  '.shell .hero-inner{padding:16px 18px;position:relative;z-index:1}',
+  '.shell .hero .title{font-size:24px;letter-spacing:-.7px;text-shadow:none}',
+  '.shell .body{padding:12px 16px 20px;margin:0}',
+  '.eh40-cockpit{padding:3px 0 10px;margin:0 0 6px;background:none;border:0;box-shadow:none;border-radius:0}',
+  '.eh40-top{align-items:center;gap:10px;padding:2px 2px 8px}',
+  '.eh40-top h3{font-size:24px;letter-spacing:-.8px;margin:4px 0;line-height:1.15}',
+  '.eh40-top p{font-size:11px;color:var(--eh26-muted)}',
+  '.eh40-kicker{color:#7cf0c6;font-size:9px;letter-spacing:.15em}',
+  '.eh40-status{background:#5f421b24;border:1px solid #ebc07952;line-height:1.4}',
+  '.eh40-status-ok{background:#114a3b6b;border-color:#63dab174}',
+  '.eh40-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:12px 0 14px}',
+  '.eh40-kpi{grid-column:span 2;min-height:93px;background:linear-gradient(148deg,#123149,#0c2233);border:1px solid var(--eh26-border);border-radius:16px;box-shadow:0 6px 18px #0002;position:relative;overflow:hidden;padding:13px;gap:4px}',
+  '.eh40-kpi:before{content:"";position:absolute;right:-30px;top:-30px;width:105px;height:105px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,#ffffff08,transparent 70%)}',
+  '.eh40-kpi:nth-child(1){grid-column:span 6;min-height:108px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:center;background:radial-gradient(ellipse at 95% 20%,#19756055,transparent 65%),linear-gradient(120deg,#11413f,#103347 64%,#0e2637);border-color:#57cdaa64;padding:17px 19px}',
+  '.eh40-kpi:nth-child(1) .eh40-kpi-label{grid-column:1;grid-row:1;align-self:end}',
+  '.eh40-kpi:nth-child(1) strong{grid-column:2;grid-row:1/3;font-size:32px;align-self:center;color:#7ff0c1;white-space:nowrap}',
+  '.eh40-kpi:nth-child(1) small{grid-column:1;grid-row:2}',
+  '.eh40-kpi:nth-child(2) strong{color:#ffda70}',
+  '.eh40-kpi:nth-child(3) strong{color:#86c9ff}',
+  '.eh40-kpi:nth-child(4) strong{color:#c0a6ff}',
+  '.eh40-kpi:nth-child(6) strong{color:#87d8ff}',
+  '.eh40-kpi-label{color:#b6cfda;font-size:12px;font-weight:650}',
+  '.eh40-kpi strong{font-size:20px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}',
+  '.eh40-kpi small{font-size:10px;color:#a2bdc9}',
+  '.eh40-visuals{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px}',
+  '.eh40-trend,.eh40-flows{background:linear-gradient(160deg,#102c42,#0a2031);border:1px solid #ffffff16;border-radius:17px;padding:16px}',
+  '.eh40-panel-head strong{font-size:14px;letter-spacing:-.2px}',
+  '.eh40-trend-button svg{height:132px;filter:drop-shadow(0 4px 10px #24d6a52d)}',
+  '.eh40-trend-button span{display:block;text-align:right;font-size:11px;margin-top:5px}',
+  '.eh40-flow-track{height:9px;background:#243d50}',
+  '.eh40-footer{padding:13px 2px 2px;color:#91b5c7;border-top:1px solid #ffffff13}',
+  '.eh40-footer button{border-radius:12px;background:#143a47;border-color:#ffffff26}',
+  '.eh26-legacy{background:#092235;border:1px solid #ffffff1a;border-radius:16px;margin:8px 0 10px;padding:0 12px}',
+  '.eh26-legacy>summary{cursor:pointer;min-height:50px;padding:15px 1px;color:#d9f0f4;font-size:13px;font-weight:760;list-style:none;display:flex;align-items:center;justify-content:space-between}',
+  '.eh26-legacy>summary::-webkit-details-marker{display:none}',
+  '.eh26-legacy>summary:after{content:"+";font-size:23px;font-weight:450;color:#6de3bb}',
+  '.eh26-legacy[open]>summary:after{content:"−"}',
+  '.eh26-legacy .metrics{margin:4px 0 12px}',
+  '.eh26-legacy .chart-panel{margin-bottom:12px}',
+  '.eh26-legacy button:focus-visible,.eh26-legacy>summary:focus-visible{outline:2px solid #67d9b8;outline-offset:2px}',
+  '.shell .cupra-card,.shell .subsection,.shell .subcard,.shell .utility-card{border-radius:18px;border-color:#ffffff21;box-shadow:0 6px 20px #0001}',
+  '.shell .cupra-page{gap:11px}',
+  '.shell .cupra-head h2,.shell .subpage-head h2{font-size:27px;letter-spacing:-.7px}',
+  '.shell .cupra-hero{background:radial-gradient(ellipse at 75% 10%,#1c5771,#103248 60%,#0b2232);border-color:#83b9cf50}',
+  '.shell .section-title,.shell .eh17-title{letter-spacing:-.25px}',
+  '.nav{gap:8px;padding:9px 12px max(12px,env(safe-area-inset-bottom));background:#061522f5;border-top:1px solid #ffffff1c;box-shadow:0 -11px 26px #0009;justify-content:space-between;position:sticky}',
+  '.eh26-navitem{min-height:55px;flex:1;max-width:none;border-radius:13px;padding:7px 5px;gap:5px;font-weight:650;font-size:11px}',
+  '.eh26-navitem .icon{width:23px;height:23px}',
+  '.eh26-navitem.active{background:linear-gradient(155deg,#11634e8a,#0a392fd9);color:#79f5c5;border:1px solid #47cda269}',
+  '.eh26-insight-menu{position:absolute;right:12px;bottom:calc(100% + 10px);width:min(350px,calc(100% - 24px));z-index:90;padding:9px;border:1px solid #64aeaa66;border-radius:19px;background:linear-gradient(155deg,#16364c,#071c2b);box-shadow:0 16px 40px #000b;display:grid;gap:6px}',
+  '.eh26-menu-label{font-size:10px;letter-spacing:.12em;color:#87e6c9;font-weight:800;text-transform:uppercase;padding:9px 8px 4px}',
+  '.eh26-insight-menu button{font:inherit;min-height:62px;text-align:left;color:#f1f9ff;display:flex;align-items:center;gap:12px;background:#ffffff08;border:1px solid #ffffff15;border-radius:12px;padding:10px 12px;cursor:pointer}',
+  '.eh26-insight-menu button .icon{height:23px;width:23px;color:#72e0c6;flex:none}',
+  '.eh26-insight-menu button span{display:grid;gap:4px}',
+  '.eh26-insight-menu button strong{font-size:13px}',
+  '.eh26-insight-menu button small{font-size:10px;color:#adc5d2}',
+  '.eh26-insight-menu button:focus-visible,.eh26-navitem:focus-visible{outline:2px solid #87e4dc;outline-offset:2px}',
+  '@media(max-width:720px){.shell .body{padding:9px 11px 15px}.eh40-top{flex-wrap:wrap}.eh40-top h3{font-size:23px}.eh40-status{font-size:9px}.eh40-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh40-kpi{grid-column:span 1;min-height:88px;padding:12px}.eh40-kpi:nth-child(1){grid-column:1/-1;min-height:99px;padding:14px 15px}.eh40-kpi:nth-child(1) strong{font-size:30px}.eh40-kpi:nth-child(6){grid-column:1/-1;min-height:72px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:center}.eh40-kpi:nth-child(6) .eh40-kpi-label{grid-column:1;grid-row:1}.eh40-kpi:nth-child(6) strong{grid-column:2;grid-row:1/3;align-self:center}.eh40-kpi:nth-child(6) small{grid-column:1;grid-row:2}.eh40-visuals{grid-template-columns:1fr}.eh40-trend,.eh40-flows{padding:13px}.eh40-trend-button svg{height:120px}.eh40-footer nav{width:100%}.eh40-footer nav button{flex:1}.shell .cupra-page{padding:11px}.shell .hero .title{font-size:22px}.eh26-legacy{padding:0 10px}.eh26-navitem{font-size:11px}.shell .cupra-hero{min-height:128px}}',
+  '@media(max-width:360px){.eh40-kpi:nth-child(1) strong{font-size:26px}.eh40-kpi strong{font-size:17px}.eh40-kpi:nth-child(6) strong{font-size:17px}.eh26-navitem{padding:5px 2px;font-size:10px}.nav{gap:4px;padding-left:7px;padding-right:7px}.eh40-trend-button svg{height:100px}}',
+  '.eh26-insight-menu{scroll-behavior:auto}'
+ ].join('\n');
+}
+(function eh26Install(){
+ const P=EnergiehuisCard.prototype,previous=P._render;
+ P._render=function(){
+  previous.call(this);
+  if(!this.config||!this._hass)return;
+  const root=this.shadowRoot,nav=root?.querySelector?.('.shell > .nav');
+  if(!nav)return;
+  const style=root.querySelector('style');
+  if(style&&!style.textContent.includes('/* EH26 VISUAL'))style.textContent+='\n'+eh26Css();
+  nav.innerHTML=eh26Navigation(this._view,this._eh26MenuOpen===true);
+  if(this._view==='overview'){
+   const hero=root.querySelector('.shell > .hero');
+   if(hero&&!this.config.hero_image)hero.style.backgroundImage='radial-gradient(ellipse at 80% 0%,#1b526a,#0c293d 55%,#091c2b)';
+   const body=root.querySelector('.shell > .body'),metrics=body?.querySelector('.metrics');
+   if(metrics){
+    const legacy=document.createElement('details');
+    legacy.className='eh26-legacy';
+    legacy.open=!!this._eh26LegacyOpen;
+    const summary=document.createElement('summary');
+    summary.textContent='Alle metingen en uitgebreide grafiek';
+    legacy.appendChild(summary);
+    metrics.insertAdjacentElement('beforebegin',legacy);
+    legacy.appendChild(metrics);
+    const chart=body.querySelector(':scope > .chart-panel');
+    if(chart)legacy.appendChild(chart);
+    // Details.open is read before each render; no asynchronous toggle-state race.
+   }
+  }
+  if(!this._eh26Events){
+   this._eh26Events=true;
+   root.addEventListener('click',e=>{
+    if(e.target?.closest?.('[data-eh26-insights]')){
+     this._eh26MenuOpen=!this._eh26MenuOpen;
+     this._schedule();
+     return;
+    }
+    if(this._eh26MenuOpen&&e.target?.closest?.('[data-eh-page]'))this._eh26MenuOpen=false;
+    else if(this._eh26MenuOpen&&!e.target?.closest?.('.eh26-insight-menu')){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   });
+   root.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&this._eh26MenuOpen){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   });
+  }
+ };
+})();
+
+/* v1.26 RC2: independent-review fixes. Presentation and accessibility only. */
+function eh26ReviewCss(){
+ return [
+  '.eh40-kpis{grid-template-columns:repeat(10,minmax(0,1fr))}',
+  '.eh40-kpi:nth-child(1){grid-column:span 10}',
+  '@media(max-width:720px){.eh40-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.eh40-kpi:nth-child(1){grid-column:1/-1}}',
+  '.shell .eh40-kicker,.shell .eh40-status,.shell .eh40-panel-head span,.shell .eh40-footer,.shell .eh40-flow-row,.shell .eh26-menu-label,.shell .eh26-navitem{font-size:11px}',
+  '.shell .eh40-kpi small,.shell .eh40-top p,.shell .eh26-insight-menu button small{font-size:12px}',
+  '.eh26-legacy .detail-panel{scroll-margin-top:95px}',
+  '.eh40-trend-button svg{aspect-ratio:300 / 64}',
+  '.shell .nav .eh26-navitem > span{font-size:12px!important;line-height:1.25}',
+  '.shell .eh40-footer nav button{font-size:11px!important;line-height:1.3}',
+  '@media(max-width:360px){.shell .nav .eh26-navitem > span{font-size:11px!important}}',
+  '@media(max-width:360px){.shell .eh26-navitem{font-size:11px}}'
+ ].join('\n');
+}
+(function eh26ReviewInstall(){
+ const P=EnergiehuisCard.prototype,previous=P._render;
+ P._render=function(){
+  const prior=this.shadowRoot,active=prior?.activeElement;
+  const oldLegacy=prior?.querySelector('.eh26-legacy');
+  if(oldLegacy){
+   this._eh26LegacyOpen=oldLegacy.open;
+   // A hidden detail must not consume the next cockpit tile click.
+   if(!oldLegacy.open&&this._eh26LegacyDetail&&this._eh26LegacyDetail===this._detail){
+    this._detail=null;
+    this._eh26LegacyDetail=null;
+    this._eh26LegacyReveal=null;
+   }
+  }
+  const remembered=active?.matches?.('.eh26-legacy > summary')?'legacy-summary':
+   active?.matches?.('[data-eh26-insights]')?'trigger':
+   active?.matches?.('.eh26-insight-menu [data-eh-page]')?'menu:'+active.dataset.ehPage:
+   active?.matches?.('.eh26-navitem[data-eh-page]')?'nav:'+active.dataset.ehPage:null;
+  previous.call(this);
+  if(!this.config||!this._hass)return;
+  const root=this.shadowRoot,nav=root?.querySelector('.shell > .nav');
+  if(!nav)return;
+  const style=root.querySelector('style');
+  if(style&&!style.textContent.includes('/* EH26 REVIEW */'))style.textContent+='\n/* EH26 REVIEW */\n'+eh26ReviewCss();
+  const trigger=nav.querySelector('[data-eh26-insights]');
+  trigger?.setAttribute('aria-haspopup','dialog');
+  const menu=nav.querySelector('.eh26-insight-menu');
+  if(menu)menu.setAttribute('role','dialog');
+  root.querySelector('.eh40-trend-button svg')?.setAttribute('preserveAspectRatio','xMidYMid meet');
+  if(this._view==='overview'){
+   const body=root.querySelector('.shell > .body'),legacy=body?.querySelector('.eh26-legacy');
+   const pane=body?.querySelector(':scope > .detail-panel');
+   if(legacy&&pane&&this._detail&&this._eh40PinnedDetail!==this._detail){
+    const metricList=legacy.querySelector('.metrics');
+    metricList?.insertAdjacentElement('afterend',pane);
+    if(this._eh26LegacyReveal===this._detail){
+     this._eh26LegacyReveal=null;
+     pane.scrollIntoView?.({block:'start',behavior:'auto'});
+    }
+   }
+  }
+  let key=this._eh26RestoreFocus||remembered;
+  this._eh26RestoreFocus=null;
+  if(key){
+   let target=key==='legacy-summary'?root.querySelector('.eh26-legacy > summary'):
+    key==='trigger'?trigger:
+    key==='first'?menu?.querySelector('[data-eh-page]'):
+    key.startsWith('menu:')?menu?.querySelector('[data-eh-page="'+key.slice(5)+'"]'):
+    key.startsWith('nav:')?nav.querySelector('.eh26-navitem[data-eh-page="'+key.slice(4)+'"]'):null;
+   if(!target&&key.startsWith('menu:'))target=trigger;
+   target?.focus({preventScroll:true});
+  }
+  if(!this._eh26ReviewEvents){
+   this._eh26ReviewEvents=true;
+   root.addEventListener('click',e=>{
+    const summary=e.target?.closest?.('.eh26-legacy > summary');
+    if(summary){
+     // Native Enter/Space activation re-creates the DOM on the next frame.
+     // Return focus to the replacement summary, not to the removed element.
+     if(root.activeElement===summary)this._eh26RestoreFocus='legacy-summary';
+     const wasOpen=summary.parentElement.open;
+     this._eh26LegacyOpen=!wasOpen;
+     if(wasOpen&&this._eh26LegacyDetail&&this._eh26LegacyDetail===this._detail){
+      this._detail=null;
+      this._metricSelectedTime=null;
+      this._eh26LegacyDetail=null;
+      this._eh26LegacyReveal=null;
+     }
+     this._schedule();
+     return;
+    }
+    const meter=e.target?.closest?.('.eh26-legacy .metric[data-eh-detail]');
+    if(meter){
+     this._eh26LegacyOpen=true;
+     this._eh26LegacyDetail=this._detail===meter.dataset.ehDetail?this._detail:null;
+     this._eh26LegacyReveal=this._eh26LegacyDetail;
+    }
+    // A cockpit tile supersedes any legacy meter selection. Otherwise the
+    // stale legacy marker could clear a valid cockpit detail on the next render.
+    if(e.target?.closest?.('.eh40-cockpit [data-eh-detail]')){
+     this._eh26LegacyDetail=null;
+     this._eh26LegacyReveal=null;
+    }
+    if(e.target?.closest?.('[data-eh26-insights]')){
+     this._eh26RestoreFocus=this._eh26MenuOpen?'first':'trigger';
+    }else if(e.target?.closest?.('.eh26-insight-menu [data-eh-page]')){
+     this._eh26RestoreFocus='trigger';
+    }
+   });
+  }
+  if(!this._eh26DocumentHandlers&&this.isConnected){
+   const pointer=e=>{
+    if(this._eh26MenuOpen&&!e.composedPath().includes(this)){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   };
+   const focus=e=>{
+    if(!this._eh26MenuOpen)return;
+    if(!e.composedPath().some(x=>x?.matches?.('.eh26-insight-menu,[data-eh26-insights]'))){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   };
+   const key=e=>{
+    if(e.key!=='Escape'||!this._eh26MenuOpen)return;
+    e.preventDefault();
+    this._eh26MenuOpen=false;
+    this._eh26RestoreFocus='trigger';
+    this._schedule();
+   };
+   this._eh26DocumentHandlers={pointer,focus,key};
+   document.addEventListener('pointerdown',pointer,true);
+   document.addEventListener('focusin',focus,true);
+   document.addEventListener('keydown',key,true);
   }
  };
 })();
