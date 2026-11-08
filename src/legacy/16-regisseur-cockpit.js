@@ -233,7 +233,7 @@ function eh26Css(){
   '.eh26-insight-menu button:focus-visible,.eh26-navitem:focus-visible{outline:2px solid #87e4dc;outline-offset:2px}',
   '@media(max-width:720px){.shell .body{padding:9px 11px 15px}.eh40-top{flex-wrap:wrap}.eh40-top h3{font-size:23px}.eh40-status{font-size:9px}.eh40-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.eh40-kpi{grid-column:span 1;min-height:88px;padding:12px}.eh40-kpi:nth-child(1){grid-column:1/-1;min-height:99px;padding:14px 15px}.eh40-kpi:nth-child(1) strong{font-size:30px}.eh40-kpi:nth-child(6){grid-column:1/-1;min-height:72px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-content:center}.eh40-kpi:nth-child(6) .eh40-kpi-label{grid-column:1;grid-row:1}.eh40-kpi:nth-child(6) strong{grid-column:2;grid-row:1/3;align-self:center}.eh40-kpi:nth-child(6) small{grid-column:1;grid-row:2}.eh40-visuals{grid-template-columns:1fr}.eh40-trend,.eh40-flows{padding:13px}.eh40-trend-button svg{height:120px}.eh40-footer nav{width:100%}.eh40-footer nav button{flex:1}.shell .cupra-page{padding:11px}.shell .hero .title{font-size:22px}.eh26-legacy{padding:0 10px}.eh26-navitem{font-size:11px}.shell .cupra-hero{min-height:128px}}',
   '@media(max-width:360px){.eh40-kpi:nth-child(1) strong{font-size:26px}.eh40-kpi strong{font-size:17px}.eh40-kpi:nth-child(6) strong{font-size:17px}.eh26-navitem{padding:5px 2px;font-size:10px}.nav{gap:4px;padding-left:7px;padding-right:7px}.eh40-trend-button svg{height:100px}}',
-  '@media(prefers-reduced-motion:reduce){.eh26-insight-menu{scroll-behavior:auto}}'
+  '.eh26-insight-menu{scroll-behavior:auto}'
  ].join('\n');
 }
 (function eh26Install(){
@@ -261,7 +261,7 @@ function eh26Css(){
     legacy.appendChild(metrics);
     const chart=body.querySelector(':scope > .chart-panel');
     if(chart)legacy.appendChild(chart);
-    legacy.addEventListener('toggle',()=>{this._eh26LegacyOpen=legacy.open;});
+    // Details.open is read before each render; no asynchronous toggle-state race.
    }
   }
   if(!this._eh26Events){
@@ -282,6 +282,114 @@ function eh26Css(){
      this._eh26MenuOpen=false;this._schedule();
     }
    });
+  }
+ };
+})();
+
+/* v1.26 RC2: independent-review fixes. Presentation and accessibility only. */
+function eh26ReviewCss(){
+ return [
+  '.eh40-kpis{grid-template-columns:repeat(10,minmax(0,1fr))}',
+  '.eh40-kpi:nth-child(1){grid-column:span 10}',
+  '@media(max-width:720px){.eh40-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.eh40-kpi:nth-child(1){grid-column:1/-1}}',
+  '.shell .eh40-kicker,.shell .eh40-status,.shell .eh40-panel-head span,.shell .eh40-footer,.shell .eh40-flow-row,.shell .eh26-menu-label,.shell .eh26-navitem{font-size:11px}',
+  '.shell .eh40-kpi small,.shell .eh40-top p,.shell .eh26-insight-menu button small{font-size:12px}',
+  '.eh26-legacy .detail-panel{scroll-margin-top:95px}',
+  '.eh40-trend-button svg{aspect-ratio:300 / 64}',
+  '@media(max-width:360px){.shell .eh26-navitem{font-size:11px}}'
+ ].join('\n');
+}
+(function eh26ReviewInstall(){
+ const P=EnergiehuisCard.prototype,previous=P._render,disconnect=P.disconnectedCallback;
+ P.disconnectedCallback=function(){
+  if(this._eh26DocumentHandlers){
+   const {pointer,focus,key}=this._eh26DocumentHandlers;
+   document.removeEventListener('pointerdown',pointer,true);
+   document.removeEventListener('focusin',focus,true);
+   document.removeEventListener('keydown',key,true);
+   this._eh26DocumentHandlers=null;
+  }
+  this._eh26MenuOpen=false;
+  if(typeof disconnect==='function')disconnect.call(this);
+ };
+ P._render=function(){
+  const prior=this.shadowRoot,active=prior?.activeElement;
+  const oldLegacy=prior?.querySelector('.eh26-legacy');
+  if(oldLegacy)this._eh26LegacyOpen=oldLegacy.open;
+  const remembered=active?.matches?.('[data-eh26-insights]')?'trigger':
+   active?.matches?.('.eh26-insight-menu [data-eh-page]')?'menu:'+active.dataset.ehPage:
+   active?.matches?.('.eh26-navitem[data-eh-page]')?'nav:'+active.dataset.ehPage:null;
+  previous.call(this);
+  if(!this.config||!this._hass)return;
+  const root=this.shadowRoot,nav=root?.querySelector('.shell > .nav');
+  if(!nav)return;
+  const style=root.querySelector('style');
+  if(style&&!style.textContent.includes('/* EH26 REVIEW */'))style.textContent+='\n/* EH26 REVIEW */\n'+eh26ReviewCss();
+  const trigger=nav.querySelector('[data-eh26-insights]');
+  trigger?.setAttribute('aria-haspopup','dialog');
+  const menu=nav.querySelector('.eh26-insight-menu');
+  if(menu)menu.setAttribute('role','dialog');
+  root.querySelector('.eh40-trend-button svg')?.setAttribute('preserveAspectRatio','xMidYMid meet');
+  if(this._view==='overview'){
+   const body=root.querySelector('.shell > .body'),legacy=body?.querySelector('.eh26-legacy');
+   const pane=body?.querySelector(':scope > .detail-panel');
+   if(legacy&&pane&&this._detail&&this._eh40PinnedDetail!==this._detail){
+    const metricList=legacy.querySelector('.metrics');
+    metricList?.insertAdjacentElement('afterend',pane);
+    if(this._eh26LegacyReveal===this._detail){
+     this._eh26LegacyReveal=null;
+     pane.scrollIntoView?.({block:'start',behavior:'auto'});
+    }
+   }
+  }
+  let key=this._eh26RestoreFocus||remembered;
+  this._eh26RestoreFocus=null;
+  if(key){
+   let target=key==='trigger'?trigger:
+    key==='first'?menu?.querySelector('[data-eh-page]'):
+    key.startsWith('menu:')?menu?.querySelector('[data-eh-page="'+key.slice(5)+'"]'):
+    key.startsWith('nav:')?nav.querySelector('.eh26-navitem[data-eh-page="'+key.slice(4)+'"]'):null;
+   if(!target&&key.startsWith('menu:'))target=trigger;
+   target?.focus({preventScroll:true});
+  }
+  if(!this._eh26ReviewEvents){
+   this._eh26ReviewEvents=true;
+   root.addEventListener('click',e=>{
+    const meter=e.target?.closest?.('.eh26-legacy .metric[data-eh-detail]');
+    if(meter){
+     this._eh26LegacyOpen=true;
+     this._eh26LegacyReveal=this._detail===meter.dataset.ehDetail?this._detail:null;
+    }
+    if(e.target?.closest?.('[data-eh26-insights]')){
+     this._eh26RestoreFocus=this._eh26MenuOpen?'first':'trigger';
+    }else if(e.target?.closest?.('.eh26-insight-menu [data-eh-page]')){
+     this._eh26RestoreFocus='trigger';
+    }
+   });
+  }
+  if(!this._eh26DocumentHandlers&&this.isConnected){
+   const pointer=e=>{
+    if(this._eh26MenuOpen&&!e.composedPath().includes(this)){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   };
+   const focus=e=>{
+    if(!this._eh26MenuOpen)return;
+    if(!e.composedPath().some(x=>x?.matches?.('.eh26-insight-menu,[data-eh26-insights]'))){
+     this._eh26MenuOpen=false;this._schedule();
+    }
+   };
+   const key=e=>{
+    if(e.key!=='Escape'||!this._eh26MenuOpen)return;
+    e.preventDefault();
+    this._eh26MenuOpen=false;
+    this._eh26RestoreFocus='trigger';
+    this._schedule();
+   };
+   this._eh26DocumentHandlers={pointer,focus,key};
+   document.addEventListener('pointerdown',pointer,true);
+   document.addEventListener('focusin',focus,true);
+   document.addEventListener('keydown',key,true);
   }
  };
 })();
