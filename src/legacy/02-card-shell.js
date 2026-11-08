@@ -358,6 +358,16 @@ class EnergiehuisCard extends HTMLElement {
   }
  }
  disconnectedCallback(){
+  // Native custom-element lifecycle: post-define prototype overrides are ignored.
+  if(this._eh26DocumentHandlers){
+   const {pointer,focus,key}=this._eh26DocumentHandlers;
+   this._eh26DocumentHandlers=null;
+   document.removeEventListener('pointerdown',pointer,true);
+   document.removeEventListener('focusin',focus,true);
+   document.removeEventListener('keydown',key,true);
+  }
+  this._eh26MenuOpen=false;
+  this._eh26RestoreFocus=null;
   if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}
   if(this._eh19Observer){this._eh19Observer.disconnect();this._eh19Observer=null;}
   if(this._eh19NetworkListener){
