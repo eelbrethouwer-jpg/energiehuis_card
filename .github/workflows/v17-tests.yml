@@ -1,6 +1,9 @@
 name: Energiehuis v1.7.0 regressiecontrole
 
 on:
+  # Run the full suite on every main push (including merges and docs-only changes).
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'energiehuis-card.js'
