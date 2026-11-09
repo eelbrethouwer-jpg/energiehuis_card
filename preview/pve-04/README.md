@@ -1,12 +1,39 @@
-# PVE-04 — Fotorealistische Premium Live Cockpit (stap 0: beeldinfrastructuur)
+# PVE-04 — Energiehuis Live Cockpit op de goedgekeurde master
 
 > **DEMO — fictieve meetwaarden.** Zelfstandige browserpreview zonder Home Assistant, zonder bediening en zonder opslag. Geen productiekaart, geen HACS-resource.
->
-> **Tijdelijk beeld — niet visueel goedgekeurd.** De huidige scènelaag is de PVE-03-CGI, uitsluitend als placeholder. Fotorealisme is een harde acceptatie-eis voor de definitieve lagen (stap 1).
 
-Branch `preview/claude-premium-pve04`, technische basis PVE-03 `cae8edf`. Alles staat in `preview/pve-04/`. Overdracht: [HANDOFF_TO_CHATGPT.md](HANDOFF_TO_CHATGPT.md) · Rechten: [ASSET_RIGHTS.md](ASSET_RIGHTS.md) · Visuele norm: [goedgekeurde referentie (PVE-03)](../pve-03/reference/APPROVED_VISUAL_REFERENCE.md).
+Branch `preview/claude-premium-pve04`. Alles staat in `preview/pve-04/`. Overdracht: [HANDOFF_TO_CHATGPT.md](HANDOFF_TO_CHATGPT.md) · Rechten: [ASSET_RIGHTS.md](ASSET_RIGHTS.md).
 
-![Desktop 1440×900](screenshots/pve04-1440x900.jpg)
+![Desktop 1440×900, actieve stroom](screenshots/master-desktop-actief.jpg)
+
+## Master-cockpit (standaard, sinds 9 november 2026)
+
+De eigenaar heeft `preview/pve-03/reference/approved-visual-20261109.webp` expliciet goedgekeurd als **definitieve visuele referentie, inclusief de ingebakken kaarten en stromen**. Die afbeelding is nu ongewijzigd de achtergrond. De eerdere regel "niet als gehele achtergrond gebruiken" in `pve-03/reference/APPROVED_VISUAL_REFERENCE.md` is daarmee door de eigenaar vervangen. Het bestand wordt **niet gekopieerd**: de preview verwijst ernaar en er worden geen afgeleide beeldbestanden opgeslagen.
+
+```
+master (WebP, 1330×748, ongewijzigd)                                   ← master-scene.js (SHA-256 gecontroleerd)
+  └ rustlagen per ingebakken stroomlijn (canvas, in de browser berekend) ← zichtbaar zolang de route NIET actief is
+  └ lichtdeeltjes langs exact dezelfde lijn, in de stroomrichting         ← alleen bij een actieve route (model.js)
+  └ afdekvlakken: DEMO-pil over datum/tijd, waardeplaatjes (compact)
+  └ live kaarten exact en ondoorzichtig over de ingebakken kaarten        ← kaartmaat + 6 px (onder + 8 px)
+```
+
+| Bestand | Rol |
+|---|---|
+| `master-scene.js` | **Gegenereerd** door `tools/build-master-scene.cjs` uit `cleanplate/overlay-map.json`: verwijzing naar de master (bytes, SHA-256), afdekvlakken per kaart en de geometrie van de vijf ingebakken stroomlijnen, met hun koppeling aan modelroutes. `--check` faalt bij elke afwijking. |
+| `master.js` | Runtime: kaarten, rustlagen, deeltjes, detailpaneel, scenario's. Dezelfde veiligheidsregels als de vorige cockpit (model.js). |
+
+**Stroomlijnen eerlijk:** per lijn (zon, praktijk, net, Cupra plus de korte kaart-autolijn) berekent de browser eenmalig een rustlaag. Die vervangt de lijn en haar gloed door de omgeving: het laagfrequente deel komt uit de pixels buiten alle lijnen en kaarten, het fijne paneel-, pannen- of plankenpatroon blijft in de gloedzone behouden. De rustlaag staat aan bij 0 W, offline, verouderde of ongeldige data en bij een niet-gekoppelde praktijk, en gaat in 0,6 s uit zodra de route actief wordt. Dan zijn de ingebakken lijn en de bewegende deeltjes zichtbaar. Kan de canvas niet worden gelezen (bijv. via `file://`), dan valt de cockpit terug op een donkere dimlaag met de melding "Ingebakken stroomlijnen niet onderdrukbaar".
+
+**Indeling:** vanaf 900 px containerbreedte staan de interactieve kaarten óp de master. Daaronder (tablet en mobiel) blijft de master volledig zichtbaar, met ondoorzichtige waardeplaatjes over de ingebakken kaarten, en staan de interactieve kaarten leesbaar onder het beeld. Ontbreekt de master of de scènedata, dan blijft alleen de interface over.
+
+**Bekende beperkingen**
+- Een onderdrukte lijn laat op 200–300 % een zachte, kleurloze "veeg" zien, vooral over het paneelraster en de pannen rechts van de dakkapel. Er is geen licht of kleur van de lijn meer zichtbaar: de pixeltoets meet 0 % lijnkleur bij 0 W en offline.
+- De rustlagen kosten bij het laden eenmalig ~0,4 s rekentijd op de hoofdthread (Chromium, 1× CPU). De animatie zelf haalt 60 fps, ook bij 4× CPU-vertraging.
+- De lijnkleur ligt vast in het beeld: de netlijn is cyaan, zowel bij afname als bij teruglevering. De richting tonen de deeltjes en de Net-kaart.
+- Het kenteken "CUPRA BORN" en het merklogo blijven in beeld (geaccepteerd door de eigenaar, privégebruik).
+
+De eerdere **placeholder- en privélaag-cockpit** (stap 0/1A) blijft beschikbaar via `?scene=placeholder` en `?scene=private` en wordt als regressie getest. De beschrijving hieronder gaat over die variant.
 
 ## Starten
 
@@ -16,7 +43,8 @@ python3 -m http.server 8000      # open http://localhost:8000
 ```
 
 Ook direct te openen als `index.html` (file://): manifest, beeldlagen en maskers laden zonder netwerk.
-URL-opties: `?scenario=<id>`, `?ticker=0`, `?instances=2`, en de testhaak `?manifest=0` (simuleert een ontbrekend manifest).
+Start vanuit `preview/` (de master staat in `pve-03/reference/`): `cd preview && python3 -m http.server 8000` en open http://localhost:8000/pve-04/.
+URL-opties: `?scenario=<id>` (o.a. `zon-export`, `nul-watt`, `offline`, `verouderd`, `praktijk-sim`), `?ticker=0`, `?instances=2`, `?scene=placeholder|private`; testhaken `?masterScene=0`, `?masterBase=missing`, `?manifest=0`.
 
 ## Architectuur
 
@@ -98,13 +126,16 @@ TZ=Europe/Amsterdam node --test preview/pve-04/tests/*.test.cjs
 node preview/pve-04/tests/browser.cjs --screenshots                   # Chromium
 node preview/pve-04/tests/browser.cjs --browser=webkit --screenshots  # WebKit (Playwright)
 node preview/pve-04/tests/perf.cjs --write
+node preview/pve-04/tests/master.cjs --screenshots                    # master-cockpit, Chromium
+node preview/pve-04/tests/master.cjs --browser=webkit --screenshots   # master-cockpit, WebKit
 ```
 
-- **Node (79 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting; plus de clean-plate- en privacytests (overlay-map, geen getrackte privébestanden, weigering van output buiten `private/`, privémanifest, veilige URL's).
-- **Browser (26 controles, Chromium én WebKit):** o.a. het laden van de privélaag via een synthetische testlaag, met mobiele terugval en terugval bij een ontbrekend of onveilig manifest; viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
+- **Master (21 controles, Chromium én WebKit):** 7 viewports (320–1920) met dekking ≥ ingebakken kaart + 5 px en ondoorzichtigheid, 200 % tekst, rustlaag = model voor alle 14 scenario's, **pixeltoets van de ingebakken lijnen** (actief / 0 W / offline / verouderd), deeltjes alleen op actieve lijnen, DEMO/simulatie/praktijk/minteken, 50 hertekeningen, terugval (geen scène, beeld-404, `file://`), toetsenbord, reduced motion, twee instanties + destroy, performance (Chromium) en screenshots.
+- **Node (84 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting; plus de clean-plate- en privacytests (overlay-map, geen getrackte privébestanden, weigering van output buiten `private/`, privémanifest, veilige URL's).
+- **Browser-regressie placeholder/privélaag (26 controles, Chromium én WebKit, `?scene=placeholder`):** o.a. het laden van de privélaag via een synthetische testlaag, met mobiele terugval en terugval bij een ontbrekend of onveilig manifest; viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
 
 ## Beperkingen
 
-- De scènelaag is een **placeholder** (CGI) en geen visueel eindbeeld.
+- Placeholder-variant: de scènelaag is een CGI-placeholder. De standaardcockpit gebruikt de goedgekeurde master.
 - Getest in Chromium 153 en Playwright-WebKit 26.6 (Linux, headless). **Echte Safari op iPhone/macOS is niet getest** en blijft vereist vóór acceptatie.
 - Fps-metingen zijn headless-metingen en geen meting op een echt toestel.

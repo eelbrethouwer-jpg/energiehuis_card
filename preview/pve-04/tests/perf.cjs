@@ -8,7 +8,7 @@
  * schommeling uit (?ticker=0), CPU-throttling 1× en 4× via CDP. Per meting N runs; fps = mediaan over runs,
  * p95 = 95e percentiel van alle frametijden (requestAnimationFrame-delta's).
  *
- * Varianten: PVE-03 (geen masker, nulmeting) · PVE-04 full · PVE-04 bbox (standaard) · PVE-04 css.
+ * Varianten: PVE-03 (nulmeting) · PVE-04 placeholder full/bbox/css · PVE-04 master (standaard sinds de master-cockpit).
  * Doelen voor de standaardvariant bij 4×: ≥ 50 fps = DOEL, 45–49 = WAARSCHUWING, < 45 = DOEL NIET GEHAALD,
  * < 30 fps = harde FOUT (exit 1). p95 ≤ 33 ms = doel (anders WAARSCHUWING).
  */
@@ -36,10 +36,11 @@ function serve() {
 
 const VARIANTS = [
   { id: 'pve03', url: '/pve-03/index.html?ticker=0&scenario=praktijk-sim' },
-  { id: 'pve04-full', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=full' },
-  { id: 'pve04-bbox', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=bbox', default: true },
-  { id: 'pve04-css', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=css' },
-  { id: 'pve04-bbox-nosvg', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=bbox&svgmask=0' }
+  { id: 'pve04-full', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=full&scene=placeholder' },
+  { id: 'pve04-bbox', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=bbox&scene=placeholder' },
+  { id: 'pve04-css', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=css&scene=placeholder' },
+  { id: 'pve04-bbox-nosvg', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim&maskmode=bbox&svgmask=0&scene=placeholder' },
+  { id: 'pve04-master', url: '/pve-04/index.html?ticker=0&scenario=praktijk-sim', default: true }
 ];
 const VIEWPORTS = [{ id: 'desktop', width: 1440, height: 900 }, { id: 'mobile', width: 390, height: 844 }];
 const RATES = [1, 4];
@@ -57,9 +58,9 @@ const median = arr => pct(arr, 50);
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(base + v.url);
-    await page.waitForFunction(() => { const i = document.querySelector('.ehc-scene img'); return i && i.complete && i.naturalWidth > 0; });
+    await page.waitForFunction(() => { const i = document.querySelector('.ehc-scene img, img.ehm-scene'); const e = document.querySelector('.ehc'); return i && i.complete && i.naturalWidth > 0 && e.dataset.quiet !== 'pending'; });
     await page.waitForTimeout(800);
-    const mode = await page.evaluate(() => { const f = window.__cockpits[0].flows; return f.maskInfo ? f.maskInfo().effectiveMode : 'geen masker'; });
+    const mode = await page.evaluate(() => { const f = window.__cockpits[0].flows; return f && f.maskInfo ? f.maskInfo().effectiveMode : (window.__cockpits[0].quietInfo ? 'master+rust' : 'geen masker'); });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate });
     await page.waitForTimeout(300);

@@ -1,0 +1,892 @@
+{
+  "engine": "chromium",
+  "version": "153.0.8010.12",
+  "viewports": {
+    "320x700": {
+      "layout": "compact",
+      "scrollW": 320,
+      "innerW": 320,
+      "stage": {
+        "w": 296,
+        "h": 166.5
+      },
+      "u": 0.223,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 144,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 144,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 144,
+          "h": 78.21875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 144,
+          "h": 78.21875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 144,
+          "h": 164.390625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 144,
+          "h": 164.390625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "390x844": {
+      "layout": "compact",
+      "scrollW": 390,
+      "innerW": 390,
+      "stage": {
+        "w": 366,
+        "h": 205.8
+      },
+      "u": 0.275,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.82,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.82,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.8,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 179,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 179,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 179,
+          "h": 78.21875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 179,
+          "h": 78.21875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 179,
+          "h": 164.390625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 179,
+          "h": 164.390625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "768x1024": {
+      "layout": "compact",
+      "scrollW": 768,
+      "innerW": 768,
+      "stage": {
+        "w": 736,
+        "h": 413.9
+      },
+      "u": 0.553,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 1.64,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 1.66,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 1.66,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 1.64,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 240,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 240,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 240,
+          "h": 100.453125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 240,
+          "h": 148.40625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 240,
+          "h": 148.40625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 240,
+          "h": 148.40625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "1024x768": {
+      "layout": "overlay",
+      "scrollW": 1024,
+      "innerW": 1024,
+      "stage": {
+        "w": 992,
+        "h": 557.9
+      },
+      "u": 0.746,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 2.21,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 2.24,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 2.21,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 2.22,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 173,
+          "h": 89.484375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 180.4375,
+          "h": 90.984375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 170.8125,
+          "h": 89.484375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 148.390625,
+          "h": 73.078125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 192.4375,
+          "h": 91.71875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 170.8125,
+          "h": 93.9375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "1330x748": {
+      "layout": "overlay",
+      "scrollW": 1330,
+      "innerW": 1330,
+      "stage": {
+        "w": 1116.6,
+        "h": 628
+      },
+      "u": 0.84,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 194.734375,
+          "h": 100.71875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 203.109375,
+          "h": 102.421875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 192.28125,
+          "h": 100.71875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 167.046875,
+          "h": 82.265625,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 216.625,
+          "h": 103.234375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 192.28125,
+          "h": 105.75,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "1440x900": {
+      "layout": "overlay",
+      "scrollW": 1440,
+      "innerW": 1440,
+      "stage": {
+        "w": 1386.9,
+        "h": 780
+      },
+      "u": 1.043,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 3.12,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 3.13,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 3.13,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 3.12,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 241.859375,
+          "h": 125.109375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 252.265625,
+          "h": 127.203125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 238.8125,
+          "h": 125.109375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 207.46875,
+          "h": 102.171875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 269.046875,
+          "h": 128.21875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 238.8125,
+          "h": 131.34375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    },
+    "1920x1080": {
+      "layout": "overlay",
+      "scrollW": 1920,
+      "innerW": 1920,
+      "stage": {
+        "w": 1448,
+        "h": 814.4
+      },
+      "u": 1.089,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 252.515625,
+          "h": 130.609375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "12,3 kW"
+        },
+        {
+          "key": "battery",
+          "w": 263.390625,
+          "h": 132.8125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "100 %"
+        },
+        {
+          "key": "house",
+          "w": 249.34375,
+          "h": 130.609375,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "2,48 kW"
+        },
+        {
+          "key": "practice",
+          "w": 216.609375,
+          "h": 106.671875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "—"
+        },
+        {
+          "key": "net",
+          "w": 280.90625,
+          "h": 133.875,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "−9,87 kW"
+        },
+        {
+          "key": "cupra",
+          "w": 249.34375,
+          "h": 137.125,
+          "valueClipped": false,
+          "titleClipped": false,
+          "value": "0 W"
+        }
+      ],
+      "small": [],
+      "clipped": [],
+      "titleClipped": []
+    }
+  },
+  "flowness": {
+    "flow-pv": {
+      "zon-export": 0.919,
+      "praktijk-sim": 0.919,
+      "net-laden": 0.919,
+      "nul-watt": 0,
+      "offline": 0,
+      "verouderd": 0.919
+    },
+    "flow-practice": {
+      "zon-export": 0,
+      "praktijk-sim": 0.53,
+      "net-laden": 0,
+      "nul-watt": 0,
+      "offline": 0,
+      "verouderd": 0
+    },
+    "flow-net": {
+      "zon-export": 0.654,
+      "praktijk-sim": 0.654,
+      "net-laden": 0.564,
+      "nul-watt": 0,
+      "offline": 0,
+      "verouderd": 0
+    },
+    "flow-car": {
+      "zon-export": 0.385,
+      "praktijk-sim": 0.385,
+      "net-laden": 0.385,
+      "nul-watt": 0,
+      "offline": 0,
+      "verouderd": 0.385
+    },
+    "flow-card-car": {
+      "zon-export": 0.394,
+      "praktijk-sim": 0.394,
+      "net-laden": 0.394,
+      "nul-watt": 0,
+      "offline": 0,
+      "verouderd": 0.394
+    }
+  },
+  "performance": {
+    "fps1x": 60,
+    "p95_1x": 16.7,
+    "fps4x": 60,
+    "p95_4x": 16.7,
+    "quietBuildMs": 455,
+    "heapDeltaKB": 135,
+    "verdict4x": "DOEL (≥ 50 fps)"
+  },
+  "results": [
+    {
+      "name": "viewport 320x700: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 390x844: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 768x1024: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1024x768: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1330x748: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1440x900: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1920x1080: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "ok": true
+    },
+    {
+      "name": "200% tekst 390x844: geen horizontale scroll, dekking blijft intact",
+      "ok": true
+    },
+    {
+      "name": "200% tekst 1440x900: geen horizontale scroll, dekking blijft intact",
+      "ok": true
+    },
+    {
+      "name": "alle scenario’s: rustlaag per lijn aan ⇔ geen actieve route (DOM = model), deeltjes alleen bij actief",
+      "ok": true
+    },
+    {
+      "name": "pixeltoets: ingebakken stroomlijnen bij 0 W, offline en verouderd onzichtbaar (≤ 3 % én ≤ 15 % van actief)",
+      "ok": true
+    },
+    {
+      "name": "deeltjes: bewegen alleen op actieve lijnen, in stroomrichting; bij offline direct stil",
+      "ok": true
+    },
+    {
+      "name": "inhoud: DEMO zichtbaar, batterij = Simulatie, praktijk \"Nog niet gekoppeld\", minteken U+2212, ingebakken waarden afgedekt",
+      "ok": true
+    },
+    {
+      "name": "50 hertekeningen: geen DOM-rebuild, rustlagen flikkeren niet, deeltjesfase loopt door",
+      "ok": true
+    },
+    {
+      "name": "terugval: geen scènedata / beeld laadt niet ⇒ alleen interface (compact), geen JS-fouten",
+      "ok": true
+    },
+    {
+      "name": "file:// (canvas mogelijk geblokkeerd): rustlaag óf zichtbare dimterugval met melding",
+      "ok": true
+    },
+    {
+      "name": "toetsenbord: Tab → kaart, Enter opent detail, Escape sluit en herstelt focus",
+      "ok": true
+    },
+    {
+      "name": "prefers-reduced-motion: geen animatielus, richting via pijlen op actieve lijnen",
+      "ok": true
+    },
+    {
+      "name": "twee instanties onafhankelijk; destroy() ruimt timers, rAF en DOM op",
+      "ok": true
+    },
+    {
+      "name": "performance: fps (1× en 4× CPU) met actieve deeltjes, rustlaag-rekentijd, geheugen na 200 updates",
+      "ok": true
+    },
+    {
+      "name": "screenshots: desktop en mobiel × actief / 0 W / offline",
+      "ok": true
+    }
+  ]
+}

@@ -27,6 +27,20 @@ Rechtenregister voor **alle** beeldbestanden van de PVE-04-preview. De tests (`t
 | Ruwe bron in repository | Ja: de generatorbron zelf (geen betaalde of externe ruwe modellen) |
 | Visuele status | **placeholder — NIET visueel goedgekeurd (fotorealisme vereist)** |
 
+### R-PVE04-MASTER-REFERENCE (gebruikt, niet gekopieerd)
+
+| Veld | Waarde |
+|---|---|
+| Titel | Goedgekeurde visuele master `approved-visual-20261109.webp` |
+| Locatie | `preview/pve-03/reference/` (al in de repository sinds de PVE-03-referentie; **niet** gekopieerd naar `pve-04/assets/`) |
+| SHA-256 | `932d0e745f8e8a415f6aab4e87091366a32d5a68d7363b908f55445fcccc7ee6` (1330×748, WebP, 176 622 bytes) |
+| Herkomst | Door de eigenaar gedeelde afbeelding uit de ChatGPT-ontwerpchat (zie `pve-03/reference/APPROVED_VISUAL_REFERENCE.md`) |
+| Rechthebbende | eelbrethouwer-jpg (repository-eigenaar) |
+| Gebruik | Ongewijzigde achtergrond van de master-cockpit (`master-scene.js`), uitsluitend voor privégebruik. Rustlagen worden alleen in het browsergeheugen berekend; er wordt geen afgeleid beeldbestand opgeslagen of gecommit. |
+| Bevat | Ingebakken voorbeeldkaarten, -waarden en -stromen (afgedekt of onderdrukt door de cockpit), merklogo en kenteken "CUPRA BORN" |
+| Visuele status | **goedgekeurd door de eigenaar** (9 november 2026) als definitieve visuele referentie |
+| Niet toegestaan | Het originele PNG of privé-retouches (pilot 1B-a, clean plate) committen |
+
 ## Assets
 
 | Compositie | Bestand | Afmeting | Type | Bytes | SHA-256 | Rechten-ID |

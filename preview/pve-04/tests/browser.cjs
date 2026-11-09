@@ -1,6 +1,7 @@
 'use strict';
 /*
- * PVE-04 · browseracceptatie (Playwright + Chromium).
+ * PVE-04 · browseracceptatie van de placeholder/privélaag-cockpit (?scene=placeholder) — regressiesuite.
+ * De master-cockpit (standaard) wordt getest in tests/master.cjs.
  *   node preview/pve-03/tests/browser.cjs               # alle controles
  *   node preview/pve-04/tests/browser.cjs --screenshots # idem + screenshots naar preview/pve-04/screenshots/
  *   node preview/pve-04/tests/browser.cjs --browser=webkit   # WebKit (Playwright); CDP-metingen worden overgeslagen
@@ -77,6 +78,9 @@ async function open(browser, base, { width, height, query = '', reducedMotion = 
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(INSTRUMENT);
   if (route) await page.route(route.pattern, r => r.fulfill({ status: 404, body: '' }));
+  // Sinds PVE-04 (master als achtergrond) is de master-cockpit de standaard. Deze regressiesuite test de eerdere
+  // placeholder/privélaag-cockpit en voegt daarom ?scene=placeholder toe, tenzij een test zelf een scène kiest.
+  if (!/[?&]scene=/.test(query)) query = query ? query + '&scene=placeholder' : '?scene=placeholder';
   await page.goto(base + '/index.html' + query);
   if (waitImage) await page.waitForFunction(() => { const i = document.querySelector('.ehc-scene img'); return i && i.complete && i.naturalWidth > 0 && document.querySelector('.ehc').dataset.mask !== 'none'; });
   await page.waitForTimeout(400);

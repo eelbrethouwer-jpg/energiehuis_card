@@ -12,7 +12,7 @@ const DIR = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
 // Code zonder commentaar: commentaar mag de verboden API's wél benoemen.
 const code = f => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
-const RUNTIME = ['index.html', 'app.js', 'model.js', 'flows.js', 'styles.css', 'scene-manifest.js', 'manifest-validate.js'];
+const RUNTIME = ['index.html', 'app.js', 'model.js', 'flows.js', 'styles.css', 'scene-manifest.js', 'manifest-validate.js', 'master.js', 'master-scene.js'];
 
 test('routecontract: kleuren per route, praktijk gestippeld, batterij nooit een route', () => {
   assert.deepEqual(Object.keys(F.STYLE).sort(), ['grid-home', 'home-ev', 'home-grid', 'home-practice', 'sun-home']);
@@ -71,7 +71,7 @@ test('veiligheid: geen HA-, netwerk- of opslagaanroepen in de runtimebestanden',
   const forbidden = /callService|callWS|\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|document\.cookie|\bhass\b|serviceWorker/;
   for (const f of RUNTIME) assert.doesNotMatch(code(f), forbidden, f);
   // geen grace-semantiek
-  for (const f of ['model.js', 'flows.js', 'app.js']) assert.doesNotMatch(code(f), /graceMs|grace\s*:/, f);
+  for (const f of ['model.js', 'flows.js', 'app.js', 'master.js']) assert.doesNotMatch(code(f), /graceMs|grace\s*:/, f);
   // geen externe bronnen (CDN, fonts, tracking)
   for (const f of ['index.html', 'styles.css']) assert.doesNotMatch(code(f), /https?:\/\//, f);
 });
@@ -79,6 +79,7 @@ test('veiligheid: geen HA-, netwerk- of opslagaanroepen in de runtimebestanden',
 test('permanente DEMO-aanduiding aanwezig', () => {
   assert.match(read('index.html'), /DEMO — fictieve meetwaarden/);
   assert.match(read('app.js'), /DEMO — fictieve meetwaarden/);
+  assert.match(read('master.js'), /DEMO — fictieve meetwaarden/);
   assert.match(read('index.html'), /noindex/);
 });
 

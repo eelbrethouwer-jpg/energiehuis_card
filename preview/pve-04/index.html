@@ -17,6 +17,8 @@
 <script src="model.js"></script>
 <script src="flows.js"></script>
 <script src="app.js"></script>
+<script src="master-scene.js"></script>
+<script src="master.js"></script>
 <script>
   (function () {
     var q = new URLSearchParams(location.search);
@@ -41,6 +43,21 @@
         }, extra || {})));
       }
       window.__mounted = true;
+    }
+    // Standaard (PVE-04): de goedgekeurde master als vaste achtergrond (master.js). De eerdere placeholder-cockpit
+    // blijft beschikbaar voor regressietests via ?scene=placeholder (en ?scene=private voor de privélaag).
+    var sceneQ = q.get('scene');
+    if (sceneQ !== 'placeholder' && sceneQ !== 'private') {
+      if (q.get('masterScene') === '0') window.EhPve04MasterScene = null;   // testhaak: master-scène ontbreekt
+      for (var j = 0; j < n; j++) {
+        window.__cockpits.push(EhPve04Master.createMasterCockpit(mount, {
+          scenario: q.get('scenario') || (j ? 'net-laden' : 'zon-export'),
+          ticker: q.get('ticker') !== '0',
+          base: q.get('masterBase') === 'missing' ? 'bestaat-niet/' : ''
+        }));
+      }
+      window.__mounted = true;
+      return;
     }
     // Privébeeldlaag (opt-in): ?scene=private laadt een privémanifest dat NIET in de repository staat
     // (standaard private/scene-manifest.private.js; in Home Assistant bijv. /local/energiehuis/pve04/…).
