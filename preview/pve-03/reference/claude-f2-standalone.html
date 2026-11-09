@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Energiehuis Premium Cockpit F2</title>
+<style>
+:root{
+  --bg:#04090F; --ink:#EEF4FA; --ink2:#A9BBCB; --ink3:#7F93A6;
+  --glass:rgba(10,20,34,.62); --line:rgba(255,255,255,.10);
+  --sun:#FFC23D; --export:#4BE38A; --import:#FF8A5B; --ev:#33DDFF; --praktijk:#7CB8FF; --battery:#B07CFF; --house:#FFE2B8; --idle:#7D8C99; --kpn:#5BE13A;
+  --radius-l:22px; --radius-m:16px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:radial-gradient(120% 60% at 50% 0%,#0E1E33 0%,#060D17 55%,#04090F 100%)}
+button{font:inherit;color:inherit}
+.wrap{max-width:1440px;margin:0 auto;padding:16px 32px 32px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- host chrome ---------- */
+.ck-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 4px 14px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-icon{width:34px;height:34px;color:var(--ink);flex:none}
+.brand-icon svg{width:100%;height:100%}
+h1{font-size:28px;line-height:1.1;font-weight:700;letter-spacing:-.02em;margin:0}
+h1 span{font-weight:500;color:var(--ink2);margin-left:6px}
+.head-right{display:flex;align-items:center;gap:16px;flex:none}
+time{font-variant-numeric:tabular-nums;color:var(--ink2);font-size:15px}
+.pill{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-weight:650;font-size:14px;cursor:pointer}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--idle)}
+.pill[data-tone=ok]{border-color:#4BE38A66;background:#4BE38A14;color:#B9F7D0}.pill[data-tone=ok] i{background:var(--export);box-shadow:0 0 10px var(--export)}
+.pill[data-tone=warn]{border-color:#FFC23D55;background:#FFC23D10;color:#FFE3A1}.pill[data-tone=warn] i{background:var(--sun)}
+.pill[data-tone=bad]{border-color:#FF6B5B77;background:#FF6B5B18;color:#FFC4BB}.pill[data-tone=bad] i{background:#FF6B5B}
+.pill[data-tone=demo]{border-color:#B07CFF77;background:#B07CFF1C;color:#E3D2FF}.pill[data-tone=demo] i{background:var(--battery)}
+.band{margin:0 0 10px;padding:9px 14px;border-radius:12px;font-weight:700;font-size:14px;letter-spacing:.01em}
+.band[data-kind=demo]{background:repeating-linear-gradient(135deg,#3A2470 0 14px,#2F1D5C 14px 28px);color:#F1E8FF;border:1px solid #B07CFF88}
+.band[data-kind=test]{background:#2A2410;color:#FFE7A6;border:1px solid #FFC23D66}
+.summary{margin:14px 4px 6px;font-size:17px;line-height:1.45;color:var(--ink);max-width:70ch}
+.warnings{list-style:none;margin:8px 0;padding:0;display:grid;gap:6px}
+.warnings li{padding:10px 14px;border-radius:12px;background:#FFC23D14;border:1px solid #FFC23D55;color:#FFE7A6;font-size:14px}
+.warnings li[data-critical=true]{background:#FF6B5B18;border-color:#FF6B5B77;color:#FFD0C8}
+.below{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-top:14px}
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius-m);padding:18px 20px}
+.panel h2{font-size:16px;margin:0 0 6px;letter-spacing:-.01em}
+.panel p{margin:0 0 12px;color:var(--ink2);font-size:14px}
+.flags{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;font-size:14px}
+.flags li{display:flex;gap:10px;align-items:flex-start;color:var(--ink2)}
+.flags li i{flex:none;width:16px;height:16px;margin-top:2px;border-radius:50%;border:2px solid var(--idle)}
+.flags li[data-ok=true]{color:var(--ink)}.flags li[data-ok=true] i{border-color:var(--export);background:radial-gradient(circle,var(--export) 40%,transparent 45%)}
+.flags.big li span{display:grid;gap:2px}.flags.big small{color:var(--ink3);font-size:13px}
+.ghost{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);font-weight:600;cursor:pointer}
+.legend ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:14px;color:var(--ink2)}
+.legend i{display:inline-block;width:26px;height:4px;border-radius:2px;background:var(--c);box-shadow:0 0 8px var(--c);vertical-align:middle;margin-right:10px}
+.legend i.dotted{background:none;box-shadow:none;border-top:3px dotted var(--c);height:0}
+
+/* ---------- stage (island) ---------- */
+.stage{position:relative;width:100%;aspect-ratio:var(--ar,2/1);border-radius:var(--radius-l);overflow:hidden;background:#071020;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);isolation:isolate}
+.scene,.particles{position:absolute;inset:0;width:100%;height:100%;display:block}
+.particles{pointer-events:none}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 45%,transparent 55%,rgba(2,6,12,.55) 100%)}
+
+.route .r-groove{fill:none;stroke:#020507;stroke-opacity:.7;stroke-width:9;stroke-linecap:round}
+.route .r-core{fill:none;stroke:var(--c,#7D8C99);stroke-opacity:.34;stroke-width:2.4;stroke-linecap:round;transition:stroke .8s,stroke-opacity .8s}
+.route .r-glow{fill:none;stroke:var(--c);stroke-width:8;stroke-linecap:round;opacity:0;filter:url(#fBlur6);transition:opacity .8s}
+.route .r-chev{display:none}
+.route.route-sun .r-core,.route.route-battery .r-core{stroke-dasharray:2 7}
+.route[data-state=active] .r-core{stroke-opacity:.75;stroke-width:3}
+.route[data-state=active] .r-glow{opacity:calc(.15 + var(--i,0) * .35)}
+.route[data-state=hidden]{display:none}
+.route-battery .r-core{stroke:var(--battery);stroke-opacity:.6;stroke-dasharray:1 9;stroke-width:3}
+.route-battery[data-state=off] .r-core{stroke-opacity:.15}
+
+.tiles{position:absolute;inset:0;z-index:2}
+.tile{position:absolute;left:0;top:0;display:grid;gap:2px;text-align:left;cursor:pointer;padding:14px 16px;border-radius:var(--radius-m);
+  background:var(--glass);-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%);
+  border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 45%,transparent),0 12px 30px rgba(0,0,0,.45),0 0 26px color-mix(in srgb,var(--accent) 18%,transparent);
+  transition:border-color .6s,box-shadow .6s,opacity .6s}
+.tile:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.t-head{display:flex;align-items:center;gap:10px;min-width:0}
+.t-icon{width:28px;height:28px;color:var(--accent);flex:none;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 60%,transparent))}
+.t-icon svg{width:100%;height:100%}
+.t-name{font-size:15px;font-weight:650;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-tag{margin-left:auto;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#B07CFF2E;color:#E3D2FF;border:1px solid #B07CFF66}
+.t-val{font-size:32px;line-height:1.1;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--accent);margin-top:6px}
+.t-sub{font-size:13px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-simshort{display:none;font-size:11px;color:#D9C6FF}
+.t-bar{display:block;height:6px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:8px;overflow:hidden}
+.t-bar i{display:block;height:100%;background:linear-gradient(90deg,#7B4DE0,var(--battery));border-radius:3px;transition:width .8s}
+.tile[data-tone=off]{--accent:var(--idle)!important}
+.tile[data-tone=warn]{--accent:#FF6B5B!important}
+.tile[data-tone=warn] .t-val{color:#FFB3A8}
+.tile[data-tone=off] .t-val{color:var(--ink3)}
+.tile[data-tone=dim] .t-val{opacity:.6}
+.t-sun{--accent:var(--sun);width:300px}
+.t-battery{--accent:var(--battery);width:300px}
+.t-praktijk{--accent:var(--praktijk);width:250px}
+.t-net{--accent:var(--idle);width:270px}
+.t-net[data-dir=export]{--accent:var(--export)}.t-net[data-dir=import]{--accent:var(--import)}.t-net[data-dir=balance]{--accent:var(--ink2)}
+.t-cupra{--accent:var(--kpn);width:270px}
+.t-cupra .t-val{color:var(--ev)}
+.t-house{--accent:var(--house);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 12px;background:rgba(14,12,10,.66)}
+.t-house .t-icon{width:30px;height:30px}
+.t-house .t-text{display:grid}
+.t-house .t-name{font-size:13px;color:var(--ink2);font-weight:600}
+.t-house .t-val{font-size:26px;margin:0;color:var(--house)}
+.t-house .t-sub{font-size:12px}
+
+/* tablet */
+.stage[data-comp=tablet] .tile{padding:10px 12px}
+.stage[data-comp=tablet] .t-sun,.stage[data-comp=tablet] .t-battery{width:214px}
+.stage[data-comp=tablet] .t-praktijk,.stage[data-comp=tablet] .t-net,.stage[data-comp=tablet] .t-cupra{width:190px}
+.stage[data-comp=tablet] .t-val{font-size:23px;margin-top:2px}
+.stage[data-comp=tablet] .t-icon{width:22px;height:22px}
+.stage[data-comp=tablet] .t-name{font-size:13px}
+.stage[data-comp=tablet] .t-sub{font-size:12px;white-space:normal;line-height:1.25}
+.stage[data-comp=tablet] .t-house .t-val{font-size:20px}
+.stage[data-comp=tablet] .t-battery .t-sub,.stage[data-comp=tablet] .t-house .t-sub{display:none}
+.stage[data-comp=tablet] .t-simshort{display:block}
+
+/* mobile: pods sized in % so anchors stay true at 320 and 390 */
+.stage[data-comp=mobile]{border-radius:20px}
+.stage[data-comp=mobile] .tile{padding:9px 10px;border-radius:14px;gap:1px}
+.stage[data-comp=mobile] .t-sun,.stage[data-comp=mobile] .t-battery{width:46%}
+.stage[data-comp=mobile] .t-praktijk,.stage[data-comp=mobile] .t-net,.stage[data-comp=mobile] .t-cupra{width:31.5%;padding:9px 8px;text-align:center}
+.stage[data-comp=mobile] .t-praktijk .t-head,.stage[data-comp=mobile] .t-net .t-head,.stage[data-comp=mobile] .t-cupra .t-head{flex-direction:column;gap:3px}
+.stage[data-comp=mobile] .t-icon{width:22px;height:22px}
+.stage[data-comp=mobile] .t-name{font-size:12.5px}
+.stage[data-comp=mobile] .t-val{font-size:clamp(16px,5.2vw,21px);margin-top:2px}
+.stage[data-comp=mobile] .t-sub{font-size:11px;white-space:normal;line-height:1.25}
+.stage[data-comp=mobile] .t-tag{font-size:10.5px;padding:1px 6px}
+.stage[data-comp=mobile] .t-bar{margin-top:4px;height:5px}
+.stage[data-comp=mobile] .t-house{padding:7px 12px 7px 9px;gap:8px}
+.stage[data-comp=mobile] .t-house .t-icon{width:22px;height:22px}
+.stage[data-comp=mobile] .t-house .t-val{font-size:19px}
+.stage[data-comp=mobile] .t-house .t-name{font-size:11.5px}
+.stage[data-comp=mobile] .t-house .t-sub{display:none}
+.stage[data-comp=mobile] .t-battery .t-sub,.stage[data-comp=mobile] .t-tag{display:none}
+.stage[data-comp=mobile] .t-simshort{display:block}
+
+@media (max-width:720px){
+  .wrap{padding:max(10px,env(safe-area-inset-top)) 12px 24px}
+  h1{font-size:21px}
+  h1 span{display:block;margin:0;font-size:16px}
+  .brand-icon{width:30px;height:30px}
+  .head-right{gap:10px}
+  time{display:none}
+  .pill{min-height:44px;padding:0 14px;font-size:13px}
+  .band{font-size:13px;padding:8px 12px}
+  .summary{font-size:15.5px;margin:12px 2px 4px}
+  .below{grid-template-columns:1fr;gap:12px}
+  .legend ul{grid-template-columns:1fr}
+}
+@media (max-width:340px){
+  .stage[data-comp=mobile] .t-name{font-size:11.5px}
+  .stage[data-comp=mobile] .t-praktijk,.stage[data-comp=mobile] .t-net,.stage[data-comp=mobile] .t-cupra{padding:8px 4px}
+}
+
+/* ---------- sheet ---------- */
+.backdrop{position:fixed;inset:0;background:rgba(2,5,10,.55);opacity:0;transition:opacity .25s;z-index:40}
+.backdrop.open{opacity:1}
+.sheet{position:fixed;z-index:41;top:0;right:0;bottom:0;width:min(440px,100vw);background:linear-gradient(180deg,#0E1B2C,#09121F);border-left:1px solid var(--line);box-shadow:-20px 0 60px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.sheet.open{transform:none}
+.sheet header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 8px}
+.sheet h2{margin:0;font-size:22px;letter-spacing:-.01em}
+.close{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);cursor:pointer;font-size:20px}
+.sheet-body{overflow:auto;padding:4px 20px 28px}
+.sheet h3{font-size:14px;color:var(--ink2);margin:20px 0 6px;font-weight:650}
+.sheet dl{margin:0}
+.row{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14.5px}
+.row dt{color:var(--ink2)}.row dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;word-break:break-word}
+.note{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:14px;color:var(--ink2);margin:6px 0 10px}
+.note.demo{background:#B07CFF1C;border-color:#B07CFF66;color:#E3D2FF;font-weight:600}
+.note.sim{background:#B07CFF14;border-color:#B07CFF55;color:#E3D2FF}
+.lead{font-size:16px;line-height:1.45;margin:4px 0 10px}
+@media (max-width:720px){
+  .sheet{top:auto;left:0;width:100%;max-height:72vh;border-left:0;border-top:1px solid var(--line);border-radius:20px 20px 0 0;transform:translateY(100%);padding-bottom:env(safe-area-inset-bottom)}
+}
+
+/* ---------- review bar (preview only, not part of the cockpit) ---------- */
+.review{margin:28px 0 0;padding:14px 16px;border-radius:14px;border:1px dashed rgba(255,255,255,.18);color:var(--ink2);font-size:14px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.review strong{color:var(--ink)}
+.review label{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+.review select{min-width:0;flex:1 1 auto;min-height:40px;background:#0B1624;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;max-width:100%}
+.review input{width:20px;height:20px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+.stage.rm .route .r-glow{transition:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <main id="host" aria-label="Energiehuis Live Cockpit"></main>
+  <p id="live" class="sr-only" aria-live="polite"></p>
+  <section class="review" aria-label="Beoordelingspaneel, alleen in deze preview">
+    <strong>Beoordelingspaneel (alleen preview)</strong>
+    <label>Bron <select id="modeSel"><option value="demo">DEMO, fictief</option><option value="test">TEST, gesimuleerde HA-states</option></select></label>
+    <label>Scenario <select id="scSel"></select></label>
+    <label><input type="checkbox" id="rmBox"> Beweging verminderen</label>
+  </section>
+</div>
+<div class="backdrop" id="backdrop" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <header><h2 id="sheetTitle"></h2><button type="button" class="close" aria-label="Sluiten">✕</button></header>
+  <div class="sheet-body"></div>
+</section>
+<script>
+/* ---- readings-engine.cjs ---- */
+/* Energiehuis Premium Cockpit · laag 1: sensordata en validatie.
+ * Puur: geen DOM, geen Home Assistant-aanroepen, geen opslag. Werkt in Node (require) en browser (globalThis.EhReadings).
+ * Zet een HA-state om in een Reading met één van zeven toestanden. Strenger dan legacy ehW:
+ * een ontbrekende eenheid is hier 'invalid-unit' in plaats van stilzwijgend W.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.EhReadings = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const STATES = Object.freeze(['live', 'live-zero', 'retained', 'stale', 'unknown', 'invalid-unit', 'unlinked']);
+  const ZERO_W = 30;
+  const FUTURE_TOLERANCE_MS = 120000;
+  const UNAVAILABLE = new Set(['', 'unknown', 'unavailable', 'none', 'null', 'nan']);
+
+  function parseNumber(raw) {
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+    if (typeof raw !== 'string') return null;
+    const s = raw.trim();
+    if (UNAVAILABLE.has(s.toLowerCase())) return null;
+    if (!/^[-+]?(\d+([.,]\d+)?|[.,]\d+)$/.test(s)) return null;
+    const n = Number(s.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function stampOf(state) {
+    for (const key of ['last_reported', 'last_updated', 'last_changed']) {
+      const t = Date.parse(state?.[key] || '');
+      if (Number.isFinite(t)) return { t, source: key };
+    }
+    return { t: NaN, source: null };
+  }
+
+  /**
+   * spec: { key, entity, kind: 'power'|'percent', ttlS, stable }
+   * returns a frozen Reading.
+   */
+  function readEntity(hass, spec, now) {
+    const base = { key: spec.key, entity: spec.entity || null, kind: spec.kind, value: null, ageMs: null, stampSource: null, reason: '' };
+    const done = (state, extra) => Object.freeze({ ...base, ...extra, state });
+    if (!spec.entity) return done('unlinked', { reason: 'Nog niet gekoppeld' });
+    const st = hass?.states?.[spec.entity];
+    if (!st) return done('unknown', { reason: 'Entiteit niet gevonden' });
+    const value = parseNumber(st.state);
+    if (value === null) return done('unknown', { reason: 'Geen geldige waarde (' + String(st.state) + ')' });
+
+    let normalized = value;
+    const unit = String(st.attributes?.unit_of_measurement ?? '').trim().toLowerCase();
+    if (spec.kind === 'power') {
+      if (unit === 'kw') normalized = value * 1000;
+      else if (unit !== 'w') return done('invalid-unit', { reason: unit ? 'Onbekende eenheid ' + unit : 'Eenheid ontbreekt' });
+    } else if (spec.kind === 'percent') {
+      if (unit !== '%') return done('invalid-unit', { reason: unit ? 'Onbekende eenheid ' + unit : 'Eenheid ontbreekt' });
+      if (value < 0 || value > 100) return done('unknown', { reason: 'Buiten 0–100 %' });
+    }
+
+    const { t, source } = stampOf(st);
+    const age = now - t;
+    if (!Number.isFinite(t) || age < -FUTURE_TOLERANCE_MS) {
+      return done('stale', { reason: 'Tijdstempel onbekend', stampSource: source });
+    }
+    const ageMs = Math.max(0, age);
+    if (ageMs > spec.ttlS * 1000) {
+      if (spec.stable) return done('retained', { value: normalized, ageMs, stampSource: source, reason: 'Laatst bekend · ' + ageLabel(ageMs) });
+      return done('stale', { ageMs, stampSource: source, reason: 'Verouderd · ' + ageLabel(ageMs) });
+    }
+    if (spec.kind === 'power' && Math.abs(normalized) < ZERO_W) {
+      return done('live-zero', { value: normalized, ageMs, stampSource: source, reason: 'Actueel' });
+    }
+    return done('live', { value: normalized, ageMs, stampSource: source, reason: 'Actueel' });
+  }
+
+  function isCurrent(r) { return !!r && (r.state === 'live' || r.state === 'live-zero'); }
+  function hasValue(r) { return !!r && (isCurrent(r) || r.state === 'retained'); }
+
+  function ageLabel(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return 'tijd onbekend';
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return 'zojuist';
+    if (m < 60) return m + ' min';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + ' uur';
+    const d = Math.floor(h / 24);
+    return d + (d === 1 ? ' dag' : ' dagen');
+  }
+
+  /** Magnitude only: callers decide the direction word. Never prints a minus sign. */
+  function formatPower(w) {
+    if (!Number.isFinite(w)) return '—';
+    const a = Math.abs(w);
+    if (a < 1000) return String(Math.round(a / 10) * 10) + ' W';
+    return (a / 1000).toFixed(2).replace('.', ',') + ' kW';
+  }
+
+  return Object.freeze({ STATES, ZERO_W, parseNumber, readEntity, isCurrent, hasValue, ageLabel, formatPower });
+});
+
+/* ---- flow-model-engine.cjs ---- */
+/* Energiehuis Premium Cockpit · laag 2: energieflowmodel.
+ * Puur: Readings + verificatieflags + vorig model -> routes, richting, integriteit, labels.
+ * De animatielaag mag alleen routes tonen die hier active=true zijn. Zo kan geen visuele laag
+ * de meetbeveiliging omzeilen. De virtuele batterij is nooit een route.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.EhFlowModel = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const DEFAULT_TRUST = Object.freeze({
+    p1_sign_verified: false,
+    pv_verified: false,
+    alfen_verified: false,
+    house_derivation_verified: false,
+    praktijk_meter: false
+  });
+  const DEMO_TRUST = Object.freeze(Object.fromEntries(Object.keys(DEFAULT_TRUST).map(k => [k, true])));
+
+  const T = Object.freeze({
+    routeMinW: 30,
+    dirEnterW: 80,
+    dirExitW: 40,
+    dirHoldMs: 3000,
+    graceMs: 10000,
+    houseNegW: -100,
+    houseNegMs: 30000,
+    crossDiffW: 150,
+    crossMs: 60000,
+    maxW: 7400
+  });
+
+  const ROUTES = Object.freeze(['sun-home', 'grid-home', 'home-grid', 'home-ev', 'home-praktijk']);
+
+  const cur = r => !!r && !r.demoRejected && (r.state === 'live' || r.state === 'live-zero');
+  // A stable source that is retained at exactly 0 W (PV at night, idle charger) may count as 0 for balances.
+  const balanceValue = r => cur(r) ? r.value : (r && r.state === 'retained' && r.value === 0 ? 0 : null);
+  const intensityOf = w => Math.max(0.15, Math.min(1, Math.sqrt(Math.max(0, w) / T.maxW)));
+
+  function sanitize(readings, mode) {
+    // Live mode never accepts demo-flagged readings: they are treated as unknown.
+    const out = {};
+    for (const [k, r] of Object.entries(readings || {})) {
+      if (!r) { out[k] = null; continue; }
+      if (mode === 'live' && r.demo) out[k] = Object.freeze({ ...r, state: 'unknown', value: null, reason: 'DEMO-waarde geweigerd in live-modus', demoRejected: true });
+      else out[k] = r;
+    }
+    return out;
+  }
+
+  function gridDirection(importW, memo, now) {
+    if (importW === null) return { dir: null, memo: { ...memo, candidate: null, since: null } };
+    const prev = memo.dir ?? null;
+    let raw;
+    const a = Math.abs(importW);
+    if (a < T.dirExitW) raw = 'balance';
+    else if (importW >= T.dirEnterW) raw = 'import';
+    else if (importW <= -T.dirEnterW) raw = 'export';
+    else raw = prev ?? 'balance'; // dead band: keep what we had
+    if (prev === null || raw === prev) return { dir: raw, memo: { ...memo, dir: raw, candidate: null, since: null } };
+    if (memo.candidate === raw && now - memo.since >= T.dirHoldMs) {
+      return { dir: raw, memo: { ...memo, dir: raw, candidate: null, since: null } };
+    }
+    const since = memo.candidate === raw ? memo.since : now;
+    return { dir: prev, memo: { ...memo, candidate: raw, since } };
+  }
+
+  function computeModel(input, prevModel) {
+    const now = input.now;
+    const mode = input.mode === 'demo' ? 'demo' : 'live';
+    const connected = input.connected !== false;
+    const cfg = { p1Sign: 'import_positive', ...(input.config || {}) };
+    const trust = mode === 'demo' ? DEMO_TRUST : Object.freeze({ ...DEFAULT_TRUST, ...pickBooleans(input.trust) });
+    const r = sanitize(input.readings, mode);
+    const memo0 = prevModel?.memo || {};
+
+    // --- Grid sign normalisation: importW > 0 means taking from the grid.
+    const net = cur(r.net) ? r.net.value : null;
+    const importW = net === null ? null : (cfg.p1Sign === 'export_positive' ? -net : net);
+    const g = gridDirection(importW, memo0.grid || {}, now);
+
+    // --- Integrity
+    const warnings = [];
+    let negSince = null, crossSince = null;
+    const pv = balanceValue(r.pv), ev = balanceValue(r.ev);
+    const house = cur(r.house) ? r.house.value : null;
+    if (house !== null && house < T.houseNegW) {
+      negSince = memo0.negSince ?? now;
+      if (now - negSince >= T.houseNegMs) warnings.push({ code: 'house-negative', critical: true, text: 'Huisverbruik is negatief: richting van P1 mogelijk omgekeerd of formule fout.' });
+    }
+    const total = importW !== null && pv !== null ? importW + pv : null; // whole connection, incl. Cupra and praktijk
+    if (total !== null && ev !== null && house !== null) {
+      const calc = total - ev; // = house sensor incl. praktijk (praktijk is a sub-meter behind P1)
+      if (Math.abs(calc - house) > T.crossDiffW) {
+        crossSince = memo0.crossSince ?? now;
+        if (now - crossSince >= T.crossMs) warnings.push({ code: 'crosscheck', critical: true, text: 'Net + zon − Cupra wijkt meer dan 150 W af van de huissensor.' });
+      }
+    }
+    const praktijkLinked = !!r.praktijk && r.praktijk.state !== 'unlinked';
+    let praktijkOk = cur(r.praktijk);
+    if (praktijkOk) {
+      const p = r.praktijk.value;
+      const ceiling = house !== null ? house + T.crossDiffW : (total !== null && ev !== null ? total - ev + T.crossDiffW : Infinity);
+      if (p < -T.routeMinW || p > ceiling) {
+        praktijkOk = false;
+        warnings.push({ code: 'praktijk-implausible', critical: false, text: 'Praktijkmeting past niet binnen het totale verbruik: submeter controleren.' });
+      }
+    }
+    if (input.sunUp === false && cur(r.pv) && r.pv.value > 50) {
+      warnings.push({ code: 'pv-night', critical: false, text: 'Zonne-opwek gemeten terwijl de zon onder is.' });
+    }
+    const critical = warnings.some(w => w.critical);
+    const blockedReason = !connected ? 'Offline' : critical ? 'Gestopt: meetketen tegenstrijdig' : null;
+
+    // --- Routes
+    const candidates = {
+      'sun-home': { flag: 'pv_verified', reading: r.pv, w: cur(r.pv) ? r.pv.value : null, ok: cur(r.pv) },
+      'grid-home': { flag: 'p1_sign_verified', reading: r.net, w: importW, ok: cur(r.net) && g.dir === 'import' },
+      'home-grid': { flag: 'p1_sign_verified', reading: r.net, w: importW === null ? null : -importW, ok: cur(r.net) && g.dir === 'export' },
+      'home-ev': { flag: 'alfen_verified', reading: r.ev, w: cur(r.ev) ? r.ev.value : null, ok: cur(r.ev) },
+      'home-praktijk': { flag: 'praktijk_meter', reading: r.praktijk, w: praktijkOk ? r.praktijk.value : null, ok: praktijkOk }
+    };
+    const memoRoutes = memo0.routes || {};
+    const routes = {};
+    const nextMemoRoutes = {};
+    for (const id of ROUTES) {
+      const c = candidates[id];
+      const m = memoRoutes[id] || {};
+      let active = false, intensity = 0, grace = false, reason;
+      if (blockedReason) reason = blockedReason;
+      else if (!trust[c.flag]) reason = 'Meetketen niet geverifieerd';
+      else if (c.ok && c.w !== null && c.w >= T.routeMinW) {
+        active = true; intensity = intensityOf(c.w); reason = 'Actief';
+      } else if (!cur(c.reading) && m.lastActiveAt != null && now - m.lastActiveAt < T.graceMs) {
+        // One bad update must not make the route blink: fade out over the grace period.
+        active = true; grace = true;
+        intensity = Math.max(0.05, (m.intensity || 0.15) * (1 - (now - m.lastActiveAt) / T.graceMs));
+        reason = 'Laatste meting wordt bevestigd';
+      } else reason = cur(c.reading) ? 'Onder 30 W of andere richting' : 'Geen actuele meting';
+      routes[id] = Object.freeze({ id, active, intensity, grace, reason, watts: active && !grace ? c.w : null });
+      nextMemoRoutes[id] = active && !grace ? { lastActiveAt: now, intensity } : (grace ? m : {});
+    }
+
+    // --- House label (praktijk is a sub-meter behind P1)
+    let houseTile;
+    const derivedNote = trust.house_derivation_verified ? 'excl. Cupra' : 'excl. Cupra · berekend';
+    if (!praktijkLinked) {
+      houseTile = { label: 'Huis + praktijk', sub: derivedNote, value: house !== null && house >= 0 ? house : null, state: r.house?.state || 'unknown', reason: house !== null && house < 0 ? 'Negatieve waarde, zie meetketen' : (r.house?.reason || 'Onbekend') };
+    } else if (praktijkOk && house !== null && house - r.praktijk.value >= -T.routeMinW) {
+      houseTile = { label: 'Eigen huis', sub: trust.house_derivation_verified ? 'excl. Cupra en praktijk' : 'excl. Cupra en praktijk · berekend', value: Math.max(0, house - r.praktijk.value), state: r.house.state, reason: 'Actueel' };
+    } else {
+      houseTile = { label: 'Eigen huis', sub: 'excl. Cupra en praktijk', value: null, state: 'unknown', reason: 'Praktijkmeting ontbreekt of klopt niet' };
+    }
+
+    // --- Status and summary
+    const keys = ['net', 'pv', 'house', 'ev', 'soc'].concat(praktijkLinked ? ['praktijk'] : []);
+    const nCur = keys.filter(k => cur(r[k])).length;
+    let status;
+    if (mode === 'demo') status = { text: 'DEMO', tone: 'demo' };
+    else if (!connected) status = { text: 'Offline', tone: 'bad' };
+    else if (critical) status = { text: 'Controle nodig', tone: 'bad' };
+    else status = { text: 'Live · ' + nCur + '/' + keys.length, tone: nCur === keys.length ? 'ok' : 'warn' };
+
+    const anyActive = ROUTES.some(id => routes[id].active);
+    const summary = summarize({ mode, connected, critical, r, g, importW, anyActive, trust });
+
+    const model = {
+      mode, connected, now, trust, warnings: Object.freeze(warnings), critical,
+      grid: Object.freeze({ direction: g.dir, importW }),
+      routes: Object.freeze(routes), houseTile: Object.freeze(houseTile), status: Object.freeze(status),
+      summary, readings: r,
+      memo: { grid: g.memo, negSince, crossSince, routes: nextMemoRoutes }
+    };
+    return Object.freeze(model);
+  }
+
+  function pickBooleans(obj) {
+    const out = {};
+    for (const k of Object.keys(DEFAULT_TRUST)) if (obj && obj[k] === true) out[k] = true; // only an explicit true opens a route
+    return out;
+  }
+
+  function fmt(w) {
+    const a = Math.abs(w);
+    return a < 1000 ? Math.round(a / 10) * 10 + ' W' : (a / 1000).toFixed(1).replace('.', ',') + ' kW';
+  }
+
+  function summarize({ mode, connected, critical, r, g, importW, anyActive, trust }) {
+    if (!connected) return 'Geen verbinding met Home Assistant. Waarden tonen hun laatste stand.';
+    if (critical) return 'De meetketen geeft tegenstrijdige waarden. Stroomroutes staan stil tot dit is opgelost.';
+    const parts = [];
+    if (cur(r.pv) && r.pv.value >= T.routeMinW) parts.push('zon levert ' + fmt(r.pv.value));
+    if (g.dir === 'export' && importW !== null) parts.push(fmt(importW) + ' gaat terug naar het net');
+    else if (g.dir === 'import' && importW !== null) parts.push(fmt(importW) + ' komt van het net');
+    else if (g.dir === 'balance') parts.push('het net is in balans');
+    if (cur(r.ev) && r.ev.value >= T.routeMinW) parts.push('de Cupra laadt met ' + fmt(r.ev.value));
+    let s = parts.length ? parts.join(', ') : 'nog geen actuele vermogensmeting';
+    s = s.charAt(0).toUpperCase() + s.slice(1) + '.';
+    if (mode === 'live' && !anyActive && Object.values(trust).some(v => !v)) s += ' Stroomroutes staan stil: meetketen nog niet geverifieerd.';
+    return s;
+  }
+
+  return Object.freeze({ DEFAULT_TRUST, THRESHOLDS: T, ROUTES, computeModel });
+});
+
+/* ---- scene-art.js ---- */
+/* Laag 3 + 4: compositie (layouttabellen) en vector-art van de scène.
+ * Alle coördinaten in scène-eenheden (canvas 1600 x 1100). Kaarten en deeltjes gebruiken
+ * dezelfde viewBox-transformatie, dus ze kunnen niet van hun route af schuiven.
+ * Deze vector-art is de F2-noodvariant: de opleverversie vervangt laag 4 door gerenderde rasterlagen.
+ */
+(function (root) {
+  'use strict';
+
+  const LAYOUTS = {
+    desktop: {
+      viewBox: [0, 40, 1600, 840],
+      hide: [],
+      anchors: { sun: [285, 150], battery: [1315, 150], house: [1030, 292], praktijk: [285, 420], cupra: [1330, 470], net: [800, 818] },
+      routes: {
+        sun: 'M440 168 C 620 150 770 220 846 370',
+        grid: 'M800 616 C 800 670 800 710 800 748',
+        ev: 'M1006 600 C 1040 640 1062 676 1090 690',
+        praktijk: 'M640 616 C 560 660 480 650 424 606',
+        battery: 'M1160 150 C 1010 150 940 230 912 350'
+      }
+    },
+    tablet: {
+      viewBox: [70, 20, 1460, 1020],
+      hide: [],
+      anchors: { sun: [300, 140], battery: [1300, 140], house: [690, 330], praktijk: [290, 440], cupra: [1320, 470], net: [800, 930] },
+      routes: {
+        sun: 'M515 150 C 700 120 820 200 846 370',
+        grid: 'M800 616 C 800 700 800 780 800 856',
+        ev: 'M1006 600 C 1040 640 1062 676 1090 690',
+        praktijk: 'M640 616 C 560 660 480 650 424 606',
+        battery: 'M1088 200 C 1000 220 940 260 912 350'
+      }
+    },
+    mobile: {
+      viewBox: [450, 110, 700, 900],
+      hide: ['pavilion', 'car', 'charger'],
+      anchors: { sun: [625, 202], battery: [975, 202], house: [790, 418], praktijk: [565, 907], net: [800, 907], cupra: [1035, 907] },
+      routes: {
+        sun: 'M625 292 C 660 340 730 370 830 388',
+        grid: 'M800 616 C 800 690 800 760 800 818',
+        ev: 'M962 602 C 1000 670 1035 740 1035 818',
+        praktijk: 'M650 616 C 610 680 565 750 565 818',
+        battery: 'M975 292 C 970 320 950 340 930 362'
+      }
+    }
+  };
+
+  // Bilinear point on the right roof plane (where the panels are).
+  const ROOF = [[720, 330], [915, 356], [1030, 458], [828, 440]];
+  function roofPt(u, v) {
+    const [a, b, c, d] = ROOF;
+    const top = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+    const bot = [d[0] + (c[0] - d[0]) * u, d[1] + (c[1] - d[1]) * u];
+    return [top[0] + (bot[0] - top[0]) * v, top[1] + (bot[1] - top[1]) * v];
+  }
+  const P = pts => pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+
+  function panels() {
+    let s = '';
+    const cols = 5, rows = 3, u0 = 0.1, u1 = 0.92, v0 = 0.14, v1 = 0.86, gu = 0.012, gv = 0.03;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const ua = u0 + (u1 - u0) * c / cols + gu, ub = u0 + (u1 - u0) * (c + 1) / cols - gu;
+      const va = v0 + (v1 - v0) * r / rows + gv, vb = v0 + (v1 - v0) * (r + 1) / rows - gv;
+      s += '<polygon points="' + P([roofPt(ua, va), roofPt(ub, va), roofPt(ub, vb), roofPt(ua, vb)]) + '" fill="url(#gPanel)" stroke="#6E93D6" stroke-opacity=".45" stroke-width="1"/>';
+      // cell grid lines
+      for (let k = 1; k < 3; k++) {
+        const v = va + (vb - va) * k / 3;
+        s += '<line x1="' + roofPt(ua, v)[0].toFixed(1) + '" y1="' + roofPt(ua, v)[1].toFixed(1) + '" x2="' + roofPt(ub, v)[0].toFixed(1) + '" y2="' + roofPt(ub, v)[1].toFixed(1) + '" stroke="#8FB0EA" stroke-opacity=".18" stroke-width=".8"/>';
+      }
+    }
+    return s;
+  }
+
+  // Deterministic pseudo-random for stars/trees (same picture every render).
+  function rng(seed) { let x = seed; return () => (x = (x * 16807) % 2147483647) / 2147483647; }
+
+  function stars() {
+    const r = rng(7); let s = '';
+    for (let i = 0; i < 70; i++) {
+      const x = r() * 1600, y = 40 + r() * 330, o = 0.25 + r() * 0.6, rad = r() < 0.1 ? 1.6 : 0.9;
+      s += '<circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + rad + '" fill="#DCE8FF" opacity="' + o.toFixed(2) + '"/>';
+    }
+    return s;
+  }
+
+  function treeline(y, h, seed, fill, opacity, blur) {
+    const r = rng(seed); let d = 'M0 ' + (y + 40) + ' L0 ' + y;
+    let x = 0;
+    while (x < 1600) {
+      const w = 30 + r() * 70, peak = y - h * (0.4 + r() * 0.6);
+      d += ' Q' + (x + w / 2).toFixed(0) + ' ' + peak.toFixed(0) + ' ' + (x + w).toFixed(0) + ' ' + (y - r() * h * 0.25).toFixed(0);
+      x += w;
+    }
+    d += ' L1600 ' + (y + 40) + ' Z';
+    return '<path d="' + d + '" fill="' + fill + '" opacity="' + opacity + '"' + (blur ? ' filter="url(#fBlur' + blur + ')"' : '') + '/>';
+  }
+
+  function tree(x, base, h, w, fill) {
+    // Layered deciduous crown with a subtle warm rim from the house.
+    return '<g>' +
+      '<rect x="' + (x - 4) + '" y="' + (base - h * 0.35) + '" width="8" height="' + (h * 0.35) + '" fill="#0A0F0D"/>' +
+      '<ellipse cx="' + x + '" cy="' + (base - h * 0.6) + '" rx="' + w + '" ry="' + (h * 0.42) + '" fill="' + fill + '"/>' +
+      '<ellipse cx="' + (x - w * 0.35) + '" cy="' + (base - h * 0.5) + '" rx="' + (w * 0.65) + '" ry="' + (h * 0.3) + '" fill="' + fill + '"/>' +
+      '<ellipse cx="' + (x + w * 0.4) + '" cy="' + (base - h * 0.72) + '" rx="' + (w * 0.6) + '" ry="' + (h * 0.3) + '" fill="' + fill + '"/>' +
+      '</g>';
+  }
+
+  function house() {
+    return '<g id="house">' +
+      // light spill on the lawn
+      '<ellipse cx="760" cy="640" rx="330" ry="70" fill="#FFB24D" opacity=".20" filter="url(#fBlur30)"/>' +
+      '<ellipse cx="680" cy="625" rx="70" ry="22" fill="#FFC77A" opacity=".45" filter="url(#fBlur12)"/>' +
+      '<ellipse cx="900" cy="618" rx="80" ry="18" fill="#FFC77A" opacity=".30" filter="url(#fBlur12)"/>' +
+      // contact shadow
+      '<ellipse cx="820" cy="612" rx="280" ry="12" fill="#000" opacity=".55" filter="url(#fBlur6)"/>' +
+      // garden wing (flat roof, big glass)
+      '<rect x="520" y="502" width="102" height="110" fill="url(#gWallFront)"/>' +
+      '<rect x="512" y="492" width="116" height="12" rx="2" fill="#0F141B"/>' +
+      '<rect x="512" y="503" width="116" height="2" fill="#FFCF8A" opacity=".55"/>' +
+      '<rect x="532" y="520" width="78" height="84" fill="url(#gWindow)"/>' +
+      '<path d="M571 520 V604 M532 560 H610" stroke="#2A2118" stroke-width="3"/>' +
+      // side wall (receding)
+      '<polygon points="820,430 1012,452 1012,600 820,612" fill="url(#gWallSide)"/>' +
+      '<polygon points="858,486 902,490 902,548 858,546" fill="url(#gWindow)" opacity=".9"/>' +
+      '<polygon points="936,494 978,498 978,552 936,550" fill="url(#gWindow)" opacity=".75"/>' +
+      '<path d="M858 486 L902 490 L902 548 L858 546 Z M936 494 L978 498 L978 552 L936 550 Z M880 488 V547 M957 496 V551" fill="none" stroke="#1B1610" stroke-width="2.5"/>' +
+      // front gable facade
+      '<polygon points="620,440 720,334 820,440 820,612 620,612" fill="url(#gWallFront)"/>' +
+      '<rect x="638" y="498" width="72" height="92" fill="url(#gWindow)"/>' +
+      '<path d="M674 498 V590 M638 540 H710" stroke="#2A2118" stroke-width="3.5"/>' +
+      '<rect x="736" y="512" width="44" height="100" fill="url(#gDoor)"/>' +
+      '<circle cx="772" cy="562" r="2.4" fill="#FFE2A8"/>' +
+      '<rect x="700" y="380" width="40" height="44" fill="url(#gWindow)"/>' +
+      '<path d="M720 380 V424" stroke="#2A2118" stroke-width="2.5"/>' +
+      '<circle cx="788" cy="500" r="4" fill="#FFF1C9"/><circle cx="788" cy="500" r="16" fill="#FFD48A" opacity=".35" filter="url(#fBlur6)"/>' +
+      // roof: front fascia + right plane
+      '<polygon points="' + P(ROOF) + '" fill="url(#gRoof)"/>' +
+      panels() +
+      '<polygon points="' + P(ROOF) + '" fill="url(#gRoofSheen)"/>' +
+      '<polyline points="604,446 720,326 836,446" fill="none" stroke="#151A22" stroke-width="14" stroke-linejoin="round"/>' +
+      '<polyline points="604,446 720,326 836,446" fill="none" stroke="#FFD9A0" stroke-opacity=".22" stroke-width="2" stroke-linejoin="round"/>' +
+      '<line x1="720" y1="326" x2="915" y2="352" stroke="#2A3240" stroke-width="5" stroke-linecap="round"/>' +
+      '<line x1="836" y1="446" x2="1034" y2="462" stroke="#0E1218" stroke-width="7" stroke-linecap="round"/>' +
+      // foundation / plinth
+      '<polygon points="616,606 820,606 1012,596 1012,604 820,618 616,618" fill="#0E1116"/>' +
+      // shrubs with warm rim
+      '<ellipse cx="610" cy="612" rx="34" ry="16" fill="#0D1E15"/><ellipse cx="604" cy="606" rx="22" ry="9" fill="#2E4A26" opacity=".7"/>' +
+      '<ellipse cx="840" cy="616" rx="30" ry="13" fill="#0D1E15"/><ellipse cx="838" cy="610" rx="18" ry="7" fill="#3A5228" opacity=".7"/>' +
+      '<ellipse cx="990" cy="606" rx="36" ry="14" fill="#0B1912"/>' +
+      '</g>';
+  }
+
+  function pavilion() {
+    return '<g id="pavilion" data-only="pavilion">' +
+      '<ellipse cx="290" cy="640" rx="190" ry="34" fill="#FFB24D" opacity=".16" filter="url(#fBlur20)"/>' +
+      '<ellipse cx="300" cy="634" rx="160" ry="9" fill="#000" opacity=".55" filter="url(#fBlur6)"/>' +
+      // right side wall
+      '<polygon points="402,540 444,548 444,622 402,632" fill="#20170F"/>' +
+      // front with slats
+      '<rect x="168" y="540" width="234" height="92" fill="url(#gWood)"/>' +
+      '<rect x="168" y="540" width="234" height="92" fill="url(#pSlats)"/>' +
+      '<rect x="206" y="554" width="150" height="70" fill="url(#gWindowCool)"/>' +
+      '<path d="M256 554 V624 M306 554 V624" stroke="#22190F" stroke-width="3"/>' +
+      '<rect x="368" y="566" width="22" height="66" fill="#1A120B"/>' +
+      // flat roof slab with ice-blue LED edge (praktijk accent)
+      '<polygon points="156,528 414,528 452,538 452,544 414,542 156,542" fill="#12161C"/>' +
+      '<rect x="156" y="541" width="258" height="2" fill="#7CB8FF" opacity=".75"/>' +
+      '<rect x="156" y="541" width="258" height="8" fill="#7CB8FF" opacity=".18" filter="url(#fBlur6)"/>' +
+      // planters
+      '<rect x="176" y="616" width="22" height="16" fill="#151A1E"/><ellipse cx="187" cy="610" rx="16" ry="12" fill="#1E3A20"/>' +
+      '<rect x="372" y="620" width="18" height="12" fill="#151A1E"/>' +
+      '</g>';
+  }
+
+  function charger() {
+    return '<g id="charger" data-only="charger">' +
+      '<ellipse cx="1092" cy="700" rx="22" ry="5" fill="#000" opacity=".6" filter="url(#fBlur3)"/>' +
+      '<rect x="1084" y="630" width="16" height="70" rx="3" fill="#1C232C"/>' +
+      '<rect x="1081" y="628" width="22" height="30" rx="4" fill="#E9EEF2"/>' +
+      '<rect x="1086" y="634" width="12" height="3" rx="1.5" fill="#33DDFF"/>' +
+      '<path d="M1100 650 C 1120 660 1128 676 1146 668" fill="none" stroke="#11161C" stroke-width="3"/>' +
+      '</g>';
+  }
+
+  function car() {
+    // Side view facing the house (front at left). Body green as the KPN company car; no logos.
+    return '<g id="car" data-only="car">' +
+      '<ellipse cx="1295" cy="716" rx="200" ry="40" fill="#5BE13A" opacity=".22" filter="url(#fBlur20)"/>' +
+      '<ellipse cx="1295" cy="712" rx="180" ry="10" fill="#000" opacity=".7" filter="url(#fBlur6)"/>' +
+      '<path d="M1136 690 L1132 664 Q1132 646 1152 640 L1236 622 Q1262 600 1292 588 Q1306 582 1330 582 L1398 584 Q1428 586 1440 600 L1452 630 Q1462 646 1460 668 L1456 690 Z" fill="url(#gCar)"/>' +
+      // greenhouse
+      '<path d="M1246 624 L1290 594 Q1300 589 1316 589 L1396 591 Q1418 593 1426 606 L1432 622 Z" fill="url(#gGlass)"/>' +
+      '<path d="M1336 590 L1332 624" stroke="#0B1310" stroke-width="5"/>' +
+      // shoulder highlight + copper trim
+      '<path d="M1150 644 L1240 628 L1440 630" fill="none" stroke="#D8FFC8" stroke-opacity=".55" stroke-width="2"/>' +
+      '<path d="M1170 676 L1430 676" stroke="#C98B5A" stroke-opacity=".75" stroke-width="2"/>' +
+      // door seams
+      '<path d="M1258 630 L1262 684 M1336 630 L1340 684" stroke="#1D7A22" stroke-opacity=".7" stroke-width="1.5"/>' +
+      // lights
+      '<path d="M1136 652 L1176 646" stroke="#E8FBFF" stroke-width="4" stroke-linecap="round"/>' +
+      '<path d="M1130 654 L1190 644" stroke="#BFF6FF" stroke-width="12" stroke-linecap="round" opacity=".35" filter="url(#fBlur6)"/>' +
+      '<path d="M1446 618 L1456 640" stroke="#FF3B3B" stroke-width="4" stroke-linecap="round"/>' +
+      // wheels
+      wheel(1196) + wheel(1394) +
+      '</g>';
+  }
+  function wheel(cx) {
+    const cy = 690;
+    let spokes = '';
+    for (let i = 0; i < 5; i++) {
+      const a = i * Math.PI * 2 / 5;
+      spokes += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + Math.cos(a) * 17).toFixed(1) + '" y2="' + (cy + Math.sin(a) * 17).toFixed(1) + '" stroke="#8C949C" stroke-width="4" stroke-linecap="round"/>';
+    }
+    return '<path d="M' + (cx - 38) + ' ' + (cy + 2) + ' A38 38 0 0 1 ' + (cx + 38) + ' ' + (cy + 2) + '" fill="#0B110C"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="29" fill="#0C0E10"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="20" fill="#2B3036"/>' + spokes +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#C98B5A"/>';
+  }
+
+  function cabinet() {
+    return '<g id="cabinet">' +
+      '<ellipse cx="876" cy="712" rx="40" ry="6" fill="#000" opacity=".6" filter="url(#fBlur3)"/>' +
+      '<g transform="translate(76 0)"><polygon points="770,664 824,664 834,660 834,706 824,712 770,712" fill="#1A2224"/>' +
+      '<rect x="770" y="664" width="54" height="48" fill="url(#gCabinet)"/>' +
+      '<path d="M800 672 L792 690 H800 L796 704 L808 684 H800 L804 672 Z" fill="#C7D3D6" opacity=".7"/>' +
+      '<path d="M770 700 C 750 704 740 712 724 712" fill="none" stroke="#0A0F12" stroke-width="3"/></g>' +
+      '</g>';
+  }
+
+  function defs() {
+    return '<defs>' +
+      '<linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="#050C1A"/><stop offset=".45" stop-color="#0B1830"/><stop offset=".72" stop-color="#18284A"/>' +
+        '<stop offset=".86" stop-color="#3A3352"/><stop offset=".94" stop-color="#6B4048"/><stop offset="1" stop-color="#8A5340"/></linearGradient>' +
+      '<linearGradient id="gGround" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="#12261F"/><stop offset=".25" stop-color="#0B1A15"/><stop offset="1" stop-color="#03080A"/></linearGradient>' +
+      '<radialGradient id="gHorizon" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FF9A4D" stop-opacity=".45"/><stop offset="1" stop-color="#FF9A4D" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="gWallFront" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3734"/><stop offset="1" stop-color="#26241F"/></linearGradient>' +
+      '<linearGradient id="gWallSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22201D"/><stop offset="1" stop-color="#151514"/></linearGradient>' +
+      '<linearGradient id="gRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20252E"/><stop offset="1" stop-color="#11151B"/></linearGradient>' +
+      '<linearGradient id="gRoofSheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9FC2FF" stop-opacity=".18"/><stop offset=".5" stop-color="#9FC2FF" stop-opacity="0"/><stop offset="1" stop-color="#FF9A4D" stop-opacity=".12"/></linearGradient>' +
+      '<linearGradient id="gPanel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2C4D86"/><stop offset=".6" stop-color="#132A52"/><stop offset="1" stop-color="#0B1A36"/></linearGradient>' +
+      '<linearGradient id="gWindow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE3A6"/><stop offset=".55" stop-color="#FFB357"/><stop offset="1" stop-color="#E07A28"/></linearGradient>' +
+      '<linearGradient id="gWindowCool" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE9C2"/><stop offset="1" stop-color="#F0A256"/></linearGradient>' +
+      '<linearGradient id="gDoor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2A1C"/><stop offset="1" stop-color="#1E150D"/></linearGradient>' +
+      '<linearGradient id="gWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6A4529"/><stop offset="1" stop-color="#3A2515"/></linearGradient>' +
+      '<pattern id="pSlats" width="9" height="10" patternUnits="userSpaceOnUse"><rect width="9" height="10" fill="none"/><rect x="7" width="2" height="10" fill="#1F140B" opacity=".55"/></pattern>' +
+      '<linearGradient id="gCar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8CF56A"/><stop offset=".35" stop-color="#4FD62E"/><stop offset=".8" stop-color="#2E9A1C"/><stop offset="1" stop-color="#1B5E12"/></linearGradient>' +
+      '<linearGradient id="gGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2C3E4E"/><stop offset=".5" stop-color="#0E161E"/><stop offset="1" stop-color="#1C2A36"/></linearGradient>' +
+      '<linearGradient id="gCabinet" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3A4648"/><stop offset="1" stop-color="#232C2E"/></linearGradient>' +
+      [3, 6, 12, 20, 30].map(n => '<filter id="fBlur' + n + '" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + n + '"/></filter>').join('') +
+      '<filter id="fGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+      '</defs>';
+  }
+
+  function routeGroup(comp, id, d, kind) {
+    // Groove + idle core + active glow; chevrons are the reduced-motion direction cue.
+    const aerial = id === 'sun' || id === 'battery';
+    return '<g class="route route-' + id + '" data-route="' + id + '" data-comp="' + comp + '">' +
+      (aerial ? '' : '<path class="r-groove" d="' + d + '"/>') +
+      '<path class="r-core" d="' + d + '" id="path-' + comp + '-' + id + '"/>' +
+      (kind === 'calc' ? '' : '<path class="r-glow" d="' + d + '"/><path class="r-chev" d="' + d + '"/>') +
+      '</g>';
+  }
+
+  function build() {
+    let routes = '';
+    for (const [comp, L] of Object.entries(LAYOUTS)) {
+      for (const [id, d] of Object.entries(L.routes)) routes += routeGroup(comp, id, d, id === 'battery' ? 'calc' : 'energy');
+    }
+    return defs() +
+      '<rect x="0" y="0" width="1600" height="480" fill="url(#gSky)"/>' +
+      '<g class="stars">' + stars() + '</g>' +
+      '<ellipse cx="800" cy="480" rx="760" ry="120" fill="url(#gHorizon)"/>' +
+      treeline(486, 120, 3, '#0E1A28', 0.9, 3) +
+      treeline(496, 80, 11, '#0A1512', 1, 0) +
+      '<rect x="0" y="480" width="1600" height="620" fill="url(#gGround)"/>' +
+      '<ellipse cx="800" cy="560" rx="700" ry="40" fill="#1E3A2C" opacity=".35" filter="url(#fBlur20)"/>' +
+      '<g class="bokeh">' +
+        '<circle cx="140" cy="420" r="26" fill="#FFB24D" opacity=".10" filter="url(#fBlur6)"/>' +
+        '<circle cx="1480" cy="430" r="34" fill="#7CB8FF" opacity=".08" filter="url(#fBlur6)"/>' +
+        '<circle cx="1060" cy="470" r="14" fill="#FFB24D" opacity=".14" filter="url(#fBlur3)"/>' +
+      '</g>' +
+      tree(470, 600, 210, 70, '#081510') + tree(1095, 590, 240, 80, '#07130E') + tree(1520, 640, 260, 90, '#06100C') + tree(70, 650, 230, 80, '#06100C') +
+      pavilion() + house() + cabinet() + charger() +
+      '<g class="routes">' + routes + '</g>' +
+      car();
+  }
+
+  root.EhSceneArt = Object.freeze({ LAYOUTS, build });
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+/* ---- sources.js ---- */
+/* Laag 1b: databronnen voor de preview. Buiten Home Assistant bestaan er geen echte metingen,
+ * dus elke bron hier is ofwel DEMO (fictief, demo:true) of TEST (gesimuleerde HA-states die door
+ * exact dezelfde validatie gaan als in de kaart). Geen van beide wordt ooit als live getoond.
+ */
+(function (root) {
+  'use strict';
+  const R = root.EhReadings;
+
+  const ENTITIES = Object.freeze({
+    net: 'sensor.p1_meter_vermogen',
+    pv: 'sensor.goodwe_pv_power',
+    house: 'sensor.energiehuis_huisverbruik_exclusief_auto',
+    ev: 'sensor.alfen_actief_vermogen_totaal',
+    soc: 'sensor.garage_cupra_born_accuniveau',
+    battery: 'sensor.virtuele_batterij_soc',
+    praktijk: ''
+  });
+  // TTL's gelijk aan de bestaande eh40-cockpit (minuten -> seconden).
+  const SPECS = Object.freeze([
+    { key: 'net', kind: 'power', ttlS: 300, stable: false },
+    { key: 'pv', kind: 'power', ttlS: 2100, stable: true },
+    { key: 'house', kind: 'power', ttlS: 300, stable: false },
+    { key: 'ev', kind: 'power', ttlS: 2100, stable: true },
+    { key: 'soc', kind: 'percent', ttlS: 5400, stable: true },
+    { key: 'battery', kind: 'percent', ttlS: 5400, stable: true },
+    { key: 'praktijk', kind: 'power', ttlS: 300, stable: false }
+  ]);
+
+  // ---------- DEMO: fictieve, intern consistente waarden ----------
+  // Elk scenario klopt met de verbruiksbalans: huis(incl. praktijk) = afname + zon − Cupra.
+  const DEMO = {
+    teruglevering: { label: 'Avond, teruglevering', pv: 4820, ev: 1740, praktijk: 760, house: 1200, soc: 56, battery: 68 },
+    afname: { label: 'Na zonsondergang, laden van het net', pv: 0, ev: 2300, praktijk: 300, house: 600, soc: 41, battery: 22 },
+    zonladen: { label: 'Middag, laden op zon', pv: 6200, ev: 3700, praktijk: 760, house: 2350, soc: 63, battery: 91 }
+  };
+
+  function demoReadings(name, now) {
+    const s = DEMO[name] || DEMO.teruglevering;
+    // Gentle, deterministic variation so reviewers can judge smoothness; balance stays exact.
+    const wobble = s.pv > 0 ? Math.round(Math.sin(now / 6000) * 140) : 0;
+    const pv = s.pv + wobble;
+    const net = s.house + s.ev - pv; // import positive
+    const mk = (key, value, kind = 'power') => Object.freeze({
+      key, kind, value, demo: true, ageMs: 0, stampSource: 'demo', entity: 'demo.' + key,
+      state: kind === 'power' && Math.abs(value) < R.ZERO_W ? 'live-zero' : 'live', reason: 'DEMO'
+    });
+    return {
+      net: mk('net', net), pv: mk('pv', pv), house: mk('house', s.house), ev: mk('ev', s.ev),
+      soc: mk('soc', s.soc, 'percent'), battery: mk('battery', s.battery, 'percent'), praktijk: mk('praktijk', s.praktijk)
+    };
+  }
+
+  // ---------- TEST: gesimuleerde Home Assistant-states ----------
+  const iso = ms => new Date(ms).toISOString();
+  const W = (v, ageS, now) => ({ state: String(v), attributes: { unit_of_measurement: 'W' }, last_updated: iso(now - ageS * 1000) });
+  const PCT = (v, ageS, now) => ({ state: String(v), attributes: { unit_of_measurement: '%' }, last_updated: iso(now - ageS * 1000) });
+
+  const TEST = {
+    avond: { label: 'Avond, teruglevering (flags uit)', build: now => ({ net: W(-1880, 4, now), pv: W(4820, 20, now), house: W(1200, 4, now), ev: W(1740, 15, now), soc: PCT(56, 300, now), battery: PCT(68, 60, now) }) },
+    nacht: { label: 'Nacht, PV en Alfen laatst bekend 0 W', build: now => ({ net: W(650, 3, now), pv: W(0, 3 * 3600, now), house: W(650, 3, now), ev: W(0, 2 * 3600, now), soc: PCT(80, 4 * 3600, now), battery: PCT(12, 60, now) }) },
+    verouderd: { label: 'P1 en huis 20 min oud', build: now => ({ net: W(-900, 1200, now), pv: W(1300, 30, now), house: W(400, 1200, now), ev: W(0, 600, now), soc: PCT(72, 600, now), battery: PCT(40, 60, now) }) },
+    onbekend: { label: 'Onbekend en verkeerde eenheid', build: now => ({ net: { state: 'unavailable', attributes: { unit_of_measurement: 'W' }, last_updated: iso(now) }, pv: { state: '3.1', attributes: { unit_of_measurement: 'kWh' }, last_updated: iso(now) }, house: W(820, 5, now), ev: W(0, 30, now), soc: { state: 'unknown', attributes: { unit_of_measurement: '%' }, last_updated: iso(now) }, battery: PCT(40, 60, now) }) },
+    omgekeerd: { label: 'P1-teken omgekeerd (nacht)', warmupMs: 31000, build: now => ({ net: W(-650, 3, now), pv: W(0, 3 * 3600, now), house: W(-650, 3, now), ev: W(0, 7200, now), soc: PCT(80, 600, now), battery: PCT(12, 60, now) }) },
+    offline: { label: 'Home Assistant offline', connected: false, build: now => ({ net: W(-1880, 40, now), pv: W(4820, 40, now), house: W(1200, 40, now), ev: W(1740, 40, now), soc: PCT(56, 300, now), battery: PCT(68, 60, now) }) },
+    praktijk: { label: 'Praktijkmeter gekoppeld (flags uit)', praktijk: 'sensor.praktijk_kwh_meter_vermogen', build: now => ({ net: W(-1880, 4, now), pv: W(4820, 20, now), house: W(1200, 4, now), ev: W(1740, 15, now), soc: PCT(56, 300, now), battery: PCT(68, 60, now), praktijk: W(760, 4, now) }) },
+    geverifieerd: { label: 'Alle flags handmatig op true', trust: { p1_sign_verified: true, pv_verified: true, alfen_verified: true, house_derivation_verified: true, praktijk_meter: true }, praktijk: 'sensor.praktijk_kwh_meter_vermogen', build: now => ({ net: W(-1880, 4, now), pv: W(4820, 20, now), house: W(1200, 4, now), ev: W(1740, 15, now), soc: PCT(56, 300, now), battery: PCT(68, 60, now), praktijk: W(760, 4, now) }) }
+  };
+
+  function testReadings(name, now) {
+    const sc = TEST[name] || TEST.avond;
+    const ents = { ...ENTITIES, praktijk: sc.praktijk || '' };
+    const raw = sc.build(now);
+    const states = {};
+    for (const [k, v] of Object.entries(raw)) if (ents[k]) states[ents[k]] = { entity_id: ents[k], ...v };
+    const hass = { states };
+    const out = {};
+    for (const s of SPECS) out[s.key] = R.readEntity(hass, { ...s, entity: ents[s.key] }, now);
+    return { readings: out, entities: ents, trust: sc.trust || {}, connected: sc.connected !== false, warmupMs: sc.warmupMs || 0 };
+  }
+
+  root.EhSources = Object.freeze({ ENTITIES, SPECS, DEMO, TEST, demoReadings, testReadings });
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+/* ---- app.js ---- */
+/* Lagen 5–7 + host-simulatie.
+ * - HostSim herschrijft elke seconde zijn innerHTML, net als EnergiehuisCard._render() in HA.
+ * - Het scène-eiland (#island) wordt één keer gemaakt en na elke host-render teruggeplaatst.
+ *   Canvas, deeltjes en focus overleven daardoor elke update.
+ */
+(function () {
+  'use strict';
+  const R = window.EhReadings, F = window.EhFlowModel, A = window.EhSceneArt, S = window.EhSources;
+
+  const COLORS = { sun: '#FFC23D', export: '#4BE38A', import: '#FF8A5B', ev: '#33DDFF', praktijk: '#7CB8FF', battery: '#B07CFF', idle: '#7D8C99' };
+  const ROUTE_ART = {
+    'sun-home': { art: 'sun', color: COLORS.sun, reverse: false },
+    'home-grid': { art: 'grid', color: COLORS.export, reverse: false },
+    'grid-home': { art: 'grid', color: COLORS.import, reverse: true },
+    'home-ev': { art: 'ev', color: COLORS.ev, reverse: false },
+    'home-praktijk': { art: 'praktijk', color: COLORS.praktijk, reverse: false }
+  };
+
+  // ---------------- state ----------------
+  const params = new URLSearchParams(location.search);
+  const state = {
+    source: params.get('mode') === 'test' ? 'test' : 'demo',
+    scenario: params.get('scenario') || null,
+    forceReducedMotion: params.get('rm') === '1',
+    model: null,
+    entities: S.ENTITIES,
+    renders: 0,
+    lastLiveText: '', lastLiveAt: 0,
+    sheetKey: null, sheetOpener: null
+  };
+  if (!state.scenario) state.scenario = state.source === 'demo' ? 'teruglevering' : 'avond';
+
+  const mqReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reducedMotion = () => state.forceReducedMotion || mqReduce.matches;
+
+  // ---------------- icons ----------------
+  const ICON = {
+    sun: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="22" cy="9" r="4.5" fill="currentColor" opacity=".9"/><path d="M3 27 L9 15 H27 L29 27 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M6 21 H28 M14 15 L12 27 M21 15 L21 27" stroke="currentColor" stroke-width="1.4" opacity=".7"/></svg>',
+    battery: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="9" y="6" width="14" height="23" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13" y="3" width="6" height="3" rx="1" fill="currentColor"/><path d="M17 11 L12.5 18.5 H16 L15 24 L19.5 16.5 H16 Z" fill="currentColor"/></svg>',
+    house: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 15 L16 5 L28 15 M8 12 V27 H24 V12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><rect x="13.5" y="18" width="5" height="9" fill="currentColor" opacity=".8"/></svg>',
+    praktijk: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 11 H29 M5 11 V27 H27 V11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><rect x="9" y="15" width="10" height="8" fill="currentColor" opacity=".8"/><path d="M23 15 V27" stroke="currentColor" stroke-width="2"/></svg>',
+    net: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 L10 29 M16 3 L22 29 M11 23 H21 M12.5 16 H19.5 M8 10 H24 M14 8 L16 3 L18 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>',
+    car: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 21 V17 Q3 14 6 13.5 L10 9 Q11.5 7.5 14 7.5 H21 Q23 7.5 24.5 9.5 L27 13.5 Q29 14.5 29 17 V21 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="22" r="3" fill="currentColor"/><circle cx="23" cy="22" r="3" fill="currentColor"/></svg>'
+  };
+
+  // ---------------- island (built once) ----------------
+  const island = document.createElement('section');
+  island.id = 'island';
+  island.className = 'stage';
+  island.setAttribute('aria-label', 'Energiescène: woning met zonnepanelen, virtuele batterij, praktijkruimte, net en Cupra');
+  island.innerHTML =
+    '<svg class="scene" id="scene" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice">' + A.build() + '</svg>' +
+    '<canvas class="particles" id="particles" aria-hidden="true"></canvas>' +
+    '<div class="tiles">' +
+      tileHtml('sun', 'Zonnepanelen', ICON.sun) +
+      tileHtml('battery', 'Batterij', ICON.battery, '<span class="t-tag">Simulatie</span>', '<span class="t-simshort">Simulatie</span><span class="t-bar"><i></i></span>') +
+      '<button type="button" class="tile t-house" data-tile="house"><span class="t-icon">' + ICON.house + '</span><span class="t-text"><span class="t-name"></span><span class="t-val"></span><span class="t-sub"></span></span></button>' +
+      tileHtml('praktijk', 'Praktijkruimte', ICON.praktijk) +
+      tileHtml('net', 'Net', ICON.net) +
+      tileHtml('cupra', 'Cupra Born', ICON.car) +
+    '</div>';
+  function tileHtml(key, name, icon, tag = '', extra = '') {
+    return '<button type="button" class="tile t-' + key + '" data-tile="' + key + '">' +
+      '<span class="t-head"><span class="t-icon">' + icon + '</span><span class="t-name">' + name + '</span>' + tag + '</span>' +
+      '<span class="t-val">—</span><span class="t-sub"></span>' + extra + '</button>';
+  }
+
+  const svg = island.querySelector('#scene');
+  const canvas = island.querySelector('#particles');
+  const tiles = Object.fromEntries([...island.querySelectorAll('.tile')].map(b => [b.dataset.tile, b]));
+  let comp = null, layout = null, scale = 1, stageW = 0, stageH = 0;
+
+  function chooseComp(w) { return w < 560 ? 'mobile' : w < 1100 ? 'tablet' : 'desktop'; }
+
+  function applyLayout() {
+    const w = island.clientWidth;
+    if (!w) return;
+    const next = chooseComp(w);
+    if (next !== comp) {
+      comp = next; layout = A.LAYOUTS[comp];
+      island.dataset.comp = comp;
+      svg.setAttribute('viewBox', layout.viewBox.join(' '));
+      island.style.setProperty('--ar', layout.viewBox[2] + ' / ' + layout.viewBox[3]);
+      for (const g of svg.querySelectorAll('[data-only]')) g.style.display = layout.hide.includes(g.dataset.only) ? 'none' : '';
+      for (const g of svg.querySelectorAll('.route')) g.style.display = g.dataset.comp === comp ? '' : 'none';
+    }
+    stageW = island.clientWidth; stageH = island.clientHeight;
+    scale = stageW / layout.viewBox[2];
+    // Position tiles on their anchors, clamped inside the stage.
+    for (const [key, el] of Object.entries(tiles)) {
+      const [ax, ay] = layout.anchors[key === 'cupra' ? 'cupra' : key];
+      const px = (ax - layout.viewBox[0]) * scale, py = (ay - layout.viewBox[1]) * scale;
+      const tw = el.offsetWidth, th = el.offsetHeight;
+      const left = Math.max(6, Math.min(stageW - tw - 6, px - tw / 2));
+      const top = Math.max(6, Math.min(stageH - th - 6, py - th / 2));
+      el.style.transform = 'translate(' + left.toFixed(1) + 'px,' + top.toFixed(1) + 'px)';
+    }
+    particles.relayout();
+  }
+
+  // ---------------- particles (layer 5) ----------------
+  const particles = (function () {
+    const ctx = canvas.getContext('2d');
+    let dpr = 1, routes = new Map(), raf = 0, last = 0, visible = true, frames = 0, cost = [];
+    const sprites = {};
+    function sprite(color) {
+      if (sprites[color]) return sprites[color];
+      const c = document.createElement('canvas'), n = 64; c.width = c.height = n;
+      const g = c.getContext('2d'), grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+      grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.18, color); grad.addColorStop(0.45, color + '55'); grad.addColorStop(1, color + '00');
+      g.fillStyle = grad; g.fillRect(0, 0, n, n);
+      return (sprites[color] = c);
+    }
+    function samplePath(artId, reverse) {
+      const p = svg.querySelector('#path-' + comp + '-' + artId);
+      if (!p) return null;
+      const len = p.getTotalLength(), pts = [];
+      for (let s = 0; s <= len; s += 3) {
+        const q = p.getPointAtLength(s);
+        pts.push([(q.x - layout.viewBox[0]) * scale, (q.y - layout.viewBox[1]) * scale]);
+      }
+      if (reverse) pts.reverse();
+      return pts;
+    }
+    function relayout() {
+      dpr = Math.min(window.devicePixelRatio || 1, stageW < 700 ? 2 : 1.25);
+      canvas.width = Math.round(stageW * dpr); canvas.height = Math.round(stageH * dpr);
+      for (const r of routes.values()) r.pts = samplePath(r.art, r.reverse);
+      kick();
+    }
+    function set(model) {
+      const seen = new Set();
+      for (const [id, spec] of Object.entries(ROUTE_ART)) {
+        const m = model.routes[id];
+        if (!m.active) { const r = routes.get(id); if (r) r.target = 0; continue; }
+        seen.add(id);
+        let r = routes.get(id);
+        if (!r) { r = { id, art: spec.art, reverse: spec.reverse, color: spec.color, shown: 0, target: 0, phase: 0, pts: null }; routes.set(id, r); }
+        r.target = m.intensity; r.pts = r.pts || samplePath(spec.art, spec.reverse);
+      }
+      kick();
+    }
+    function kick() {
+      if (reducedMotion()) { cancelAnimationFrame(raf); raf = 0; drawStatic(); return; }
+      if (!raf && visible && !document.hidden && [...routes.values()].some(r => r.target > 0 || r.shown > 0.01)) { last = performance.now(); raf = requestAnimationFrame(frame); }
+      if (![...routes.values()].length) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    function frame(t) {
+      const t0 = performance.now();
+      const dt = Math.min(0.05, (t - last) / 1000); last = t; frames++;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, stageW, stageH);
+      ctx.globalCompositeOperation = 'lighter';
+      let alive = false;
+      for (const r of routes.values()) {
+        r.shown += (r.target - r.shown) * (1 - Math.exp(-dt / 1.2)); // damped, never jumps
+        if (r.target === 0 && r.shown < 0.01) { routes.delete(r.id); continue; }
+        alive = true;
+        if (!r.pts || r.pts.length < 2) continue;
+        drawRoute(r, dt);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      cost.push(performance.now() - t0); if (cost.length > 240) cost.shift();
+      raf = alive && visible && !document.hidden ? requestAnimationFrame(frame) : 0;
+      if (!raf) ctx.clearRect(0, 0, stageW, stageH);
+    }
+    function drawRoute(r, dt) {
+      const pts = r.pts, n = pts.length, step = 3 * scale; // px per sample
+      const speed = 115 * scale; // constant speed; power changes density and brightness, not speed
+      r.phase = (r.phase + speed * dt) % (n * step);
+      const slots = 14, density = Math.sqrt(r.shown) * slots, spacing = (n * step) / slots;
+      const sp = sprite(r.color), size = (16 + 14 * r.shown) * Math.max(0.7, scale * 1.1);
+      for (let i = 0; i < slots; i++) {
+        const a = Math.max(0, Math.min(1, density - i));
+        if (a <= 0) continue;
+        const pos = (r.phase + i * spacing) % (n * step), idx = Math.floor(pos / step);
+        const edge = Math.min(1, idx / 8, (n - 1 - idx) / 8); // fade in/out at the ends
+        const alpha = a * Math.max(0, edge) * (0.45 + 0.55 * r.shown);
+        if (alpha <= 0.01) continue;
+        for (let k = 3; k >= 1; k--) {
+          const ti = idx - k * 3; if (ti < 0) continue;
+          ctx.globalAlpha = alpha * (0.3 - k * 0.07);
+          ctx.drawImage(sp, pts[ti][0] - size * 0.25, pts[ti][1] - size * 0.25, size * 0.5, size * 0.5);
+        }
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(sp, pts[idx][0] - size / 2, pts[idx][1] - size / 2, size, size);
+      }
+      ctx.globalAlpha = Math.min(1, r.shown * 1.4);
+      arrow(pts, r.color, 1);
+      ctx.globalAlpha = 1;
+    }
+    function arrow(pts, color, at) {
+      const n = pts.length, i = Math.max(2, Math.min(n - 1, Math.round((n - 1) * at)));
+      const [x, y] = pts[i], [px, py] = pts[i - 2], ang = Math.atan2(y - py, x - px), s = Math.max(5, 9 * scale * 1.2);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+      ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(-s, -s * 0.62); ctx.lineTo(-s * 0.6, 0); ctx.lineTo(-s, s * 0.62); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    function drawStatic() {
+      // Reduced motion: no movement. Direction = gradient from source to target + three chevrons.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, stageW, stageH);
+      for (const r of routes.values()) {
+        if (r.target <= 0) continue;
+        r.shown = r.target;
+        const pts = r.pts; if (!pts || pts.length < 2) continue;
+        const [x0, y0] = pts[0], [x1, y1] = pts[pts.length - 1];
+        const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, r.color + '10'); g.addColorStop(1, r.color + 'EE');
+        ctx.strokeStyle = g; ctx.lineWidth = Math.max(2, 3.2 * scale * 1.2); ctx.lineCap = 'round';
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke();
+        for (const at of [0.35, 0.65, 1]) arrow(pts, r.color, at);
+      }
+    }
+    new IntersectionObserver(es => { visible = es[0].isIntersecting; kick(); }).observe(island);
+    document.addEventListener('visibilitychange', kick);
+    return { set, relayout, kick, get cost() { const c = cost.slice().sort((a, b) => a - b); return c.length ? { p50: c[c.length >> 1], p95: c[Math.floor(c.length * 0.95)] } : null; }, get frames() { return frames; }, get running() { return !!raf; }, get count() { return routes.size; } };
+  })();
+
+  // ---------------- tiles (layer 6, patch-only) ----------------
+  function patch(el, sel, text) { const n = el.querySelector(sel); if (n && n.textContent !== text) n.textContent = text; }
+  function setTile(key, { value, sub, tone, aria, name }) {
+    const el = tiles[key];
+    if (name) patch(el, '.t-name', name);
+    patch(el, '.t-val', value);
+    patch(el, '.t-sub', sub);
+    el.dataset.tone = tone;
+    el.setAttribute('aria-label', aria);
+  }
+  const toneOf = r => !r ? 'off' : r.state === 'live' || r.state === 'live-zero' ? 'on' : r.state === 'retained' ? 'dim' : 'off';
+  const valOf = r => r && (r.state === 'live' || r.state === 'live-zero' || r.state === 'retained') ? R.formatPower(r.value) : '—';
+
+  function updateIsland(model) {
+    const r = model.readings;
+    island.dataset.mode = model.mode;
+    // Sun
+    setTile('sun', { value: valOf(r.pv), sub: r.pv.state === 'live' ? 'Opwek nu' : r.pv.state === 'live-zero' ? 'Geen opwek' : r.pv.reason, tone: toneOf(r.pv), aria: 'Zonnepanelen ' + valOf(r.pv) + ', ' + r.pv.reason + '. Details openen' });
+    // Battery (simulation, never a flow)
+    const b = r.battery, bv = b && R.hasValue(b) ? Math.round(b.value) + ' %' : '—';
+    setTile('battery', { value: bv, sub: 'Rekenmodel, geen fysieke batterij', tone: toneOf(b) === 'off' ? 'off' : 'sim', aria: 'Virtuele batterij, simulatie, ' + bv + '. Geen fysieke batterij. Details openen' });
+    tiles.battery.querySelector('.t-bar i').style.width = (b && R.hasValue(b) ? Math.max(0, Math.min(100, b.value)) : 0) + '%';
+    // House
+    const h = model.houseTile, hv = h.value === null ? '—' : R.formatPower(h.value);
+    setTile('house', { name: h.label, value: hv, sub: h.value === null ? h.reason : h.sub, tone: h.value === null ? 'off' : 'on', aria: h.label + ' ' + hv + ', ' + (h.value === null ? h.reason : h.sub) + '. Meetketen openen' });
+    // Praktijk
+    const p = r.praktijk;
+    const pUnl = !p || p.state === 'unlinked';
+    setTile('praktijk', { value: pUnl ? '— kW' : valOf(p), sub: pUnl ? 'Nog niet gekoppeld' : (p.state === 'live' || p.state === 'live-zero' ? 'Verbruik nu' : p.reason), tone: pUnl ? 'off' : toneOf(p), aria: 'Praktijkruimte ' + (pUnl ? 'nog niet gekoppeld' : valOf(p)) + '. Details openen' });
+    // Net: magnitude + word, never a sign
+    const dir = model.grid.direction, nv = model.grid.importW === null ? '—' : R.formatPower(model.grid.importW);
+    const word = dir === 'export' ? 'Teruglevering' : dir === 'import' ? 'Afname' : dir === 'balance' ? 'In balans' : r.net.reason;
+    const dirDoubt = model.warnings.some(w => w.code === 'house-negative' || w.code === 'crosscheck');
+    setTile('net', { value: dir === 'balance' ? '0 W' : nv, sub: dirDoubt ? 'Richting onzeker, zie meetketen' : word, tone: dirDoubt ? 'warn' : dir ? 'on' : 'off', aria: 'Net: ' + (dirDoubt ? 'richting onzeker, ' : word + ' ') + nv + '. Details openen' });
+    tiles.net.dataset.dir = dir || 'none';
+    // Cupra
+    const ev = r.ev, soc = r.soc;
+    const charging = ev && (ev.state === 'live') && ev.value >= F.THRESHOLDS.routeMinW;
+    const socTxt = soc && R.hasValue(soc) ? 'accu ' + Math.round(soc.value) + ' %' + (soc.state === 'retained' ? ' (laatst bekend)' : '') : 'accu onbekend';
+    const evSub = (ev && R.hasValue(ev) ? (charging ? 'Laadt' : 'Laadt niet') : ev ? ev.reason : 'Onbekend') + ' · ' + socTxt;
+    setTile('cupra', { value: valOf(ev), sub: evSub, tone: toneOf(ev), aria: 'Cupra Born laadvermogen ' + valOf(ev) + ', ' + evSub + '. Details openen' });
+
+    // Route styling (SVG layer): idle cable vs active colour; praktijk cable hidden until linked.
+    for (const g of svg.querySelectorAll('.route[data-comp="' + comp + '"]')) {
+      const art = g.dataset.route;
+      if (art === 'battery') { g.dataset.state = b && R.hasValue(b) ? 'calc' : 'off'; continue; }
+      const ids = Object.entries(ROUTE_ART).filter(([, v]) => v.art === art).map(([k]) => k);
+      const active = ids.find(id => model.routes[id].active);
+      g.dataset.state = art === 'praktijk' && pUnl ? 'hidden' : active ? 'active' : 'idle';
+      g.style.setProperty('--c', active ? ROUTE_ART[active].color : COLORS.idle);
+      g.style.setProperty('--i', active ? model.routes[active].intensity.toFixed(2) : '0');
+    }
+    particles.set(model);
+  }
+
+  // ---------------- host simulation (rewrites innerHTML like the HA card) ----------------
+  const host = document.getElementById('host');
+  function renderHost(model) {
+    // Remember focus inside the island: detaching the island blurs it.
+    const focusKey = island.contains(document.activeElement) ? document.activeElement.dataset.tile : null;
+    const time = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    const pillText = state.source === 'test' && model.status.tone !== 'bad' ? model.status.text.replace('Live', 'TEST') : model.status.text;
+    const band = state.source === 'demo' ? 'DEMO · fictieve waarden' : 'TESTDATA · gesimuleerde Home Assistant-states, geen echte meting';
+    const flags = Object.entries(model.mode === 'demo' ? F.DEFAULT_TRUST : model.trust);
+    host.innerHTML =
+      '<header class="ck-head"><div class="brand"><span class="brand-icon">' + ICON.house + '</span><h1>Energiehuis <span>Live Cockpit</span></h1></div>' +
+      '<div class="head-right"><button type="button" class="pill" data-tone="' + model.status.tone + '" data-open="meetketen" aria-label="Status ' + esc(pillText) + '. Meetketen openen"><i></i>' + esc(pillText) + '</button><time>' + time + '</time></div></header>' +
+      '<div class="band" data-kind="' + state.source + '" role="note">' + band + '</div>' +
+      '<div data-scene-slot></div>' +
+      '<p class="summary" aria-hidden="true">' + esc(model.summary) + '</p>' +
+      (model.warnings.length ? '<ul class="warnings">' + model.warnings.map(w => '<li data-critical="' + w.critical + '">' + esc(w.text) + '</li>').join('') + '</ul>' : '') +
+      '<section class="below">' +
+        '<article class="panel chain"><h2>Meetketen</h2><p>' + (model.mode === 'demo' ? 'In DEMO bewegen alle routes met fictieve waarden. De echte verificatie hieronder staat nog uit.' : flags.every(([, v]) => v) ? 'Alle routes zijn als geverifieerd ingesteld.' :'Stroomroutes bewegen pas als de meting én de route geverifieerd zijn.') + '</p>' +
+        '<ul class="flags">' + flags.map(([k, v]) => '<li data-ok="' + v + '"><i></i>' + esc(FLAG_LABEL[k]) + '</li>').join('') + '</ul>' +
+        '<button type="button" class="ghost" data-open="meetketen">Meetketen bekijken</button></article>' +
+        '<article class="panel legend"><h2>Zo lees je de lichtpaden</h2><ul>' +
+          '<li><i style="--c:' + COLORS.sun + '"></i>Zon naar huis</li><li><i style="--c:' + COLORS.export + '"></i>Teruglevering aan het net</li>' +
+          '<li><i style="--c:' + COLORS.import + '"></i>Afname van het net</li><li><i style="--c:' + COLORS.ev + '"></i>Laden van de Cupra</li>' +
+          '<li><i style="--c:' + COLORS.praktijk + '"></i>Praktijk (na koppeling)</li><li><i class="dotted" style="--c:' + COLORS.battery + '"></i>Batterij: rekenrelatie, geen stroom</li>' +
+          '<li><i style="--c:' + COLORS.idle + '"></i>Stille kabel: niet gemeten of niet geverifieerd</li></ul></article>' +
+      '</section>';
+    host.querySelector('[data-scene-slot]').appendChild(island);
+    if (focusKey) tiles[focusKey].focus({ preventScroll: true });
+    state.renders++;
+  }
+  const FLAG_LABEL = { p1_sign_verified: 'Richting P1 gecontroleerd', pv_verified: 'Zonnepanelen gecontroleerd', alfen_verified: 'Alfen-laadvermogen gecontroleerd', house_derivation_verified: 'Huisberekening gecontroleerd', praktijk_meter: 'Praktijkmeter gecontroleerd' };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------------- detail sheet ----------------
+  const sheet = document.getElementById('sheet'), backdrop = document.getElementById('backdrop');
+  function openSheet(key, opener) {
+    state.sheetKey = key; state.sheetOpener = opener ? (opener.dataset.tile || opener.dataset.open) : null;
+    renderSheet();
+    sheet.hidden = false; backdrop.hidden = false;
+    requestAnimationFrame(() => { sheet.classList.add('open'); backdrop.classList.add('open'); });
+    sheet.querySelector('.close').focus();
+  }
+  function closeSheet() {
+    sheet.classList.remove('open'); backdrop.classList.remove('open');
+    sheet.hidden = true; backdrop.hidden = true;
+    const k = state.sheetOpener; state.sheetKey = null;
+    const back = (k && tiles[k]) || host.querySelector('[data-open="' + k + '"]');
+    if (back) back.focus({ preventScroll: true });
+  }
+  function row(label, value) { return '<div class="row"><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>'; }
+  function readingRows(rd, entity) {
+    if (!rd) return row('Toestand', 'Onbekend');
+    return row('Waarde', rd.kind === 'percent' ? (R.hasValue(rd) ? Math.round(rd.value) + ' %' : '—') : valOf(rd)) +
+      row('Toestand', STATE_LABEL[rd.state] + (rd.reason && rd.reason !== 'Actueel' ? ' · ' + rd.reason : '')) +
+      row('Bron', entity || rd.entity || '—') +
+      row('Tijdstempel', rd.stampSource ? rd.stampSource + (Number.isFinite(rd.ageMs) ? ' · ' + R.ageLabel(rd.ageMs) + ' oud' : '') : '—');
+  }
+  const STATE_LABEL = { live: 'Actueel', 'live-zero': 'Actueel, rond 0 W', retained: 'Laatst bekend', stale: 'Verouderd', unknown: 'Onbekend', 'invalid-unit': 'Ongeldige eenheid', unlinked: 'Niet gekoppeld' };
+  function routeRow(id) { const m = state.model.routes[id]; return row('Lichtpad', m.active ? 'Actief' + (m.grace ? ' (wordt bevestigd)' : '') : 'Stil · ' + m.reason); }
+  function renderSheet() {
+    const m = state.model, r = m.readings, e = state.entities, k = state.sheetKey;
+    if (!k) return;
+    const demoNote = m.mode === 'demo' ? '<p class="note demo">DEMO · fictieve waarden. Niets hiervan is gemeten.</p>' : state.source === 'test' ? '<p class="note">TESTDATA: gesimuleerde Home Assistant-states.</p>' : '';
+    let title = '', body = '';
+    if (k === 'sun') { title = 'Zonnepanelen'; body = readingRows(r.pv, e.pv) + routeRow('sun-home'); }
+    else if (k === 'battery') { title = 'Virtuele batterij'; body = '<p class="note sim">Simulatie. Er is geen fysieke batterij en er loopt geen energie naar of uit deze batterij.</p>' + readingRows(r.battery, e.battery) + row('Lichtpad', 'Nooit: alleen een rekenrelatie'); }
+    else if (k === 'net') { title = 'Net'; body = readingRows(r.net, e.net) + row('Richting', m.grid.direction ? { import: 'Afname', export: 'Teruglevering', balance: 'In balans' }[m.grid.direction] : 'Niet vastgesteld') + row('Tekenconventie', 'Afname positief (import_positive)') + routeRow(m.grid.direction === 'import' ? 'grid-home' : 'home-grid'); }
+    else if (k === 'cupra') { title = 'Cupra Born'; body = '<h3>Laadvermogen (Alfen)</h3>' + readingRows(r.ev, e.ev) + routeRow('home-ev') + '<h3>Accu</h3>' + readingRows(r.soc, e.soc); }
+    else if (k === 'praktijk') {
+      title = 'Praktijkruimte';
+      const unl = !r.praktijk || r.praktijk.state === 'unlinked';
+      body = (unl ? '<p class="note">Er hangt een fysieke kWh-meter achter de P1-meter, maar die is nog niet gekoppeld. Er worden geen waarden geschat.</p>' : readingRows(r.praktijk, e.praktijk) + routeRow('home-praktijk')) +
+        '<h3>Straks beschikbaar</h3>' + row('Vermogen nu', unl ? '— kW' : valOf(r.praktijk)) + row('Verbruik vandaag', '— kWh') + row('Kosten vandaag', '—') + row('Historie', 'Na koppeling');
+    } else if (k === 'house' || k === 'meetketen') {
+      title = 'Meetketen';
+      body = '<p class="lead">' + esc(m.summary) + '</p>' +
+        (m.warnings.length ? '<ul class="warnings">' + m.warnings.map(w => '<li data-critical="' + w.critical + '">' + esc(w.text) + '</li>').join('') + '</ul>' : '') +
+        '<h3>' + esc(m.houseTile.label) + '</h3>' + row('Waarde', m.houseTile.value === null ? '—' : R.formatPower(m.houseTile.value)) + row('Berekening', r.praktijk && r.praktijk.state !== 'unlinked' ? 'Huissensor − praktijk (huissensor = net + zon − Cupra)' : 'Huissensor = net + zon − Cupra, inclusief praktijk') +
+        '<h3>Bronnen</h3>' + ['net', 'pv', 'house', 'ev', 'soc', 'praktijk'].map(x => row({ net: 'P1-net', pv: 'GoodWe PV', house: 'Huissensor', ev: 'Alfen', soc: 'Cupra-accu', praktijk: 'Praktijkmeter' }[x], r[x] ? STATE_LABEL[r[x].state] + (r[x].state !== 'unlinked' && Number.isFinite(r[x].ageMs) ? ' · ' + R.ageLabel(r[x].ageMs) : '') : '—')).join('') +
+        '<h3>Verificatie' + (m.mode === 'demo' ? ' (echte stand; DEMO negeert deze)' : '') + '</h3><ul class="flags big">' + Object.entries(m.mode === 'demo' ? F.DEFAULT_TRUST : m.trust).map(([f, v]) => '<li data-ok="' + v + '"><i></i><span><strong>' + esc(FLAG_LABEL[f]) + '</strong><small>' + esc(FLAG_HOW[f]) + '</small></span></li>').join('') + '</ul>';
+    }
+    sheet.querySelector('h2').textContent = title;
+    sheet.querySelector('.sheet-body').innerHTML = demoNote + '<dl>' + body + '</dl>';
+  }
+  const FLAG_HOW = {
+    p1_sign_verified: '’s Avonds waterkoker aan: het net moet als afname ~2 kW stijgen.',
+    pv_verified: 'Overdag PV-waarde vergelijken met het omvormerdisplay.',
+    alfen_verified: 'Tijdens laden Alfen-vermogen vergelijken met het laadpaaldisplay.',
+    house_derivation_verified: 'Een week geen integriteitsmelding over het huisverbruik.',
+    praktijk_meter: 'Bekend verbruik in de praktijk aanzetten: praktijk en P1 stijgen evenveel.'
+  };
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-tile],[data-open]');
+    if (t && !sheet.contains(t)) { openSheet(t.dataset.tile || t.dataset.open, t); return; }
+    if (e.target.closest('.close') || e.target === backdrop) closeSheet();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !sheet.hidden) closeSheet();
+    if (e.key === 'Tab' && !sheet.hidden) {
+      const f = [...sheet.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')];
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+
+  // ---------------- tick ----------------
+  const live = document.getElementById('live');
+  function tick(force) {
+    const now = Date.now();
+    let input;
+    if (state.source === 'demo') {
+      input = { now, mode: 'demo', readings: S.demoReadings(state.scenario, now) };
+      state.entities = Object.fromEntries(Object.keys(S.ENTITIES).map(k => [k, 'demo.' + k]));
+    } else {
+      const t = S.testReadings(state.scenario, now);
+      state.entities = t.entities;
+      input = { now, mode: 'live', readings: t.readings, trust: t.trust, connected: t.connected };
+      if (!state.model && t.warmupMs) state.model = F.computeModel({ ...input, now: now - t.warmupMs }, null);
+    }
+    state.model = F.computeModel(input, state.model);
+    renderHost(state.model);
+    updateIsland(state.model);
+    if (!sheet.hidden) renderSheet();
+    if (force || (state.model.summary !== state.lastLiveText && now - state.lastLiveAt > 30000)) {
+      live.textContent = (state.source === 'demo' ? 'Demo. ' : 'Testdata. ') + state.model.summary;
+      state.lastLiveText = state.model.summary; state.lastLiveAt = now;
+    }
+  }
+
+  // ---------------- review bar (preview only) ----------------
+  const modeSel = document.getElementById('modeSel'), scSel = document.getElementById('scSel'), rmBox = document.getElementById('rmBox');
+  function fillScenarios() {
+    const list = state.source === 'demo' ? S.DEMO : S.TEST;
+    scSel.innerHTML = Object.entries(list).map(([k, v]) => '<option value="' + k + '"' + (k === state.scenario ? ' selected' : '') + '>' + esc(v.label) + '</option>').join('');
+  }
+  modeSel.value = state.source; rmBox.checked = state.forceReducedMotion; fillScenarios();
+  modeSel.addEventListener('change', () => { state.source = modeSel.value; state.scenario = state.source === 'demo' ? 'teruglevering' : 'avond'; state.model = null; fillScenarios(); tick(true); syncUrl(); });
+  scSel.addEventListener('change', () => { state.scenario = scSel.value; state.model = null; tick(true); syncUrl(); });
+  rmBox.addEventListener('change', () => { state.forceReducedMotion = rmBox.checked; island.classList.toggle('rm', reducedMotion()); particles.kick(); syncUrl(); });
+  mqReduce.addEventListener?.('change', () => { island.classList.toggle('rm', reducedMotion()); particles.kick(); });
+  function syncUrl() { const p = new URLSearchParams({ mode: state.source, scenario: state.scenario }); if (state.forceReducedMotion) p.set('rm', '1'); history.replaceState(null, '', '?' + p); }
+
+  island.classList.toggle('rm', reducedMotion());
+  tick(true);
+  new ResizeObserver(() => applyLayout()).observe(island);
+  applyLayout();
+  updateIsland(state.model);
+  setInterval(() => tick(false), 1000);
+
+  // Test hooks (read-only).
+  window.__eh = { state, particles, island, rerender: n => { for (let i = 0; i < n; i++) tick(false); }, applyLayout };
+})();
+
+</script>
+</body>
+</html>
