@@ -14,11 +14,11 @@
       "variant": "pve03",
       "default": false,
       "mode": "geen masker",
-      "fps": 60,
+      "fps": 59.7,
       "fpsRuns": [
         60,
-        60,
-        60
+        59.7,
+        57.7
       ],
       "p95ms": 16.8,
       "errors": [],
@@ -34,12 +34,12 @@
       "fps": 59.3,
       "fpsRuns": [
         59.3,
-        60,
-        58.7
+        59.3,
+        59.7
       ],
       "p95ms": 16.8,
       "errors": [],
-      "deltaPct": -1.2,
+      "deltaPct": -0.7,
       "verdict": ""
     },
     {
@@ -48,15 +48,15 @@
       "variant": "pve04-bbox",
       "default": false,
       "mode": "bbox",
-      "fps": 59.3,
+      "fps": 60,
       "fpsRuns": [
         60,
-        59,
-        59.3
+        60,
+        59.7
       ],
-      "p95ms": 16.8,
+      "p95ms": 16.7,
       "errors": [],
-      "deltaPct": -1.2,
+      "deltaPct": 0.5,
       "verdict": ""
     },
     {
@@ -65,15 +65,15 @@
       "variant": "pve04-css",
       "default": false,
       "mode": "css",
-      "fps": 48,
+      "fps": 48.3,
       "fpsRuns": [
-        48,
-        55.7,
-        48
+        49.1,
+        46.7,
+        48.3
       ],
       "p95ms": 33.4,
       "errors": [],
-      "deltaPct": -20,
+      "deltaPct": -19.1,
       "verdict": ""
     },
     {
@@ -90,7 +90,7 @@
       ],
       "p95ms": 16.7,
       "errors": [],
-      "deltaPct": 0,
+      "deltaPct": 0.5,
       "verdict": ""
     },
     {
@@ -98,7 +98,7 @@
       "rate": 1,
       "variant": "pve04-master",
       "default": true,
-      "mode": "master+rust",
+      "mode": "master",
       "fps": 60,
       "fpsRuns": [
         60,
@@ -107,7 +107,7 @@
       ],
       "p95ms": 16.7,
       "errors": [],
-      "deltaPct": 0,
+      "deltaPct": 0.5,
       "verdict": "standaard (1×: informatief)"
     },
     {
@@ -122,7 +122,7 @@
         60,
         60
       ],
-      "p95ms": 16.8,
+      "p95ms": 16.7,
       "errors": [],
       "deltaPct": 0,
       "verdict": ""
@@ -133,15 +133,15 @@
       "variant": "pve04-full",
       "default": false,
       "mode": "full",
-      "fps": 43.1,
+      "fps": 41.9,
       "fpsRuns": [
-        44.5,
-        41.8,
-        43.1
+        41.9,
+        40.9,
+        44.4
       ],
       "p95ms": 33.4,
       "errors": [],
-      "deltaPct": -28.2,
+      "deltaPct": -30.2,
       "verdict": ""
     },
     {
@@ -150,15 +150,15 @@
       "variant": "pve04-bbox",
       "default": false,
       "mode": "bbox",
-      "fps": 60,
+      "fps": 58.7,
       "fpsRuns": [
-        60,
-        60,
-        59.3
+        58.7,
+        59.7,
+        58.7
       ],
-      "p95ms": 16.8,
+      "p95ms": 16.7,
       "errors": [],
-      "deltaPct": 0,
+      "deltaPct": -2.2,
       "verdict": ""
     },
     {
@@ -167,15 +167,15 @@
       "variant": "pve04-css",
       "default": false,
       "mode": "css",
-      "fps": 49.3,
+      "fps": 47.7,
       "fpsRuns": [
-        53.7,
-        49.3,
-        48.7
+        45.5,
+        48.3,
+        47.7
       ],
       "p95ms": 33.4,
       "errors": [],
-      "deltaPct": -17.8,
+      "deltaPct": -20.5,
       "verdict": ""
     },
     {
@@ -186,11 +186,11 @@
       "mode": "bbox",
       "fps": 60,
       "fpsRuns": [
-        60,
+        59.7,
         60,
         60
       ],
-      "p95ms": 16.7,
+      "p95ms": 16.8,
       "errors": [],
       "deltaPct": 0,
       "verdict": ""
@@ -200,7 +200,7 @@
       "rate": 4,
       "variant": "pve04-master",
       "default": true,
-      "mode": "master+rust",
+      "mode": "master",
       "fps": 60,
       "fpsRuns": [
         60,
@@ -241,7 +241,7 @@
         60,
         60
       ],
-      "p95ms": 16.7,
+      "p95ms": 16.8,
       "errors": [],
       "deltaPct": 0,
       "verdict": ""
@@ -275,7 +275,7 @@
         60,
         60
       ],
-      "p95ms": 16.7,
+      "p95ms": 16.8,
       "errors": [],
       "deltaPct": 0,
       "verdict": ""
@@ -302,14 +302,14 @@
       "rate": 1,
       "variant": "pve04-master",
       "default": true,
-      "mode": "master+rust",
+      "mode": "master",
       "fps": 60,
       "fpsRuns": [
         60,
         60,
         60
       ],
-      "p95ms": 16.8,
+      "p95ms": 16.7,
       "errors": [],
       "deltaPct": 0,
       "verdict": "standaard (1×: informatief)"
@@ -324,7 +324,7 @@
       "fpsRuns": [
         60,
         60,
-        60
+        59.7
       ],
       "p95ms": 16.8,
       "errors": [],
@@ -360,7 +360,7 @@
         60,
         60
       ],
-      "p95ms": 16.8,
+      "p95ms": 16.7,
       "errors": [],
       "deltaPct": 0,
       "verdict": ""
@@ -404,7 +404,7 @@
       "rate": 4,
       "variant": "pve04-master",
       "default": true,
-      "mode": "master+rust",
+      "mode": "master",
       "fps": 60,
       "fpsRuns": [
         60,

@@ -11,26 +11,34 @@ Branch `preview/claude-premium-pve04`. Alles staat in `preview/pve-04/`. Overdra
 De eigenaar heeft `preview/pve-03/reference/approved-visual-20261109.webp` expliciet goedgekeurd als **definitieve visuele referentie, inclusief de ingebakken kaarten en stromen**. Die afbeelding is nu ongewijzigd de achtergrond. De eerdere regel "niet als gehele achtergrond gebruiken" in `pve-03/reference/APPROVED_VISUAL_REFERENCE.md` is daarmee door de eigenaar vervangen. Het bestand wordt **niet gekopieerd**: de preview verwijst ernaar en er worden geen afgeleide beeldbestanden opgeslagen.
 
 ```
-master (WebP, 1330×748, ongewijzigd)                                   ← master-scene.js (SHA-256 gecontroleerd)
-  └ rustlagen per ingebakken stroomlijn (canvas, in de browser berekend) ← zichtbaar zolang de route NIET actief is
-  └ lichtdeeltjes langs exact dezelfde lijn, in de stroomrichting         ← alleen bij een actieve route (model.js)
-  └ afdekvlakken: DEMO-pil over datum/tijd, waardeplaatjes (compact)
-  └ live kaarten exact en ondoorzichtig over de ingebakken kaarten        ← kaartmaat + 6 px (onder + 8 px)
+master (WebP, 1330×748, exact ongewijzigd)                              ← master-scene.js (SHA-256 gecontroleerd)
+  └ bewegende lichtpunten langs de ingebakken lijn, routekleur + richting ← alleen bij een geldige, actuele, actieve route (model.js)
+  └ glaskaarten exact over de ingebakken kaarten (ondoorzichtig basisvlak) ← kaartmaat + 6 px (onder + 8 px)
+  └ DEMO-pil over de ingebakken datum/tijd
 ```
 
 | Bestand | Rol |
 |---|---|
-| `master-scene.js` | **Gegenereerd** door `tools/build-master-scene.cjs` uit `cleanplate/overlay-map.json`: verwijzing naar de master (bytes, SHA-256), afdekvlakken per kaart en de geometrie van de vijf ingebakken stroomlijnen, met hun koppeling aan modelroutes. `--check` faalt bij elke afwijking. |
-| `master.js` | Runtime: kaarten, rustlagen, deeltjes, detailpaneel, scenario's. Dezelfde veiligheidsregels als de vorige cockpit (model.js). |
+| `master-scene.js` | **Gegenereerd** door `tools/build-master-scene.cjs` uit `cleanplate/overlay-map.json`: verwijzing naar de master (bytes, SHA-256), afdekvlakken per kaart en de geometrie van de vijf ingebakken lijnen (alleen gebruikt als pad voor de lichtpunten). `--check` faalt bij elke afwijking. |
+| `master.js` | Runtime: glaskaarten, lichtpunten, detailpaneel, scenario's, drie weergaven. Dezelfde veiligheidsregels als de vorige cockpit (model.js). |
 
-**Stroomlijnen eerlijk:** per lijn (zon, praktijk, net, Cupra plus de korte kaart-autolijn) berekent de browser eenmalig een rustlaag. Die vervangt de lijn en haar gloed door de omgeving: het laagfrequente deel komt uit de pixels buiten alle lijnen en kaarten, het fijne paneel-, pannen- of plankenpatroon blijft in de gloedzone behouden. De rustlaag staat aan bij 0 W, offline, verouderde of ongeldige data en bij een niet-gekoppelde praktijk, en gaat in 0,6 s uit zodra de route actief wordt. Dan zijn de ingebakken lijn en de bewegende deeltjes zichtbaar. Kan de canvas niet worden gelezen (bijv. via `file://`), dan valt de cockpit terug op een donkere dimlaag met de melding "Ingebakken stroomlijnen niet onderdrukbaar".
+**Ingebakken lichtlijnen = decoratief (RC2-besluit).** De lijnen in de afbeelding worden niet meer bewerkt; ze zijn altijd zichtbaar en tonen **geen** actuele stroom. Dit staat in een legenda onder het beeld, in de alt-tekst en in het detailpaneel. Actuele stroom = bewegende lichtpunten (alleen bij een actieve route; bij 0 W, offline, verouderd of ongeldig staan ze stil en verdwijnen ze) plus de kaarten. **Het P1-probleem (de ingebakken lijnen bij 0 W/offline onzichtbaar maken zonder beeldverlies) is niet opgelost.** De RC1-rustlagen zijn verwijderd omdat ze zichtbare wazige banen gaven; een RC2-prototype met zonegebonden correctie haalde de kwaliteitseis niet (zie `HANDOFF_TO_CHATGPT.md`).
 
-**Indeling:** vanaf 900 px containerbreedte staan de interactieve kaarten óp de master. Daaronder (tablet en mobiel) blijft de master volledig zichtbaar, met ondoorzichtige waardeplaatjes over de ingebakken kaarten, en staan de interactieve kaarten leesbaar onder het beeld. Ontbreekt de master of de scènedata, dan blijft alleen de interface over.
+**Netrichting:** teruglevering = cyaan (kaartaccent, lichtpunten huis → net, "↓ naar net"), netafname = oranje (kaartaccent, lichtpunten net → huis, "↑ van net"). De ingebakken netlijn blijft cyaan; alleen de lichtpunten en de kaart wisselen van kleur. Richting, pijl en kleur verschijnen alleen bij een actieve netroute; anders staat er "Richting niet bevestigd".
+
+**Glaskaarten:** onder elke kaart ligt een ondoorzichtig basisvlak. Het kleurverloop daarvan wordt eenmalig in de browser bemonsterd uit de rand boven en onder de kaart (~20 ms). Daarover ligt een halfdoorzichtige glaslaag met gekleurde rand, binnengloed en buitengloed, zoals in de referentie. Oude waarden kunnen niet doorschijnen; dat wordt getest met verborgen kaartinhoud. Zonder leesbare canvas (`file://`) valt het basisvlak terug op een vaste tint.
+
+**Weergaven:**
+- **`overlay`** (≥ 900 px): volledige kaarten op de master.
+- **`compact`** (mobiel/tablet): dezelfde kaarten op de master, met alleen de waarde (plus netrichting of "Simulatie"); geen dubbele set eronder. Tikvlakken worden onzichtbaar vergroot tot ≥ 48 px en de DEMO-scenario's zijn standaard ingeklapt.
+- **`list`** (smaller dan 21 × de tekstgrootte, of tekst > 125 %): lege glasvlakken op de master en een leesbare lijst eronder.
+
+Zonder master of scènedata blijft alleen de lijst over.
 
 **Bekende beperkingen**
-- Een onderdrukte lijn laat op 200–300 % een zachte, kleurloze "veeg" zien, vooral over het paneelraster en de pannen rechts van de dakkapel. Er is geen licht of kleur van de lijn meer zichtbaar: de pixeltoets meet 0 % lijnkleur bij 0 W en offline.
-- De rustlagen kosten bij het laden eenmalig ~0,4 s rekentijd op de hoofdthread (Chromium, 1× CPU). De animatie zelf haalt 60 fps, ook bij 4× CPU-vertraging.
-- De lijnkleur ligt vast in het beeld: de netlijn is cyaan, zowel bij afname als bij teruglevering. De richting tonen de deeltjes en de Net-kaart.
+- **P1 niet opgelost:** bij 0 W en offline blijven de ingebakken gloeiende lijnen zichtbaar (decoratief, met legenda).
+- In de compacte weergave op 360–390 px zijn de waarden ~11 px.
+- De netlijn in het beeld blijft cyaan, ook bij afname.
 - Het kenteken "CUPRA BORN" en het merklogo blijven in beeld (geaccepteerd door de eigenaar, privégebruik).
 
 De eerdere **placeholder- en privélaag-cockpit** (stap 0/1A) blijft beschikbaar via `?scene=placeholder` en `?scene=private` en wordt als regressie getest. De beschrijving hieronder gaat over die variant.
@@ -130,7 +138,7 @@ node preview/pve-04/tests/master.cjs --screenshots                    # master-c
 node preview/pve-04/tests/master.cjs --browser=webkit --screenshots   # master-cockpit, WebKit
 ```
 
-- **Master (21 controles, Chromium én WebKit):** 7 viewports (320–1920) met dekking ≥ ingebakken kaart + 5 px en ondoorzichtigheid, 200 % tekst, rustlaag = model voor alle 14 scenario's, **pixeltoets van de ingebakken lijnen** (actief / 0 W / offline / verouderd), deeltjes alleen op actieve lijnen, DEMO/simulatie/praktijk/minteken, 50 hertekeningen, terugval (geen scène, beeld-404, `file://`), toetsenbord, reduced motion, twee instanties + destroy, performance (Chromium) en screenshots.
+- **Master (31 controles, Chromium én WebKit):** 8 viewports × 2 scenario's (320–1920 px, incl. grote waarden en lange labels) met dekking ≥ ingebakken kaart + 5 px, ondoorzichtig basisvlak, tikvlakken ≥ 48 px zonder overlap, geen afkapping, geen dubbele set en een compact eerste scherm; 200 % tekst ⇒ lijst; **doorschijntoets** (kaartinhoud verborgen, witte glyfpixels = 0); netrichting kaart/kleur/pijl/tekst/lichtpunten = model voor alle 14 scenario's; master onaangetast en lichtpuntlaag leeg bij 0 W/offline; lichtpunten bewegen alleen bij actief; DEMO/simulatie/praktijk/minteken/legenda; 50 hertekeningen; terugval (geen scène, beeld-404, `file://`); toetsenbord + inklapbare scenario's; reduced motion; twee instanties + destroy; performance (Chromium: ≥ 50 fps bij 4×, hoofdthread ≤ 150 ms); screenshots.
 - **Node (84 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting; plus de clean-plate- en privacytests (overlay-map, geen getrackte privébestanden, weigering van output buiten `private/`, privémanifest, veilige URL's).
 - **Browser-regressie placeholder/privélaag (26 controles, Chromium én WebKit, `?scene=placeholder`):** o.a. het laden van de privélaag via een synthetische testlaag, met mobiele terugval en terugval bij een ontbrekend of onveilig manifest; viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
 

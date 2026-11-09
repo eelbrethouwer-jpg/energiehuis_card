@@ -60,7 +60,7 @@ const median = arr => pct(arr, 50);
     await page.goto(base + v.url);
     await page.waitForFunction(() => { const i = document.querySelector('.ehc-scene img, img.ehm-scene'); const e = document.querySelector('.ehc'); return i && i.complete && i.naturalWidth > 0 && e.dataset.quiet !== 'pending'; });
     await page.waitForTimeout(800);
-    const mode = await page.evaluate(() => { const f = window.__cockpits[0].flows; return f && f.maskInfo ? f.maskInfo().effectiveMode : (window.__cockpits[0].quietInfo ? 'master+rust' : 'geen masker'); });
+    const mode = await page.evaluate(() => { const f = window.__cockpits[0].flows; return f && f.maskInfo ? f.maskInfo().effectiveMode : (window.__cockpits[0].particleInfo ? 'master' : 'geen masker'); });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate });
     await page.waitForTimeout(300);

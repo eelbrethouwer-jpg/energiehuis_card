@@ -1,64 +1,68 @@
-# Overdracht aan ChatGPT — PVE-04: interactieve cockpit op de goedgekeurde master
+# Overdracht aan ChatGPT — PVE-04 RC2 (aangepaste uitvoering: P2, P3, P4)
 
-**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. De productiekaart is ongewijzigd.
-Opgesteld door Claude Code, 9 november 2026. Opdracht: "GO — Energiehuis PVE-04: bouw de interactieve preview" (master = definitieve visuele referentie, door de eigenaar goedgekeurd).
+**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. Geen nieuwe master. De productiekaart is ongewijzigd.
+Opgesteld door Claude Code, 9 november 2026. Opdracht: "RC2 aangepaste uitvoering": P1 gestopt, alleen P2, P3 en P4.
 
 ## 1. Branchstatus
 
 | | |
 |---|---|
 | Branch | `preview/claude-premium-pve04` |
-| Uitgangs-HEAD (gecontroleerd) | `466d41306a0b2be886bdcda7953067c81a284df2` (remote = lokaal vóór aanvang) |
+| Uitgangs-HEAD (gecontroleerd) | `b6259fdc1e401c670a120d623e2b425998e79415` (remote = lokaal vóór aanvang) |
 | `main` | `62fa09cbd6dd3c4d481c0669c9cbac4f8a39aae9` (ongewijzigd) |
 | HEAD na deze ronde | de commit die dit bestand bevat (exacte SHA in het chatbericht) |
 
-De diff blijft binnen `preview/pve-04/`. **Geen privébestanden gecommit:** het originele PNG, de pilotbeelden (1B-a) en eventuele clean plates staan niet in de repository. De master wordt niet gekopieerd: de preview verwijst naar het bestand dat al in `preview/pve-03/reference/` staat.
+## 2. P1 — NIET opgelost (expliciet)
 
-## 2. Wat is gebouwd
+De ingebakken lichtlijnen blijven bij 0 W en offline zichtbaar. Op basis van het besluit worden ze **niet meer automatisch bewerkt**:
 
-| Eis | Uitvoering |
+- De RC1-rustlagen (zichtbare wazige banen) zijn uit de cockpit verwijderd.
+- Het RC2-prototype (zonegebonden correctie) haalde de kwaliteitseis niet: zon, net en Cupra NO-GO. Dat prototype is niet gecommit.
+
+De master is nu **exact en onbewerkt** de achtergrond. De lijnen zijn expliciet **decoratief**:
+
+- **Legenda** onder het beeld: "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+- **Alt-tekst** en **detailpaneel**: regel "Lichtlijn in beeld: decoratief — geen actuele stroomindicator".
+
+## 3. Wat is gebouwd
+
+| Punt | Uitvoering |
 |---|---|
-| Scène, dakpannen, objecten, kleuren en kaartposities behouden | De master is ongewijzigd de achtergrond (beeldverhouding 1330:748, geen uitsnede). Kaartposities komen 1-op-1 uit `cleanplate/overlay-map.json` (`master-scene.js`, gegenereerd en met `--check` getest). |
-| Ingebakken voorbeeldwaarden visueel volledig vervangen | Live kaarten liggen ondoorzichtig over elke ingebakken kaart, met de kaartmaat + 6 px (onder + 8 px). De datum/tijd-pil wordt afgedekt door een DEMO-pil met de echte klok. In de compacte weergave dekken waardeplaatjes de kaarten af. **Getest op 7 viewports:** elk afdekvlak bevat de ingebakken kaart + 5 px, met een kleinste overmarge van 0,65 px op 320 px en 3,25 px op 1920 px. |
-| Stromen alleen bij geldige, actuele waarden; geen misleidende stroom bij 0 W, offline of verouderd | Per ingebakken lijn een **rustlaag**, eenmalig in de browser berekend. Die vervangt lijn en gloed door de omgeving: laagfrequent uit de pixels buiten lijnen en kaarten, het fijne patroon blijft behouden. Aan zolang de route niet actief is (model.js, zonder uitsteltijd); bij een actieve route zijn de ingebakken lijn en bewegende deeltjes in stroomrichting zichtbaar. Bij offline staan de deeltjes direct stil en doven ze uit. |
-| Simulatiestatus virtuele batterij | Kaart met label "Simulatie" en "Geen fysieke opslag"; geen lijn. |
-| Praktijkruimte | "Nog niet gekoppeld" zolang er geen meting is. De gestippelde lijn is onderdrukt en wordt alleen zichtbaar in het expliciete simulatiescenario. |
-| DEMO-waarden | Permanente badge "DEMO — fictieve meetwaarden", DEMO-pil in het beeld en het voorvoegsel "DEMO ·" in de samenvatting. Nieuw scenario **"0 W (alles stil)"**. |
-| Veilige mobiele terugval | Onder 900 px containerbreedte blijft de master volledig zichtbaar, met ondoorzichtige waardeplaatjes; de interactieve kaarten staan leesbaar onder het beeld (targets ≥ 48 px). Zonder scène of bij een beeldfout: alleen de interface. Lukt de rustlaag niet (`file://`): een donkere dimlaag plus een melding. |
+| **P2 Glaskaarten** | Elke kaart heeft een **ondoorzichtig basisvlak**. Het kleurverloop wordt eenmalig in de browser bemonsterd uit de rand boven en onder de ingebakken kaart (~16–20 ms op de hoofdthread). Daarover ligt een halfdoorzichtige glaslaag (55 %), met een gekleurde rand (accent 82 %), binnen- en buitengloed, radius 24 (mastermaat) en groot wit type met een kleinere eenheid. Iconen hebben de accentkleur en gloed. De praktijkstatus "Nog niet gekoppeld" is een knop-pil, zoals in de referentie. Posities zijn ongewijzigd (afdekmaat uit `master-scene.js`). Zonder leesbare canvas valt het basisvlak terug op een vaste tint. |
+| **P3 Mobiel** | Drie weergaven. **Compact** (onder 900 px): dezelfde glaskaarten op de master, alleen de waarde (plus pijl bij het net of "Simulatie" bij de batterij). Geen dubbele tegelset, tikvlakken onzichtbaar vergroot tot ≥ 48 px, scenario's standaard ingeklapt (`<details>`). Huis, praktijk en Cupra blijven volledig in beeld; beeld, legenda en samenvatting passen in de eerste schermhoogte (390 × 844: samenvatting eindigt op 425 px). **Lijst** (smaller dan 21 × de tekstgrootte, of tekst > 125 %): lege glasvlakken op het beeld en een leesbare lijst eronder. Op desktop staan de scenario's standaard open; dezelfde inklapknop werkt daar ook. |
+| **P4 Netrichting** | Teruglevering = cyaan kaartaccent, "↓ naar net", lichtpunten cyaan huis → net. Afname = oranje kaartaccent, "↑ van net", lichtpunten oranje net → huis. De **ingebakken netlijn blijft cyaan**; de cockpit claimt niets anders. Richting, pijl en kleur verschijnen **alleen bij een actieve netroute**. Anders: "Richting niet bevestigd" (bij een tegenstrijdige meetketen met toelichting). Lichtpunten alleen bij geldige, actuele, actieve routes; bij 0 W, offline en verouderd staan ze stil en verdwijnen ze. Bij reduced motion: pijlen in de routekleur. |
 
-De oude placeholder- en privélaag-cockpit blijft beschikbaar via `?scene=placeholder` / `?scene=private` en wordt als regressie getest.
+**Bevinding tijdens het testen (opgelost):** bij "P1 omgekeerd (niet gecorrigeerd)" en "Negatieve huissensor" toonde de Net-kaart eerst een richtingspijl en -kleur terwijl de route stilstond. Dat is nu "Richting niet bevestigd (meetketen tegenstrijdig)", zonder pijl of richtingskleur.
 
-## 3. Tests (lokaal uitgevoerd in deze sessie, op de werkboom van deze commit)
+## 4. Tests (lokaal uitgevoerd in deze sessie)
 
 | Controle | Resultaat |
 |---|---|
-| PVE-04 node-tests (UTC en Europe/Amsterdam) | **84/84** per tijdzone (nieuw: `master-scene.test.cjs`, 5 tests) |
-| Productietests `tests/*.test.cjs` (UTC en Europe/Amsterdam) | **359/359** per tijdzone |
+| PVE-04 node-tests (UTC en Europe/Amsterdam) | **84/84** per tijdzone |
+| Productietests (UTC en Europe/Amsterdam) | **359/359** per tijdzone |
 | `node scripts/build.cjs --check` | Byte-identiek, SHA-256 `9f4fce00…6388` |
-| Master-browsersuite `tests/master.cjs` | **Chromium 153: 21/21**, **WebKit 26.6: 21/21** (performance alleen Chromium/CDP) |
+| Master-suite `tests/master.cjs` | **Chromium 153: 31/31**, **WebKit 26.6: 31/31** |
 | Regressie placeholder/privélaag `tests/browser.cjs` | **Chromium 26/26**, **WebKit 26/26** |
-| Kaartdekking | Geslaagd op 320×700, 390×844, 768×1024, 1024×768, 1330×748, 1440×900 en 1920×1080, plus 200 % tekst |
-| **Pixeltoets ingebakken lijnen** (aandeel lijnkleur op de kernlijn) | Actief: zon 0,92 · net 0,59–0,65 · Cupra 0,39 · kaart-auto 0,39 · praktijk (simulatie) 0,53. **0 W, offline: 0,00 op alle lijnen. Verouderde P1: netlijn 0,00.** Drempel ≤ 3 % én ≤ 15 % van actief. **Geen blocker.** |
-| Performance (Chromium, 1440×900, 4 actieve routes) | 60 fps / p95 16,7 ms bij 1× en bij 4× CPU (DOEL). Heapgroei na 200 updates ~0,14 MB. Rustlagen: eenmalig ~0,43 s rekentijd bij het laden. `perf.cjs`: master-variant 60 fps bij 4×, desktop en mobiel. |
+| Kaartdekking en ondoorzichtigheid | 8 viewports (320–1920 px) × 2 scenario's (incl. grote waarden en lange labels): geslaagd; 200 % tekst ⇒ lijst, geslaagd |
+| Doorschijntoets (kaartinhoud verborgen) | Witte glyfpixels **0,0000** voor alle kaarten en de pil op 390, 768 en 1440 px |
+| Netrichting voor alle 14 scenario's | Kaart, kleur, pijl, tekst en lichtpunten consistent; 0 W en offline zonder lichtpunten |
+| Master onaangetast | Stage = alleen beeld + lichtpuntlaag + afdekvlakken; lichtpuntlaag leeg (0 pixels) bij 0 W en offline |
+| Performance | 60 fps, p95 16,7 ms bij 4× CPU (desktop en mobiel, `perf.cjs`); hoofdthread 16–20 ms; heapgroei ~0,23 MB na 200 updates |
 
-Screenshots (Chromium en WebKit): `screenshots/master-{desktop,mobiel}-{actief,0w,offline}[-webkit].jpg`; meetwaarden in `master-metrics*.json` en `perf.json`.
+Screenshots (Chromium en WebKit): `screenshots/master-{desktop,mobiel}-{actief,0w,offline,afname}[-webkit].jpg`.
 
-## 4. Beperkingen en open punten
+## 5. Beperkingen
 
-1. **Onderdrukte lijn = zachte veeg:** op 200–300 % zichtbaar als een kleurloze, wazige band, vooral over het paneelraster en de pannen rechts van de dakkapel, en licht over gevel en bestrating bij de netlijn. Er is geen licht of kleur van de stroom meer zichtbaar. Dit vraagt een **visueel oordeel van de eigenaar**.
-2. **Rekentijd bij het laden** ~0,4 s op de hoofdthread. Kan later naar een Web Worker of `OffscreenCanvas`.
-3. **Kleur van de netlijn** ligt vast (cyaan) voor zowel afname als teruglevering; de richting zit in de deeltjes en de kaart.
-4. **`file://`:** canvas niet leesbaar in Chromium en WebKit ⇒ dimterugval. Via http(s) en in Home Assistant (same-origin `/local/` of Media Source) werkt de rustlaag.
-5. **Leesbaarheid op de master tussen 900 en 1100 px:** tekst rond 11–13 px (schaalt met de master).
-6. Niet getest op echte Safari (iPhone/macOS) of op een fysiek toestel; Playwright-WebKit is headless.
-7. Kenteken "CUPRA BORN" en merklogo blijven in beeld (geaccepteerd door de eigenaar).
+1. **P1 niet opgelost:** bij 0 W en offline blijven de gloeiende ingebakken lijnen zichtbaar (decoratief, met legenda).
+2. Compact op 360–390 px: waarden ~11 px, titels pas vanaf ~560 px beeldbreedte.
+3. De netlijn in het beeld blijft cyaan bij afname; alleen de kaart en de lichtpunten worden oranje.
+4. Niet getest op echte Safari of een fysiek toestel (alleen Playwright-WebKit, headless).
+5. Kenteken "CUPRA BORN" en merklogo blijven in beeld (geaccepteerd).
 
-## 5. Bevestigingen
+## 6. Bevestigingen
 
-- Geen PR, merge, tag, release of HACS-publicatie; productiekaart, `dist/` en `src/` ongewijzigd.
-- Geen aankopen, geen externe beeld- of AI-diensten, geen nieuwe installaties.
-- Geen privébestanden openbaar gemaakt (origineel PNG, pilotretouches en clean plates blijven privé). Gecommitte screenshots tonen de master, die al in de repository stond.
+Geen nieuwe master, geen beeldbewerking van de master, geen hand- of generatieve retouche, geen PR, merge, tag of release, geen HA/HACS-integratie en geen productiewijziging. Geen privébestanden gecommit; het RC2-P1-prototype staat alleen privé.
 
-## 6. Voorgestelde volgende stap
+## 7. Voorgestelde volgende stap
 
-Visuele review door de eigenaar van de 6 screenshots (plus de WebKit-varianten), met name de rustlagen op 100 % en 200 %. Daarna, na akkoord, de HA-integratie: de master laden via een geauthenticeerde route (Media Source) en de leeslogica op echte entiteiten aansluiten.
+Visuele beoordeling door de eigenaar en ChatGPT van de screenshots (desktop/mobiel × actief, 0 W, offline en afname). Daarna een besluit of de decoratieve lijnen bij 0 W/offline acceptabel zijn, of dat P1 later via een apart traject (nieuwe master zonder ingebakken lijnen) wordt opgepakt.

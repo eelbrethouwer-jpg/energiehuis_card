@@ -2,14 +2,11 @@
   "engine": "chromium",
   "version": "153.0.8010.12",
   "viewports": {
-    "320x700": {
-      "layout": "compact",
+    "320x700-grote-waarden": {
+      "layout": "list",
       "scrollW": 320,
       "innerW": 320,
-      "stage": {
-        "w": 296,
-        "h": 166.5
-      },
+      "innerH": 700,
       "u": 0.223,
       "cover": [
         {
@@ -58,65 +55,456 @@
       "tiles": [
         {
           "key": "pv",
-          "w": 144,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "12,3 kW",
+          "bottom": 351.921875
         },
         {
           "key": "battery",
-          "w": 144,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "w": 296,
+          "h": 100.359375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "100 %",
+          "bottom": 460.28125
         },
         {
           "key": "house",
-          "w": 144,
-          "h": 78.21875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "2,48 kW",
+          "bottom": 546.40625
         },
         {
           "key": "practice",
-          "w": 144,
-          "h": 78.21875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "—",
+          "bottom": 632.53125
         },
         {
           "key": "net",
-          "w": 144,
-          "h": 164.390625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "w": 296,
+          "h": 100.359375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "−9,87 kW",
+          "bottom": 740.890625
         },
         {
           "key": "cupra",
-          "w": 144,
-          "h": 164.390625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "w": 296,
+          "h": 116.34375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "0 W",
+          "bottom": 865.234375
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [
+        "pv",
+        "battery",
+        "house",
+        "practice",
+        "net",
+        "cupra"
+      ],
+      "platesVisible": 6,
+      "summaryBottom": 1005,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "390x844": {
+    "320x700-zon-export": {
+      "layout": "list",
+      "scrollW": 320,
+      "innerW": 320,
+      "innerH": 700,
+      "u": 0.223,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.65,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "4,82 kW",
+          "bottom": 351.921875
+        },
+        {
+          "key": "battery",
+          "w": 296,
+          "h": 100.359375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "72 %",
+          "bottom": 460.28125
+        },
+        {
+          "key": "house",
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "1,46 kW",
+          "bottom": 546.40625
+        },
+        {
+          "key": "practice",
+          "w": 296,
+          "h": 78.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "—",
+          "bottom": 632.53125
+        },
+        {
+          "key": "net",
+          "w": 296,
+          "h": 100.359375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "−1,88 kW",
+          "bottom": 740.890625
+        },
+        {
+          "key": "cupra",
+          "w": 296,
+          "h": 100.359375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": false,
+          "value": "1,48 kW",
+          "bottom": 849.25
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [
+        "pv",
+        "battery",
+        "house",
+        "practice",
+        "net",
+        "cupra"
+      ],
+      "platesVisible": 6,
+      "summaryBottom": 1010,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "360x740-grote-waarden": {
+      "layout": "compact",
+      "scrollW": 360,
+      "innerW": 360,
+      "innerH": 740,
+      "u": 0.253,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 58.59375,
+          "h": 30.296875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 155.0625
+        },
+        {
+          "key": "battery",
+          "w": 61.109375,
+          "h": 30.8125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 266.46875
+        },
+        {
+          "key": "house",
+          "w": 57.84375,
+          "h": 30.296875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 204.328125
+        },
+        {
+          "key": "practice",
+          "w": 50.25,
+          "h": 24.75,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 201.796875
+        },
+        {
+          "key": "net",
+          "w": 65.171875,
+          "h": 31.0625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 266.453125
+        },
+        {
+          "key": "cupra",
+          "w": 57.84375,
+          "h": 31.8125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 182.09375
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 409,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "360x740-zon-export": {
+      "layout": "compact",
+      "scrollW": 360,
+      "innerW": 360,
+      "innerH": 740,
+      "u": 0.253,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.75,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.74,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 58.59375,
+          "h": 30.296875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 155.0625
+        },
+        {
+          "key": "battery",
+          "w": 61.109375,
+          "h": 30.8125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 266.46875
+        },
+        {
+          "key": "house",
+          "w": 57.84375,
+          "h": 30.296875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 204.328125
+        },
+        {
+          "key": "practice",
+          "w": 50.25,
+          "h": 24.75,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 201.796875
+        },
+        {
+          "key": "net",
+          "w": 65.171875,
+          "h": 31.0625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 266.453125
+        },
+        {
+          "key": "cupra",
+          "w": 57.84375,
+          "h": 31.8125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 182.09375
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 430,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "390x844-grote-waarden": {
       "layout": "compact",
       "scrollW": 390,
       "innerW": 390,
-      "stage": {
-        "w": 366,
-        "h": 205.8
-      },
+      "innerH": 844,
       "u": 0.275,
       "cover": [
         {
@@ -165,65 +553,200 @@
       "tiles": [
         {
           "key": "pv",
-          "w": 179,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "w": 63.828125,
+          "h": 33,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 160.1875
         },
         {
           "key": "battery",
-          "w": 179,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "w": 66.5625,
+          "h": 33.5625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 281.546875
         },
         {
           "key": "house",
-          "w": 179,
-          "h": 78.21875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "w": 63.015625,
+          "h": 33,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 213.84375
         },
         {
           "key": "practice",
-          "w": 179,
-          "h": 78.21875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "w": 54.75,
+          "h": 26.953125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 211.09375
         },
         {
           "key": "net",
-          "w": 179,
-          "h": 164.390625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "w": 71,
+          "h": 33.828125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 281.515625
         },
         {
           "key": "cupra",
-          "w": 179,
-          "h": 164.390625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "w": 63.015625,
+          "h": 34.65625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 189.625
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 425,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "768x1024": {
+    "390x844-zon-export": {
+      "layout": "compact",
+      "scrollW": 390,
+      "innerW": 390,
+      "innerH": 844,
+      "u": 0.275,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 0.82,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 0.82,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 0.81,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 0.8,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 63.828125,
+          "h": 33,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 160.1875
+        },
+        {
+          "key": "battery",
+          "w": 66.5625,
+          "h": 33.5625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 281.546875
+        },
+        {
+          "key": "house",
+          "w": 63.015625,
+          "h": 33,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 213.84375
+        },
+        {
+          "key": "practice",
+          "w": 54.75,
+          "h": 26.953125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 211.09375
+        },
+        {
+          "key": "net",
+          "w": 71,
+          "h": 33.828125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 281.515625
+        },
+        {
+          "key": "cupra",
+          "w": 63.015625,
+          "h": 34.65625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 189.625
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 425,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "768x1024-grote-waarden": {
       "layout": "compact",
       "scrollW": 768,
       "innerW": 768,
-      "stage": {
-        "w": 736,
-        "h": 413.9
-      },
+      "innerH": 1024,
       "u": 0.553,
       "cover": [
         {
@@ -272,65 +795,200 @@
       "tiles": [
         {
           "key": "pv",
-          "w": 240,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "w": 128.34375,
+          "h": 66.390625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 231.4375
         },
         {
           "key": "battery",
-          "w": 240,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "w": 133.875,
+          "h": 67.5,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 475.484375
         },
         {
           "key": "house",
-          "w": 240,
-          "h": 100.453125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "w": 126.734375,
+          "h": 66.390625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 339.359375
         },
         {
           "key": "practice",
-          "w": 240,
-          "h": 148.40625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "w": 110.09375,
+          "h": 54.21875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 333.796875
         },
         {
           "key": "net",
-          "w": 240,
-          "h": 148.40625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "w": 142.78125,
+          "h": 68.046875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 475.453125
         },
         {
           "key": "cupra",
-          "w": 240,
-          "h": 148.40625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "w": 126.734375,
+          "h": 69.703125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 290.640625
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 602,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "1024x768": {
+    "768x1024-zon-export": {
+      "layout": "compact",
+      "scrollW": 768,
+      "innerW": 768,
+      "innerH": 1024,
+      "u": 0.553,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 1.64,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 1.66,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 1.66,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 1.64,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 1.65,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 128.34375,
+          "h": 66.390625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 231.4375
+        },
+        {
+          "key": "battery",
+          "w": 133.875,
+          "h": 67.5,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 475.484375
+        },
+        {
+          "key": "house",
+          "w": 126.734375,
+          "h": 66.390625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 339.359375
+        },
+        {
+          "key": "practice",
+          "w": 110.09375,
+          "h": 54.21875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 333.796875
+        },
+        {
+          "key": "net",
+          "w": 142.78125,
+          "h": 68.046875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 475.453125
+        },
+        {
+          "key": "cupra",
+          "w": 126.734375,
+          "h": 69.703125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 290.640625
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 602,
+      "controlsOpen": false,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "1024x768-grote-waarden": {
       "layout": "overlay",
       "scrollW": 1024,
       "innerW": 1024,
-      "stage": {
-        "w": 992,
-        "h": 557.9
-      },
+      "innerH": 768,
       "u": 0.746,
       "cover": [
         {
@@ -381,63 +1039,198 @@
           "key": "pv",
           "w": 173,
           "h": 89.484375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 256.796875
         },
         {
           "key": "battery",
           "w": 180.4375,
           "h": 90.984375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 585.734375
         },
         {
           "key": "house",
           "w": 170.8125,
           "h": 89.484375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 402.25
         },
         {
           "key": "practice",
           "w": 148.390625,
           "h": 73.078125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 394.765625
         },
         {
           "key": "net",
           "w": 192.4375,
           "h": 91.71875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 585.6875
         },
         {
           "key": "cupra",
           "w": 170.8125,
           "h": 93.9375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 336.5625
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 710,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "1330x748": {
+    "1024x768-zon-export": {
+      "layout": "overlay",
+      "scrollW": 1024,
+      "innerW": 1024,
+      "innerH": 768,
+      "u": 0.746,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 2.21,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 2.24,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 2.21,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 2.22,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 2.23,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 173,
+          "h": 89.484375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 256.796875
+        },
+        {
+          "key": "battery",
+          "w": 180.4375,
+          "h": 90.984375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 585.734375
+        },
+        {
+          "key": "house",
+          "w": 170.8125,
+          "h": 89.484375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 402.25
+        },
+        {
+          "key": "practice",
+          "w": 148.390625,
+          "h": 73.078125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 394.765625
+        },
+        {
+          "key": "net",
+          "w": 192.4375,
+          "h": 91.71875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 585.6875
+        },
+        {
+          "key": "cupra",
+          "w": 170.8125,
+          "h": 93.9375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 336.5625
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 710,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "1330x748-grote-waarden": {
       "layout": "overlay",
       "scrollW": 1330,
       "innerW": 1330,
-      "stage": {
-        "w": 1116.6,
-        "h": 628
-      },
+      "innerH": 748,
       "u": 0.84,
       "cover": [
         {
@@ -488,63 +1281,198 @@
           "key": "pv",
           "w": 194.734375,
           "h": 100.71875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 278.0625
         },
         {
           "key": "battery",
           "w": 203.109375,
           "h": 102.421875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 648.328125
         },
         {
           "key": "house",
           "w": 192.28125,
           "h": 100.71875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 441.78125
         },
         {
           "key": "practice",
           "w": 167.046875,
           "h": 82.265625,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 433.375
         },
         {
           "key": "net",
           "w": 216.625,
           "h": 103.234375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 648.265625
         },
         {
           "key": "cupra",
           "w": 192.28125,
           "h": 105.75,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 367.875
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 780,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "1440x900": {
+    "1330x748-zon-export": {
+      "layout": "overlay",
+      "scrollW": 1330,
+      "innerW": 1330,
+      "innerH": 748,
+      "u": 0.84,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 2.52,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 2.51,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 194.734375,
+          "h": 100.71875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 278.0625
+        },
+        {
+          "key": "battery",
+          "w": 203.109375,
+          "h": 102.421875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 648.328125
+        },
+        {
+          "key": "house",
+          "w": 192.28125,
+          "h": 100.71875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 441.78125
+        },
+        {
+          "key": "practice",
+          "w": 167.046875,
+          "h": 82.265625,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 433.375
+        },
+        {
+          "key": "net",
+          "w": 216.625,
+          "h": 103.234375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 648.265625
+        },
+        {
+          "key": "cupra",
+          "w": 192.28125,
+          "h": 105.75,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 367.875
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 780,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "1440x900-grote-waarden": {
       "layout": "overlay",
       "scrollW": 1440,
       "innerW": 1440,
-      "stage": {
-        "w": 1386.9,
-        "h": 780
-      },
+      "innerH": 900,
       "u": 1.043,
       "cover": [
         {
@@ -595,63 +1523,198 @@
           "key": "pv",
           "w": 241.859375,
           "h": 125.109375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 324.203125
         },
         {
           "key": "battery",
           "w": 252.265625,
           "h": 127.203125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 784.0625
         },
         {
           "key": "house",
           "w": 238.8125,
           "h": 125.109375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 527.546875
         },
         {
           "key": "practice",
           "w": 207.46875,
           "h": 102.171875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 517.078125
         },
         {
           "key": "net",
           "w": 269.046875,
           "h": 128.21875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 783.984375
         },
         {
           "key": "cupra",
           "w": 238.8125,
           "h": 131.34375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 435.734375
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 932,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "1920x1080": {
+    "1440x900-zon-export": {
+      "layout": "overlay",
+      "scrollW": 1440,
+      "innerW": 1440,
+      "innerH": 900,
+      "u": 1.043,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 3.12,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 3.13,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 3.13,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 3.12,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 3.11,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 241.859375,
+          "h": 125.109375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 324.203125
+        },
+        {
+          "key": "battery",
+          "w": 252.265625,
+          "h": 127.203125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 784.0625
+        },
+        {
+          "key": "house",
+          "w": 238.8125,
+          "h": 125.109375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 527.546875
+        },
+        {
+          "key": "practice",
+          "w": 207.46875,
+          "h": 102.171875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 517.078125
+        },
+        {
+          "key": "net",
+          "w": 269.046875,
+          "h": 128.21875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 783.984375
+        },
+        {
+          "key": "cupra",
+          "w": 238.8125,
+          "h": 131.34375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 435.734375
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 932,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
+    },
+    "1920x1080-grote-waarden": {
       "layout": "overlay",
       "scrollW": 1920,
       "innerW": 1920,
-      "stage": {
-        "w": 1448,
-        "h": 814.4
-      },
+      "innerH": 1080,
       "u": 1.089,
       "cover": [
         {
@@ -702,178 +1765,314 @@
           "key": "pv",
           "w": 252.515625,
           "h": 130.609375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "12,3 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "12,3 kW",
+          "bottom": 334.625
         },
         {
           "key": "battery",
           "w": 263.390625,
           "h": 132.8125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "100 %"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "100 %",
+          "bottom": 814.765625
         },
         {
           "key": "house",
           "w": 249.34375,
           "h": 130.609375,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "2,48 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "2,48 kW",
+          "bottom": 546.921875
         },
         {
           "key": "practice",
           "w": 216.609375,
           "h": 106.671875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "—"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 536.015625
         },
         {
           "key": "net",
           "w": 280.90625,
           "h": 133.875,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "−9,87 kW"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−9,87 kW",
+          "bottom": 814.6875
         },
         {
           "key": "cupra",
           "w": 249.34375,
           "h": 137.125,
-          "valueClipped": false,
-          "titleClipped": false,
-          "value": "0 W"
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "0 W",
+          "bottom": 451.078125
         }
       ],
-      "small": [],
+      "hitOverlap": [],
+      "badHit": [],
       "clipped": [],
-      "titleClipped": []
-    }
-  },
-  "flowness": {
-    "flow-pv": {
-      "zon-export": 0.919,
-      "praktijk-sim": 0.919,
-      "net-laden": 0.919,
-      "nul-watt": 0,
-      "offline": 0,
-      "verouderd": 0.919
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 967,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     },
-    "flow-practice": {
-      "zon-export": 0,
-      "praktijk-sim": 0.53,
-      "net-laden": 0,
-      "nul-watt": 0,
-      "offline": 0,
-      "verouderd": 0
-    },
-    "flow-net": {
-      "zon-export": 0.654,
-      "praktijk-sim": 0.654,
-      "net-laden": 0.564,
-      "nul-watt": 0,
-      "offline": 0,
-      "verouderd": 0
-    },
-    "flow-car": {
-      "zon-export": 0.385,
-      "praktijk-sim": 0.385,
-      "net-laden": 0.385,
-      "nul-watt": 0,
-      "offline": 0,
-      "verouderd": 0.385
-    },
-    "flow-card-car": {
-      "zon-export": 0.394,
-      "praktijk-sim": 0.394,
-      "net-laden": 0.394,
-      "nul-watt": 0,
-      "offline": 0,
-      "verouderd": 0.394
+    "1920x1080-zon-export": {
+      "layout": "overlay",
+      "scrollW": 1920,
+      "innerW": 1920,
+      "innerH": 1080,
+      "u": 1.089,
+      "cover": [
+        {
+          "key": "pill",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "pv",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "practice",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "house",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "cupra",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "battery",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        },
+        {
+          "key": "net",
+          "contains": true,
+          "slack": 3.25,
+          "opaque": true
+        }
+      ],
+      "tiles": [
+        {
+          "key": "pv",
+          "w": 252.515625,
+          "h": 130.609375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "4,82 kW",
+          "bottom": 334.625
+        },
+        {
+          "key": "battery",
+          "w": 263.390625,
+          "h": 132.8125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "72 %",
+          "bottom": 814.765625
+        },
+        {
+          "key": "house",
+          "w": 249.34375,
+          "h": 130.609375,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,46 kW",
+          "bottom": 546.921875
+        },
+        {
+          "key": "practice",
+          "w": 216.609375,
+          "h": 106.671875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "—",
+          "bottom": 536.015625
+        },
+        {
+          "key": "net",
+          "w": 280.90625,
+          "h": 133.875,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "−1,88 kW",
+          "bottom": 814.6875
+        },
+        {
+          "key": "cupra",
+          "w": 249.34375,
+          "h": 137.125,
+          "hitOk": true,
+          "clipped": false,
+          "inStage": true,
+          "value": "1,48 kW",
+          "bottom": 451.078125
+        }
+      ],
+      "hitOverlap": [],
+      "badHit": [],
+      "clipped": [],
+      "tilesOutsideStage": [],
+      "platesVisible": 0,
+      "summaryBottom": 967,
+      "controlsOpen": true,
+      "legend": "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
     }
   },
   "performance": {
     "fps1x": 60,
     "p95_1x": 16.7,
     "fps4x": 60,
-    "p95_4x": 16.7,
-    "quietBuildMs": 455,
-    "heapDeltaKB": 135,
+    "p95_4x": 16.8,
+    "mainThreadTintMs": 16,
+    "heapDeltaKB": 231,
     "verdict4x": "DOEL (≥ 50 fps)"
   },
   "results": [
     {
-      "name": "viewport 320x700: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 320x700 (grote-waarden): list, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 390x844: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 320x700 (zon-export): list, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 768x1024: compact, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 360x740 (grote-waarden): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 1024x768: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 360x740 (zon-export): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 1330x748: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 390x844 (grote-waarden): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 1440x900: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 390x844 (zon-export): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "viewport 1920x1080: overlay, kaartdekking ≥ ingebakken kaart + 5 px, ondoorzichtig, geen overflow/afkapping, targets ≥48px, geen fouten",
+      "name": "viewport 768x1024 (grote-waarden): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "200% tekst 390x844: geen horizontale scroll, dekking blijft intact",
+      "name": "viewport 768x1024 (zon-export): compact, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "200% tekst 1440x900: geen horizontale scroll, dekking blijft intact",
+      "name": "viewport 1024x768 (grote-waarden): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "alle scenario’s: rustlaag per lijn aan ⇔ geen actieve route (DOM = model), deeltjes alleen bij actief",
+      "name": "viewport 1024x768 (zon-export): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "pixeltoets: ingebakken stroomlijnen bij 0 W, offline en verouderd onzichtbaar (≤ 3 % én ≤ 15 % van actief)",
+      "name": "viewport 1330x748 (grote-waarden): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "deeltjes: bewegen alleen op actieve lijnen, in stroomrichting; bij offline direct stil",
+      "name": "viewport 1330x748 (zon-export): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "inhoud: DEMO zichtbaar, batterij = Simulatie, praktijk \"Nog niet gekoppeld\", minteken U+2212, ingebakken waarden afgedekt",
+      "name": "viewport 1440x900 (grote-waarden): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "50 hertekeningen: geen DOM-rebuild, rustlagen flikkeren niet, deeltjesfase loopt door",
+      "name": "viewport 1440x900 (zon-export): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "terugval: geen scènedata / beeld laadt niet ⇒ alleen interface (compact), geen JS-fouten",
+      "name": "viewport 1920x1080 (grote-waarden): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "file:// (canvas mogelijk geblokkeerd): rustlaag óf zichtbare dimterugval met melding",
+      "name": "viewport 1920x1080 (zon-export): overlay, dekking + ondoorzichtig basisvlak, tikvlakken ≥48px zonder overlap, geen afkapping/dubbele set, geen fouten",
       "ok": true
     },
     {
-      "name": "toetsenbord: Tab → kaart, Enter opent detail, Escape sluit en herstelt focus",
+      "name": "200% tekst 390x844: lijstweergave, geen horizontale scroll, niets afgekapt, dekking intact",
       "ok": true
     },
     {
-      "name": "prefers-reduced-motion: geen animatielus, richting via pijlen op actieve lijnen",
+      "name": "200% tekst 1440x900: lijstweergave, geen horizontale scroll, niets afgekapt, dekking intact",
+      "ok": true
+    },
+    {
+      "name": "glaskaarten: geen doorschijnende ingebakken tekst (kaartinhoud verborgen, witte-glyfpixels ≈ 0) op 390/768/1440",
+      "ok": true
+    },
+    {
+      "name": "alle scenario’s: lichtpunten = actieve routes; net: afname ↔ oranje ↑ net→huis, teruglevering ↔ cyaan ↓ huis→net; 0 W/offline: geen lichtpunten",
+      "ok": true
+    },
+    {
+      "name": "master onaangetast: geen beeldbewerkingslagen; lichtpuntlaag leeg bij 0 W en offline (alleen decoratieve lijnen zichtbaar)",
+      "ok": true
+    },
+    {
+      "name": "lichtpunten: bewegen alleen op actieve routes, in stroomrichting; bij offline direct stil",
+      "ok": true
+    },
+    {
+      "name": "inhoud: DEMO, batterij = Simulatie, praktijk \"Nog niet gekoppeld\", minteken U+2212, legenda decoratief, geen ingebakken voorbeeldwaarden",
+      "ok": true
+    },
+    {
+      "name": "50 hertekeningen: geen DOM-rebuild, geen richtings-/toonflikkering",
+      "ok": true
+    },
+    {
+      "name": "terugval: geen scènedata / beeld laadt niet ⇒ alleen interface (lijst), geen JS-fouten",
+      "ok": true
+    },
+    {
+      "name": "file:// (canvas mogelijk geblokkeerd): glasbasisvlak valt terug op vaste tint, kaarten blijven dekkend",
+      "ok": true
+    },
+    {
+      "name": "toetsenbord: Tab → kaart, Enter opent detail, Escape sluit; scenario’s in- en uitklapbaar",
+      "ok": true
+    },
+    {
+      "name": "prefers-reduced-motion: geen animatielus, richting via pijlen op actieve routes",
       "ok": true
     },
     {
@@ -881,11 +2080,11 @@
       "ok": true
     },
     {
-      "name": "performance: fps (1× en 4× CPU) met actieve deeltjes, rustlaag-rekentijd, geheugen na 200 updates",
+      "name": "performance: fps (1× en 4× CPU) met actieve lichtpunten, hoofdthread-rekentijd ≤ 150 ms, geheugen na 200 updates",
       "ok": true
     },
     {
-      "name": "screenshots: desktop en mobiel × actief / 0 W / offline",
+      "name": "screenshots: desktop en mobiel × actief / 0 W / offline (+ netafname)",
       "ok": true
     }
   ]
