@@ -1,5 +1,8 @@
 name: Stroomvergelijker browsercontrole
 on:
+  # Run the full suite on every main push (including merges and docs-only changes).
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'energiehuis-card.js'
