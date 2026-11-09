@@ -79,7 +79,10 @@
     const S = options.scene !== undefined ? options.scene : root.EhPve04MasterScene;
     const id = 'ehm' + (++seq);
     let scenario = M.SCENARIO_IDS.includes(options.scenario) ? options.scenario : 'zon-export';
-    let tick = 0, model = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null;
+    let tick = 0, model = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null, suspended = false, liveInput = null, imgRetry = 0, imgJob = 0;
+    // DEMO (standaard): fictieve scenario's. LIVE: invoer uitsluitend via setInput() (HA-adapter); geen DEMO-labels,
+    // geen scenario's, geen schommeling, geen fictieve waarden.
+    const LIVE = options.mode === 'live';
     const listeners = [];
     const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); listeners.push(() => t.removeEventListener(type, fn, o)); };
     const sceneOk = !!(S && S.image && S.image.natural && Array.isArray(S.flows) && S.covers && KEYS.every(k => S.covers[k]));
@@ -89,7 +92,7 @@
     const rootEl = el(doc, 'section', 'ehc ehc--master', { 'aria-labelledby': id + '-title', 'data-layout': 'overlay', 'data-scene': sceneOk ? 'loading' : 'missing', 'data-tint': 'none' });
     const head = el(doc, 'header', 'ehc-head');
     head.innerHTML = `<div class="ehc-brand"><h1 class="ehc-title" id="${id}-title">Energiehuis <span>Live Cockpit</span></h1></div>`;
-    const badge = el(doc, 'p', 'ehc-demo'); badge.textContent = 'DEMO — fictieve meetwaarden';
+    const badge = el(doc, 'p', LIVE ? 'ehc-demo ehc-live' : 'ehc-demo'); badge.textContent = LIVE ? 'LIVE · alleen-lezen' : 'DEMO — fictieve meetwaarden';
     const sceneNote = el(doc, 'p', 'ehc-scene-note', { role: 'note' }); sceneNote.hidden = true;
     const status = el(doc, 'p', 'ehc-status', { role: 'status' });
     head.append(badge, sceneNote, status);
@@ -99,8 +102,8 @@
     const img = el(doc, 'img', 'ehm-scene', { alt: 'Goedgekeurde avondscène: woning met zonnepanelen, houten praktijkruimte links en een groene Cupra bij de laadpaal rechts. De lichtlijnen in het beeld zijn decoratief; de ingebakken voorbeeldkaarten zijn afgedekt door live DEMO-kaarten.', decoding: 'async', fetchpriority: 'high', draggable: 'false' });
     const particles = el(doc, 'canvas', 'ehm-particles', { 'aria-hidden': 'true' });
     const covers = el(doc, 'div', 'ehm-covers', { 'aria-hidden': 'true' });
-    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
-    const pillTime = pill.querySelector('.p-time');
+    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
+    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo');
     covers.appendChild(pill);
     const PL = {};   // lege glasvlakken (alleen in de lijstweergave zichtbaar; de lijst eronder toont de waarden)
     for (const k of KEYS) { const p = el(doc, 'div', 'ehm-cover ehm-plate', { 'data-key': k }); p.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; covers.appendChild(p); PL[k] = p; }
@@ -128,9 +131,10 @@
     controls.append(cLabel, group, play);
     const detail = el(doc, 'div', 'ehc-detail', { id: id + '-detail', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': id + '-dt' });
     detail.hidden = true;
-    detail.innerHTML = `<div class="d-head"><h2 class="d-title" id="${id}-dt"></h2><button type="button" class="d-close" aria-label="Sluiten">×</button></div><p class="d-value"></p><dl class="d-list"></dl><p class="d-note">DEMO: fictieve meetwaarden. Geen verbinding met Home Assistant, geen bediening.</p>`;
+    detail.innerHTML = `<div class="d-head"><h2 class="d-title" id="${id}-dt"></h2><button type="button" class="d-close" aria-label="Sluiten">×</button></div><p class="d-value"></p><dl class="d-list"></dl><p class="d-note">${LIVE ? 'Alleen-lezen: geen bediening, geen servicecalls, geen opslag.' : 'DEMO: fictieve meetwaarden. Geen verbinding met Home Assistant, geen bediening.'}</p>`;
     const D = { title: detail.querySelector('.d-title'), value: detail.querySelector('.d-value'), list: detail.querySelector('.d-list'), close: detail.querySelector('.d-close') };
-    rootEl.append(head, frame, legend, summary, warn, controls, detail);
+    rootEl.append(head, frame, legend, summary, warn, ...(LIVE ? [] : [controls]), detail);
+    if (LIVE) rootEl.dataset.mode = 'live';
     host.appendChild(rootEl);
 
     // posities (percentages van de master) — één keer zetten
@@ -184,7 +188,7 @@
       const span = pl.cum[hi] - pl.cum[lo] || 1, t = (d - pl.cum[lo]) / span, a = pl.pts[lo], b = pl.pts[hi];
       return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, angle: Math.atan2(b.y - a.y, b.x - a.x) };
     }
-    const animating = () => !paused && !reduced.matches && !doc.hidden && !destroyed;
+    const animating = () => !paused && !suspended && !reduced.matches && !doc.hidden && !destroyed;
     function kick() { if (!raf && animating() && PF.some(p => p.active || p.alpha > 0.01)) { last = 0; raf = win.requestAnimationFrame(frameFn); } else if (!animating()) draw(0); }
     function frameFn(ts) {
       raf = 0;
@@ -258,7 +262,7 @@
       for (const p of PF) p.poly = sw > 0 ? poly(p.points) : null;
       draw(0); kick();
     }
-    const scheduleGeo = () => { if (!geoRaf && !destroyed) geoRaf = win.requestAnimationFrame(geometry); };
+    const scheduleGeo = () => { if (!geoRaf && !destroyed && !suspended) geoRaf = win.requestAnimationFrame(geometry); };
     const ro = new win.ResizeObserver(scheduleGeo); ro.observe(rootEl); ro.observe(stage);
     on(cLabel, 'click', () => { controls.dataset.touched = '1'; });   // alleen een gebruikerskeuze telt
 
@@ -266,7 +270,7 @@
     function render() {
       const m = model;
       setText(status, m.status.text); setData(status, "tone", m.status.tone);
-      setText(summary, 'DEMO · ' + m.summary);
+      setText(summary, (LIVE ? '' : 'DEMO · ') + m.summary);
       const w = m.warnings.map(x => x.text).join(' ');
       warn.hidden = !w; setText(warn, w);
       // Netrichting (pijl, kaartkleur, lichtpunten) alleen tonen bij een ACTIEVE netroute: zo kloppen tekst, kleur en
@@ -290,12 +294,16 @@
       }
       const now = new Date(m.now);
       setText(pillTime, String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'));
+      if (LIVE) { setText(pillLabel, m.connected ? 'LIVE' : 'OFFLINE'); setData(pill, 'state', m.connected ? 'live' : 'offline'); }
       for (const [sid, b] of Object.entries(SB)) if (b.getAttribute('aria-pressed') !== String(sid === scenario)) b.setAttribute('aria-pressed', String(sid === scenario));
       setData(rootEl, 'activeScenario', scenario);
       applyRoutes();
       if (openKey) fillDetail(openKey);
     }
-    function compute() { model = M.computeModel(M.scenarioInput(scenario, Date.now(), tick), model); render(); }
+    function compute() {
+      const input = LIVE ? (liveInput || { now: Date.now(), live: true, connected: true, states: {}, specs: options.specs }) : M.scenarioInput(scenario, Date.now(), tick);
+      model = M.computeModel(input, model); render();
+    }
 
     // ---------------- detailpaneel
     const ROUTES_FOR = { pv: ['sun-home'], battery: [], house: ['sun-home', 'grid-home', 'home-grid', 'home-ev'], practice: ['home-practice'], net: ['grid-home', 'home-grid'], cupra: ['home-ev'] };
@@ -303,7 +311,9 @@
       const d = model.tiles[key];
       setText(D.title, d.title);
       setText(D.value, d.value + (key === 'cupra' ? ' · accu ' + d.soc : ''));
-      const rows = [['Status', d.sub], ['Bron (DEMO-label)', d.entity || '—']];
+      const rows = [['Status', d.sub], [LIVE ? 'Entiteit' : 'Bron (DEMO-label)', d.entity || '—']];
+      if (key === 'cupra' && LIVE) rows.push(['Accuniveau', d.soc + (d.socReason && d.socReason !== 'Actueel' ? ' · ' + d.socReason : '') + (d.socEntity ? ' (' + d.socEntity + ')' : '')]);
+      if (LIVE && model.readings) { const rk = { pv: 'pv', house: 'house', net: 'net', cupra: 'ev', battery: 'battery' }[key]; const rd = rk && model.readings[rk]; if (rd && rd.stampSource) rows.push(['Tijdstempel', rd.stampSource + (Number.isFinite(rd.ageMs) ? ' · ' + M.ageLabel(rd.ageMs) : '')]); }
       if (key === 'net') {
         const na = model.routes['grid-home'].active || model.routes['home-grid'].active;
         rows.push(['Richting', !na && (d.direction === 'import' || d.direction === 'export') ? 'Niet bevestigd: netroute staat stil (' + model.routes['home-grid'].reason + ')' : d.direction === 'import' ? '↑ Afname van het net (oranje lichtpunten, net → huis)' : d.direction === 'export' ? '↓ Teruglevering aan het net (cyaan lichtpunten, huis → net)' : d.direction === 'balance' ? 'In balans: geen stroomrichting' : 'Onbekend: geen stroomrichting']);
@@ -332,24 +342,43 @@
     on(tiles, 'click', e => { const b = e.target.closest('.tile'); if (!b) return; const k = b.dataset.key; if (openKey === k) closeDetail(); else openDetail(k, b); });
     on(D.close, 'click', () => closeDetail());
     on(rootEl, 'keydown', e => { if (e.key === 'Escape' && openKey) { e.preventDefault(); e.stopPropagation(); closeDetail(); } });
-    on(doc, 'pointerdown', e => { if (openKey && !detail.contains(e.target) && !e.target.closest('.tile')) closeDetail(false); });
+    const docListeners = [['pointerdown', e => { if (openKey && !detail.contains(e.target) && !e.target.closest('.tile')) closeDetail(false); }]];
     on(group, 'click', e => { const b = e.target.closest('[data-scenario]'); if (!b) return; scenario = b.dataset.scenario; tick = 0; model = null; compute(); });
     on(play, 'click', () => { const onNow = play.getAttribute('aria-pressed') !== 'true'; play.setAttribute('aria-pressed', String(onNow)); play.textContent = onNow ? 'Schommeling aan' : 'Schommeling uit'; setTicker(); });
     const onVis = () => { setTicker(); kick(); };
-    on(doc, 'visibilitychange', onVis);
+    docListeners.push(['visibilitychange', onVis]);
+    const attachDoc = () => docListeners.forEach(([ty, fn]) => doc.addEventListener(ty, fn));
+    const detachDoc = () => docListeners.forEach(([ty, fn]) => doc.removeEventListener(ty, fn));
+    attachDoc();
     const onReduced = () => kick();
     if (reduced.addEventListener) { reduced.addEventListener('change', onReduced); listeners.push(() => reduced.removeEventListener('change', onReduced)); }
     function setTicker() {
-      const want = !destroyed && options.ticker !== false && play.getAttribute('aria-pressed') === 'true' && !doc.hidden;
+      const want = !LIVE && !destroyed && !suspended && options.ticker !== false && play.getAttribute('aria-pressed') === 'true' && !doc.hidden;
       if (want && !ticker) ticker = win.setInterval(() => { tick++; compute(); }, options.intervalMs || 2500);
       if (!want && ticker) { win.clearInterval(ticker); ticker = 0; }
     }
 
     // ---------------- start
+    // Beeldbron: DEMO = master uit de repository; LIVE = options.resolveImage() (bijv. een geauthenticeerde,
+    // tijdelijk getekende Media Source-URL). Bij een laadfout één keer opnieuw oplossen (verlopen handtekening),
+    // daarna veilige terugval: alleen interface.
+    function loadImage() {
+      const job = ++imgJob;
+      if (!options.resolveImage) { img.src = base + S.image.file; return; }
+      Promise.resolve().then(() => options.resolveImage()).then(url => {
+        if (destroyed || job !== imgJob) return;
+        if (!url) { sceneState('error', options.imageMissingText || 'Geen beeld beschikbaar — alleen interface'); scheduleGeo(); return; }
+        img.src = url;
+      }, () => { if (!destroyed && job === imgJob) { sceneState('error', 'Beeld kon niet worden opgehaald — alleen interface'); scheduleGeo(); } });
+    }
     if (sceneOk) {
-      on(img, 'load', onImageLoad);
-      on(img, 'error', () => { if (destroyed) return; sceneState('error', 'Beeldlaag kon niet laden — alleen interface'); scheduleGeo(); });
-      img.src = base + S.image.file;
+      on(img, 'load', () => { imgRetry = 0; onImageLoad(); });
+      on(img, 'error', () => {
+        if (destroyed) return;
+        if (options.resolveImage && imgRetry < 1) { imgRetry++; loadImage(); return; }
+        sceneState('error', 'Beeldlaag kon niet laden — alleen interface'); scheduleGeo();
+      });
+      loadImage();
     } else sceneState('missing', 'Scènelaag ontbreekt — alleen interface');
     compute();
     scheduleGeo();
@@ -360,7 +389,24 @@
       get model() { return model; },
       get scenario() { return scenario; },
       get layout() { return layout; },
-      setScenario(s) { if (M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
+      get live() { return LIVE; },
+      setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
+      /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
+      setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
+      /** Ontkoppeld (bijv. kaart uit de DOM): alle timers, rAF, observers en documentlisteners stoppen; DOM blijft. */
+      suspend() {
+        if (suspended || destroyed) return; suspended = true;
+        if (ticker) win.clearInterval(ticker); ticker = 0;
+        if (raf) win.cancelAnimationFrame(raf); raf = 0;
+        if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0;
+        ro.disconnect(); detachDoc();
+      },
+      resume() {
+        if (!suspended || destroyed) return; suspended = false;
+        attachDoc(); ro.observe(rootEl); ro.observe(stage);
+        scheduleGeo(); setTicker(); kick();
+      },
+      get suspended() { return suspended; },
       step() { tick++; compute(); },
       setPaused(v) { paused = !!v; if (paused && raf) { win.cancelAnimationFrame(raf); raf = 0; } kick(); },
       isAnimating: () => !!raf,
@@ -371,7 +417,7 @@
         if (ticker) win.clearInterval(ticker); ticker = 0;
         if (raf) win.cancelAnimationFrame(raf); raf = 0;
         if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0;
-        ro.disconnect();
+        ro.disconnect(); detachDoc(); imgJob++;
         listeners.splice(0).forEach(off => off());
         rootEl.remove();
       }

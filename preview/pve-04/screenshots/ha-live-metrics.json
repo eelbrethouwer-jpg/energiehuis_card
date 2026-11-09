@@ -1,0 +1,54 @@
+{
+  "engine": "chromium",
+  "version": "153.0.8010.12",
+  "results": [
+    {
+      "name": "alle 15 gesimuleerde HA-scenario’s: LIVE zonder DEMO/fictief/scenario’s; lichtpunten = actieve routes; netrichting consistent; geen fouten",
+      "ok": true
+    },
+    {
+      "name": "snelle opeenvolgende updates: 200 hass-objecten in één burst ⇒ samengevoegd per frame, geen DOM-herbouw, laatste waarde getoond",
+      "ok": true
+    },
+    {
+      "name": "veroudering zonder nieuwe HA-update: P1 passeert de TTL ⇒ netroute en lichtpunten stoppen via één timer",
+      "ok": true
+    },
+    {
+      "name": "ontkoppelen ⇒ geen timers, rAF of listeners actief; opnieuw koppelen ⇒ zelfde DOM, werkt verder",
+      "ok": true
+    },
+    {
+      "name": "beeldroute: master alleen via getekende /media-URL (media_source/resolve_media); zonder handtekening 401",
+      "ok": true
+    },
+    {
+      "name": "beeldroute: verlopen handtekening ⇒ één keer opnieuw oplossen, daarna veilige terugval (alleen interface); geen beeld geconfigureerd ⇒ terugval",
+      "ok": true
+    },
+    {
+      "name": "DEMO en LIVE strikt gescheiden: DEMO-pagina toont DEMO + scenario’s, LIVE-kaart geen van beide",
+      "ok": true
+    },
+    {
+      "name": "weergave 320x700: list, geen horizontale scroll, kaarten dekken de ingebakken kaarten, detailpaneel werkt",
+      "ok": true
+    },
+    {
+      "name": "weergave 390x844: compact, geen horizontale scroll, kaarten dekken de ingebakken kaarten, detailpaneel werkt",
+      "ok": true
+    },
+    {
+      "name": "weergave 1440x900: overlay, geen horizontale scroll, kaarten dekken de ingebakken kaarten, detailpaneel werkt",
+      "ok": true
+    },
+    {
+      "name": "prefers-reduced-motion: geen animatielus, richting via pijlen",
+      "ok": true
+    },
+    {
+      "name": "screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht",
+      "ok": true
+    }
+  ]
+}

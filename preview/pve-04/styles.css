@@ -1,5 +1,5 @@
 /* Energiehuis PVE-04 · styles.css — Cinematic Energy Experience (DEMO). */
-:root {
+:root, :host {
   color-scheme: dark;
   --bg: #070a11;
   --bg-2: #0d121c;
@@ -369,3 +369,8 @@ body {
 .ehc--master .ehc-controls[open] > summary { margin-bottom: .4rem; }
 .ehc--master .ehc-controls > summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; border-radius: .5rem; }
 @media (prefers-reduced-motion: reduce) { .ehc--master .ehm-tiles .tile, .ehc--master .ehc-controls > summary::after { transition: none; } }
+
+/* LIVE-modus (HA-01): geen DEMO-labels; neutrale LIVE-markering, alleen-lezen. */
+.ehc-demo.ehc-live { color: #04220f; background: #5fe7a0; box-shadow: 0 0 0 1px rgba(95,231,160,.4), 0 6px 20px rgba(95,231,160,.16); }
+.ehm-pill .p-demo.p-live { background: #5fe7a0; color: #04220f; }
+.ehm-pill[data-state="offline"] .p-demo.p-live { background: var(--bad); color: #2a0606; }

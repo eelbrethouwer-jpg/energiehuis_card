@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Energiehuis LIVE-cockpit — HA-01 testomgeving (gesimuleerde Home Assistant)</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  .harness { margin: 0 0 .9rem; padding: .7rem .9rem; border-radius: .9rem; border: 1px dashed rgba(255,181,71,.7); background: rgba(255,181,71,.08); color: #ffe2b0; font-size: .85rem; }
+  .harness strong { color: var(--warn); }
+  .harness-controls { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0 0; }
+  .harness-controls button { min-height: 40px; padding: .35rem .75rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: var(--text); font: inherit; font-size: .8rem; cursor: pointer; }
+  .harness-controls button[aria-pressed="true"] { background: #f4f6f9; color: #0b0f17; }
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="harness" aria-label="Testomgeving">
+    <strong>TESTOMGEVING — gesimuleerde Home Assistant-states</strong> (<code>ha/sim.js</code>). Geen echte Home Assistant-verbinding, geen bediening.
+    De kaart hieronder is de LIVE-kaart zelf: zij weet niet dat de data gesimuleerd is.
+    <div class="harness-controls" id="sc"></div>
+  </section>
+  <div id="mount"></div>
+</main>
+<script src="../model.js"></script>
+<script src="../master-scene.js"></script>
+<script src="../master.js"></script>
+<script src="contract.js"></script>
+<script src="adapter.js"></script>
+<script src="live-card.js"></script>
+<script src="sim.js"></script>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var scenario = q.get('scenario') || 'teruglevering';
+    var ttl = +(q.get('signTtl') || 30);
+    var hass = null;
+    function callWS(msg) {
+      // Simulatie van media_source/resolve_media (alleen-lezen WS-opdracht): de testserver tekent het pad tijdelijk.
+      if (!msg || msg.type !== 'media_source/resolve_media') return Promise.reject(new Error('niet ondersteund in de simulatie'));
+      var m = /^media-source:\/\/media_source\/local\/(.+)$/.exec(msg.media_content_id || '');
+      if (!m) return Promise.reject(new Error('onbekende bron'));
+      window.__ha.resolves++;
+      return fetch('/__sign?ttl=' + ttl + '&path=' + encodeURIComponent('/media/local/' + m[1])).then(function (r) { if (!r.ok) throw new Error('teken ' + r.status); return r.json(); });
+    }
+    var extra = { callWS: callWS, hassUrl: function (p) { return new URL(p, location.origin).toString(); } };
+    var card = document.createElement('energiehuis-live-cockpit-preview');
+    function config(sc) {
+      var c = Object.assign({}, (EhHaSim.SCENARIOS[sc] && EhHaSim.SCENARIOS[sc].config) || {});
+      if (q.get('img') !== '0') c.image = 'media-source://media_source/local/energiehuis/' + (q.get('imgFile') || 'approved-visual-20261109.webp');
+      return c;
+    }
+    function set(sc, now) {
+      scenario = sc;
+      card.setConfig(config(sc));
+      hass = EhHaSim.createHass(sc, now || Date.now(), hass, extra);
+      card.hass = hass;
+      [].forEach.call(document.querySelectorAll('#sc button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.sc === sc)); });
+    }
+    window.__ha = {
+      card: card, resolves: 0,
+      set: set,
+      get hass() { return hass; },
+      push: function (h) { hass = h; card.hass = h; },
+      tick: function (now) { hass = EhHaSim.createHass(scenario, now || Date.now(), hass, extra); card.hass = hass; return hass; }
+    };
+    var bar = document.getElementById('sc');
+    Object.keys(EhHaSim.SCENARIOS).forEach(function (id) { var b = document.createElement('button'); b.type = 'button'; b.dataset.sc = id; b.textContent = EhHaSim.SCENARIOS[id].label; b.onclick = function () { set(id); }; bar.appendChild(b); });
+    card.setConfig(config(scenario));
+    document.getElementById('mount').appendChild(card);
+    set(scenario);
+    window.__mounted = true;
+  })();
+</script>
+</body>
+</html>

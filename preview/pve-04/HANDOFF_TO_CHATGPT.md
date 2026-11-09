@@ -1,68 +1,74 @@
-# Overdracht aan ChatGPT — PVE-04 RC2 (aangepaste uitvoering: P2, P3, P4)
+# Overdracht aan ChatGPT — HA-01: veilige Home Assistant-integratievoorbereiding
 
-**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. Geen nieuwe master. De productiekaart is ongewijzigd.
-Opgesteld door Claude Code, 9 november 2026. Opdracht: "RC2 aangepaste uitvoering": P1 gestopt, alleen P2, P3 en P4.
+**Status: preview, niet productie.** Gebouwd en automatisch getest met **gesimuleerde** Home Assistant-states. **Niet praktisch getest** (geen echte HA-verbinding). Geen PR, merge, tag, release, HACS, dashboard- of YAML-wijziging.
+Opgesteld door Claude Code, 9 november 2026.
 
-## 1. Branchstatus
+## 1. Status vooraf (gecontroleerd)
 
 | | |
 |---|---|
-| Branch | `preview/claude-premium-pve04` |
-| Uitgangs-HEAD (gecontroleerd) | `b6259fdc1e401c670a120d623e2b425998e79415` (remote = lokaal vóór aanvang) |
-| `main` | `62fa09cbd6dd3c4d481c0669c9cbac4f8a39aae9` (ongewijzigd) |
-| HEAD na deze ronde | de commit die dit bestand bevat (exacte SHA in het chatbericht) |
+| Branch | `preview/claude-premium-pve04`, uitgangs-HEAD `2a5cc26f1170b20ceb17606b1385ec1aa92da6d9` (remote = lokaal) |
+| `main` | `62fa09cbd6dd3c4d481c0669c9cbac4f8a39aae9` |
+| PR's (REST) | #48–#53 gesloten en gemerged; geen open PR's |
+| Laatste release | v1.25.0 (7 november 2026) |
+| HEAD na HA-01 | de commit met dit bestand (SHA in het chatbericht) |
 
-## 2. P1 — NIET opgelost (expliciet)
+Vastgelegd: de eigenaar accepteert de ingebakken lichtlijnen bij 0 W en offline als decoratief; de live-indicatie komt alleen uit de kaarten en de lichtpunten.
 
-De ingebakken lichtlijnen blijven bij 0 W en offline zichtbaar. Op basis van het besluit worden ze **niet meer automatisch bewerkt**:
+## 2. Opgeleverd
 
-- De RC1-rustlagen (zichtbare wazige banen) zijn uit de cockpit verwijderd.
-- Het RC2-prototype (zonegebonden correctie) haalde de kwaliteitseis niet: zon, net en Cupra NO-GO. Dat prototype is niet gecommit.
+1. **Datacontract** — `ha/HA_DATA_CONTRACT.md` en `ha/contract.js`.
+   - Zeven bronnen met de standaard-entiteiten en configuratiesleutels exact uit de productiekaart (getest tegen `EH_DEFAULTS`); TTL's uit de v1.25-cockpit.
+   - **Alle bronnen zijn bevestigd in code, maar onbevestigd in een echte HA.** De praktijkruimte is niet gekoppeld (bewust niet koppelbaar in HA-01).
+   - De definitie van de huisverbruik-template staat niet in de repository en is dus onbevestigd.
+2. **Adapter** — `ha/adapter.js`.
+   - Leest alleen `hass.states` en `hass.connected`; geeft de originele state-objecten door; geen eigen tijdstempels.
+   - Eenheden: W/kW, decimale komma, %. Een ongeldige of ontbrekende eenheid wordt zichtbaar ongeldig (bewust strenger dan productie).
+   - Versheid: `last_reported` ≥ `last_updated` ≥ `last_changed`; TTL per bron; "laatste stand" alleen voor stabiele 0 W en SOC; hercontrole op de TTL-grens met één timer.
+3. **Koppeling aan PVE-04** — `ha/live-card.js` met `<energiehuis-live-cockpit-preview>` en LIVE-modus in `master.js`/`model.js`.
+   - Zelfde master, glaskaarten, weergaven, detailpanelen, reduced motion en decoratieve lijnen.
+   - LIVE: geen DEMO-tekst, geen scenario's, geen schommeling; badge "LIVE · alleen-lezen", pil LIVE of OFFLINE, detailpaneel met entiteit, richting en tijdstempelbron.
+   - Updates per frame samengevoegd, alleen bij een gewijzigd state-object; `suspend`/`resume` bij ontkoppelen (geen timers, rAF of listeners; dezelfde DOM).
+   - Geen bediening, geen servicecalls, geen opslag; `callWS` uitsluitend voor `media_source/resolve_media` (getest).
+4. **Beeldroute** — Media Source via `resolve_media` met validatie (alleen same-origin `/media/`), één keer opnieuw oplossen en daarna een veilige terugval. **BLOCKER:** de echte authenticatie, verloopduur, het gedrag bij een HA-herstart en de Companion-apps zijn niet te verifiëren zonder HA. De terugval blijft actief en er is geen vaste `/media`-URL gebruikt.
+5. **Privacybeoordeling** — de master staat al openbaar in de repository (PVE-03-referentie); de HA-route beschermt alleen de HA-kopie. De inhoud is een ontwerpbeeld zonder personen, adres of echt kenteken: risico laag tot middel. Details in §6 van het contract.
 
-De master is nu **exact en onbewerkt** de achtergrond. De lijnen zijn expliciet **decoratief**:
-
-- **Legenda** onder het beeld: "De lichtlijnen in de afbeelding zijn decoratief en tonen geen actuele stroom. Actuele stroom: bewegende lichtpunten en de kaarten."
-- **Alt-tekst** en **detailpaneel**: regel "Lichtlijn in beeld: decoratief — geen actuele stroomindicator".
-
-## 3. Wat is gebouwd
-
-| Punt | Uitvoering |
-|---|---|
-| **P2 Glaskaarten** | Elke kaart heeft een **ondoorzichtig basisvlak**. Het kleurverloop wordt eenmalig in de browser bemonsterd uit de rand boven en onder de ingebakken kaart (~16–20 ms op de hoofdthread). Daarover ligt een halfdoorzichtige glaslaag (55 %), met een gekleurde rand (accent 82 %), binnen- en buitengloed, radius 24 (mastermaat) en groot wit type met een kleinere eenheid. Iconen hebben de accentkleur en gloed. De praktijkstatus "Nog niet gekoppeld" is een knop-pil, zoals in de referentie. Posities zijn ongewijzigd (afdekmaat uit `master-scene.js`). Zonder leesbare canvas valt het basisvlak terug op een vaste tint. |
-| **P3 Mobiel** | Drie weergaven. **Compact** (onder 900 px): dezelfde glaskaarten op de master, alleen de waarde (plus pijl bij het net of "Simulatie" bij de batterij). Geen dubbele tegelset, tikvlakken onzichtbaar vergroot tot ≥ 48 px, scenario's standaard ingeklapt (`<details>`). Huis, praktijk en Cupra blijven volledig in beeld; beeld, legenda en samenvatting passen in de eerste schermhoogte (390 × 844: samenvatting eindigt op 425 px). **Lijst** (smaller dan 21 × de tekstgrootte, of tekst > 125 %): lege glasvlakken op het beeld en een leesbare lijst eronder. Op desktop staan de scenario's standaard open; dezelfde inklapknop werkt daar ook. |
-| **P4 Netrichting** | Teruglevering = cyaan kaartaccent, "↓ naar net", lichtpunten cyaan huis → net. Afname = oranje kaartaccent, "↑ van net", lichtpunten oranje net → huis. De **ingebakken netlijn blijft cyaan**; de cockpit claimt niets anders. Richting, pijl en kleur verschijnen **alleen bij een actieve netroute**. Anders: "Richting niet bevestigd" (bij een tegenstrijdige meetketen met toelichting). Lichtpunten alleen bij geldige, actuele, actieve routes; bij 0 W, offline en verouderd staan ze stil en verdwijnen ze. Bij reduced motion: pijlen in de routekleur. |
-
-**Bevinding tijdens het testen (opgelost):** bij "P1 omgekeerd (niet gecorrigeerd)" en "Negatieve huissensor" toonde de Net-kaart eerst een richtingspijl en -kleur terwijl de route stilstond. Dat is nu "Richting niet bevestigd (meetketen tegenstrijdig)", zonder pijl of richtingskleur.
-
-## 4. Tests (lokaal uitgevoerd in deze sessie)
+## 3. Tests (lokaal, op de werkboom van deze commit)
 
 | Controle | Resultaat |
 |---|---|
-| PVE-04 node-tests (UTC en Europe/Amsterdam) | **84/84** per tijdzone |
+| PVE-04 node-tests (UTC en Europe/Amsterdam) | **95/95** per tijdzone (nieuw: `ha-adapter.test.cjs`, 11 tests) |
 | Productietests (UTC en Europe/Amsterdam) | **359/359** per tijdzone |
-| `node scripts/build.cjs --check` | Byte-identiek, SHA-256 `9f4fce00…6388` |
-| Master-suite `tests/master.cjs` | **Chromium 153: 31/31**, **WebKit 26.6: 31/31** |
-| Regressie placeholder/privélaag `tests/browser.cjs` | **Chromium 26/26**, **WebKit 26/26** |
-| Kaartdekking en ondoorzichtigheid | 8 viewports (320–1920 px) × 2 scenario's (incl. grote waarden en lange labels): geslaagd; 200 % tekst ⇒ lijst, geslaagd |
-| Doorschijntoets (kaartinhoud verborgen) | Witte glyfpixels **0,0000** voor alle kaarten en de pil op 390, 768 en 1440 px |
-| Netrichting voor alle 14 scenario's | Kaart, kleur, pijl, tekst en lichtpunten consistent; 0 W en offline zonder lichtpunten |
-| Master onaangetast | Stage = alleen beeld + lichtpuntlaag + afdekvlakken; lichtpuntlaag leeg (0 pixels) bij 0 W en offline |
-| Performance | 60 fps, p95 16,7 ms bij 4× CPU (desktop en mobiel, `perf.cjs`); hoofdthread 16–20 ms; heapgroei ~0,23 MB na 200 updates |
+| `node scripts/build.cjs --check` + `node --check energiehuis-card.js` | Byte-identiek (`9f4fce00…6388`), syntax OK |
+| Productie-Chromium-suites | stroomvergelijker, battery-finance, charging-suggestions, mobile-visual, personal-battery-comparison, regisseur-cockpit: alle OK |
+| HA-LIVE `tests/ha-live.cjs` | **Chromium 12/12, WebKit 12/12** |
+| DEMO-master `tests/master.cjs` | Chromium 30/30, WebKit 30/30 |
+| Placeholder-regressie `tests/browser.cjs` | Chromium 26/26, WebKit 26/26 |
+| `perf.cjs` | Master 60 fps bij 4× CPU (desktop en mobiel) |
 
-Screenshots (Chromium en WebKit): `screenshots/master-{desktop,mobiel}-{actief,0w,offline,afname}[-webkit].jpg`.
+**HA-LIVE dekt:**
+- 15 gesimuleerde scenario's: afname, teruglevering, zonneladen, 0 W, offline, unavailable, kW, ongeldige eenheden, ontbrekend, verouderd, constant met en zonder `last_reported`, nacht/laatste stand, tegenstrijdig, P1 omgekeerd (wel en niet gecorrigeerd);
+- 200 updates in één burst (1 modelberekening, geen DOM-herbouw); ongewijzigde states (0 berekeningen);
+- veroudering zonder update (lichtpunten stoppen via de timer);
+- ontkoppelen en opnieuw koppelen;
+- beeldroute (getekend; 401 zonder handtekening, 403 bij een vervalste; verlopen ⇒ terugval; geen beeld ⇒ terugval);
+- strikte DEMO/LIVE-scheiding; weergaven 320/390/1440 met dekking en detailpaneel; reduced motion.
 
-## 5. Beperkingen
+**Bevindingen tijdens het testen (opgelost):** de samenvatting zei bij een tegenstrijdige meetketen "De fictieve meetketen…", ook in LIVE; nu zonder "fictieve". De pil toonde "LIVE" terwijl er geen verbinding was; nu "OFFLINE".
 
-1. **P1 niet opgelost:** bij 0 W en offline blijven de gloeiende ingebakken lijnen zichtbaar (decoratief, met legenda).
-2. Compact op 360–390 px: waarden ~11 px, titels pas vanaf ~560 px beeldbreedte.
-3. De netlijn in het beeld blijft cyaan bij afname; alleen de kaart en de lichtpunten worden oranje.
-4. Niet getest op echte Safari of een fysiek toestel (alleen Playwright-WebKit, headless).
-5. Kenteken "CUPRA BORN" en merklogo blijven in beeld (geaccepteerd).
+Screenshots (gesimuleerde HA, Chromium en WebKit): `screenshots/ha-live-{desktop,mobiel}-{zonneladen,afname,nul-watt,offline,constant-nacht}[-webkit].jpg`.
 
-## 6. Bevestigingen
+## 4. Blockers en open punten
 
-Geen nieuwe master, geen beeldbewerking van de master, geen hand- of generatieve retouche, geen PR, merge, tag of release, geen HA/HACS-integratie en geen productiewijziging. Geen privébestanden gecommit; het RC2-P1-prototype staat alleen privé.
+1. **Echte HA-test** (aparte toestemming): bestaan, eenheden en verversfrequentie van de entiteiten; `last_reported` in `hass.states`; de Media Source-route (authenticatie, verloopduur, herstart, iOS/Android).
+2. Definitie van de huisverbruik-template.
+3. Besluit van de eigenaar over de openbare GitHub-kopie van de master.
+4. Bewuste verschillen met productie: ontbrekende eenheid is ongeldig; netrichting 80/40 W in plaats van ±50 W.
 
-## 7. Voorgestelde volgende stap
+## 5. Bevestigingen
 
-Visuele beoordeling door de eigenaar en ChatGPT van de screenshots (desktop/mobiel × actief, 0 W, offline en afname). Daarna een besluit of de decoratieve lijnen bij 0 W/offline acceptabel zijn, of dat P1 later via een apart traject (nieuwe master zonder ingebakken lijnen) wordt opgepakt.
+Wijzigingen uitsluitend in `preview/pve-04/`. Geen productiebundel, dashboard, YAML, HACS, PR, merge, tag of release. Geen echte HA-verbinding. Geen tokens, REST, servicecalls of opslag. Geen nieuw privébeeld in GitHub of `/config/www`.
+
+## 6. Volgende stap
+
+Onafhankelijke review van HA-01. Daarna, na afzonderlijk akkoord, een echte HA-testinstallatie volgens het meetplan in §4/§5 van het contract.

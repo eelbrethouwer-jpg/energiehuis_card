@@ -41,6 +41,25 @@ Zonder master of scènedata blijft alleen de lijst over.
 - De netlijn in het beeld blijft cyaan, ook bij afname.
 - Het kenteken "CUPRA BORN" en het merklogo blijven in beeld (geaccepteerd door de eigenaar, privégebruik).
 
+## HA-01 — alleen-lezen LIVE-cockpit (voorbereiding, gesimuleerde Home Assistant)
+
+**Contract en beeldroute:** [ha/HA_DATA_CONTRACT.md](ha/HA_DATA_CONTRACT.md). Geen echte HA-verbinding, geen installatie, geen servicecalls.
+
+| Bestand | Rol |
+|---|---|
+| `ha/contract.js` | Datacontract: standaard-entiteiten en sleutels exact uit de productiekaart; TTL, stabiliteit, teken, configuratievalidatie |
+| `ha/adapter.js` | Leest `hass.states`/`hass.connected` (frontendcontract), geeft state-objecten ongewijzigd door aan `model.js`, detecteert wijzigingen op referentie, plant hercontrole op de TTL-grens |
+| `ha/live-card.js` | `<energiehuis-live-cockpit-preview>` (shadow DOM; niet geregistreerd als dashboardkaart): LIVE-modus van `master.js`, één rAF per frame, één timer, `suspend`/`resume` bij ontkoppelen, beeld via `media_source/resolve_media` |
+| `ha/sim.js`, `ha/index.html`, `tools/serve-ha-preview.cjs` | Uitsluitend testomgeving: 15 gesimuleerde HA-scenario's en een gesimuleerde getekende `/media`-route |
+
+```sh
+node preview/pve-04/tools/serve-ha-preview.cjs        # http://127.0.0.1:8123/pve-04/ha/
+node --test preview/pve-04/tests/ha-adapter.test.cjs
+node preview/pve-04/tests/ha-live.cjs [--browser=webkit] [--screenshots]
+```
+
+LIVE is strikt gescheiden van DEMO: geen DEMO-labels, geen fictieve waarden, geen scenario's en geen schommeling. Er staat een badge "LIVE · alleen-lezen", en de pil toont OFFLINE zonder verbinding.
+
 De eerdere **placeholder- en privélaag-cockpit** (stap 0/1A) blijft beschikbaar via `?scene=placeholder` en `?scene=private` en wordt als regressie getest. De beschrijving hieronder gaat over die variant.
 
 ## Starten

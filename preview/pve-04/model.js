@@ -1,8 +1,9 @@
-/* Energiehuis PVE-04 · model.js — pure, testbare DEMO-logica.
+/* Energiehuis PVE-04 · model.js — pure, testbare cockpitlogica voor DEMO én LIVE (HA-01).
  *
- * DEMO ONLY. Dit bestand bevat uitsluitend fictieve meetwaarden (fixtures) en de regels die
- * bepalen welke energieroutes de scène mag tonen. Er is GEEN Home Assistant-verbinding:
- * geen callService, geen callWS, geen fetch, geen opslag.
+ * De regels (eenheden, tekenrichting, versheid, integriteit, routes) gelden voor beide modi. De fictieve meetwaarden
+ * (SCENARIOS/fixtures) zijn uitsluitend voor DEMO. LIVE-invoer komt van ha/adapter.js (input.live = true, input.specs
+ * per bron) en bevat nooit fixtures. Er is GEEN Home Assistant-aanroep in dit bestand: geen callService, geen callWS,
+ * geen fetch, geen opslag.
  *
  * Gebaseerd op de leeslogica van de Claude F2-referentie (reference/claude-f2-standalone.html),
  * met één bewuste afwijking: F2 hield een route na een ongeldige update nog tot 10 s `active`
@@ -70,6 +71,7 @@
     const done = (state, extra) => Object.freeze({ ...base, ...extra, state });
     if (!spec.entity && !(st && st.simulated)) return done('unlinked', { reason: 'Nog niet gekoppeld' });
     if (!st) return done('unknown', { reason: 'Geen meting' });
+    if (st.missing) return done('unknown', { reason: 'Entiteit niet gevonden' });
     const value = parseNumber(st.state);
     if (value === null) return done('unknown', { reason: 'Geen geldige waarde' });
     const unitRaw = String((st.attributes && st.attributes.unit_of_measurement) || '').trim();
@@ -82,13 +84,29 @@
       if (unit !== '%') return done('invalid-unit', { reason: unit ? 'Onbekende eenheid “' + unitRaw + '”' : 'Eenheid ontbreekt' });
       if (value < 0 || value > 100) return done('unknown', { reason: 'Buiten 0–100 %' });
     }
-    const t = Date.parse(st.last_updated || '');
-    if (!Number.isFinite(t) || now - t < -T.futureToleranceMs) return done('stale', { reason: 'Tijdstempel onbekend' });
+    // Versheid: de meest recente BRON-tijdstempel (last_reported ≥ last_updated ≥ last_changed). Nooit een eigen
+    // tijdstempel verzinnen: ontbreekt er een, dan is de meting niet actueel.
+    const stamp = freshness(st), t = stamp.t;
+    if (!Number.isFinite(t) || now - t < -T.futureToleranceMs) return done('stale', { reason: 'Tijdstempel onbekend', stampSource: stamp.source });
     const ageMs = Math.max(0, now - t);
-    if (ageMs > spec.ttlS * 1000) return done('stale', { ageMs, reason: 'Verouderd · ' + ageLabel(ageMs) });
+    if (ageMs > spec.ttlS * 1000) {
+      // Stabiele bronnen (bijv. PV 's nachts op 0 W, Cupra-SOC): laatste stand tonen, nooit als actueel of als route.
+      const keep = spec.stable && (spec.kind !== 'power' || Math.abs(v) < T.zeroW);
+      return done('stale', { ageMs, stampSource: stamp.source, retained: keep ? v : null, reason: keep ? 'Laatste stand · ' + ageLabel(ageMs) + ' · niet recent bevestigd' : 'Verouderd · ' + ageLabel(ageMs) });
+    }
     const simulated = !!st.simulated;
-    if (spec.kind === 'power' && Math.abs(v) < T.zeroW) return done('live-zero', { value: v, ageMs, simulated, reason: 'Actueel' });
-    return done('live', { value: v, ageMs, simulated, reason: 'Actueel' });
+    if (spec.kind === 'power' && Math.abs(v) < T.zeroW) return done('live-zero', { value: v, ageMs, simulated, stampSource: stamp.source, reason: 'Actueel' });
+    return done('live', { value: v, ageMs, simulated, stampSource: stamp.source, reason: 'Actueel' });
+  }
+
+  /** Meest recente geldige bron-tijdstempel van een HA-state (geen eigen tijd). */
+  function freshness(st) {
+    let best = { t: NaN, source: null };
+    for (const k of ['last_reported', 'last_updated', 'last_changed']) {
+      const v = Date.parse((st && st[k]) || '');
+      if (Number.isFinite(v) && !(v <= best.t)) best = { t: v, source: k };
+    }
+    return best;
   }
 
   const cur = r => !!r && (r.state === 'live' || r.state === 'live-zero');
@@ -133,8 +151,12 @@
     const connected = input.connected !== false;
     const p1Sign = (input.config && input.config.p1Sign) === 'export_positive' ? 'export_positive' : 'import_positive';
     const states = input.states || {};
+    const live = input.live === true;
+    // Bronspecificaties: standaard SPECS (DEMO); LIVE levert via de HA-adapter entiteit, TTL en stabiliteit per bron.
+    const specs = {};
+    for (const k of Object.keys(SPECS)) specs[k] = Object.freeze({ ...SPECS[k], ...((input.specs && input.specs[k]) || {}), key: k, kind: SPECS[k].kind });
     const r = {};
-    for (const k of Object.keys(SPECS)) r[k] = readEntity(states[k], SPECS[k], now);
+    for (const k of Object.keys(specs)) r[k] = readEntity(states[k], specs[k], now);
     if (!connected) for (const k of Object.keys(r)) if (r[k].state !== 'unlinked') r[k] = Object.freeze({ ...r[k], state: 'offline', value: null, reason: 'Offline' });
 
     const net = cur(r.net) ? r.net.value : null;
@@ -188,26 +210,26 @@
         watts: active ? c.w : null,
         intensity: active ? intensityOf(c.w) : 0,
         simulated: id === 'home-practice',
-        reason: blocked || (active ? 'Actief (DEMO)' : c.why)
+        reason: blocked || (active ? (live ? 'Actief' : 'Actief (DEMO)') : c.why)
       });
     }
 
     // ---- tegels
-    const val = (rd, fmt) => cur(rd) ? fmt(rd.value) : '—';
+    const val = (rd, fmt) => cur(rd) ? fmt(rd.value) : rd.retained != null ? fmt(rd.retained) : '—';
     const tone = rd => rd.state === 'live' || rd.state === 'live-zero' ? 'ok' : rd.state === 'unlinked' ? 'muted' : 'warn';
     const tiles = {};
-    tiles.pv = { title: 'Zonnepanelen', value: pv !== null && pv >= 0 ? formatPower(pv) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: SPECS.pv.entity };
-    tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: 'Geen fysieke opslag', tone: 'sim', entity: SPECS.battery.entity };
-    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (house !== null ? formatPower(house) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: SPECS.house.entity };
+    tiles.pv = { title: 'Zonnepanelen', value: pv !== null && pv >= 0 ? formatPower(pv) : r.pv.retained != null ? formatPower(r.pv.retained) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: specs.pv.entity };
+    tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: cur(r.battery) || r.battery.state === 'unlinked' ? 'Geen fysieke opslag' : 'Geen fysieke opslag · ' + r.battery.reason, tone: 'sim', entity: specs.battery.entity };
+    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (house !== null ? formatPower(house) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: specs.house.entity };
     const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
-    tiles.net = { title: 'Net', value: importW === null ? '—' : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: SPECS.net.entity, p1Sign };
+    tiles.net = { title: 'Net', value: importW === null ? '—' : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: specs.net.entity, p1Sign };
     tiles.practice = practiceSim
       ? { title: 'Praktijkruimte', value: formatPower(r.practice.value), sub: 'SIMULATIE · niet gemeten', tone: 'sim', entity: '—' }
       : { title: 'Praktijkruimte', value: '—', sub: 'Nog niet gekoppeld', tone: 'muted', entity: '—' };
     const charging = routes['home-ev'].active;
     const cu = input.cupra || {};
     const cupraLabel = charging ? (cu.label || 'Laden') : (cu.idleLabel || 'Niet aan het laden');
-    tiles.cupra = { title: 'Cupra Born', value: evInvalid ? '—' : (ev !== null ? formatPower(ev) : '—'), soc: val(r.soc, formatPct), sub: evInvalid || (cur(r.ev) ? cupraLabel : r.ev.reason), tone: evInvalid ? 'bad' : tone(r.ev), charging, entity: SPECS.ev.entity };
+    tiles.cupra = { title: 'Cupra Born', value: evInvalid ? '—' : (ev !== null ? formatPower(ev) : r.ev.retained != null ? formatPower(r.ev.retained) : '—'), soc: val(r.soc, formatPct), socReason: cur(r.soc) ? 'Actueel' : r.soc.reason, sub: evInvalid || (cur(r.ev) ? cupraLabel : r.ev.reason), tone: evInvalid ? 'bad' : tone(r.ev), charging, entity: specs.ev.entity, socEntity: specs.soc.entity };
 
     // ---- status en samenvatting
     let status;
@@ -216,12 +238,12 @@
     else {
       const keys = ['net', 'pv', 'house', 'ev', 'soc'];
       const n = keys.filter(k => cur(r[k])).length;
-      status = { text: n + '/' + keys.length + ' fictieve meetwaarden actueel', tone: n === keys.length ? 'ok' : 'warn' };
+      status = { text: n + '/' + keys.length + (live ? ' meetwaarden actueel' : ' fictieve meetwaarden actueel'), tone: n === keys.length ? 'ok' : 'warn' };
     }
-    const summary = summarize({ connected, critical, routes, direction, importW });
+    const summary = summarize({ connected, critical, routes, direction, importW, live });
 
     return Object.freeze({
-      demo: true, now, connected, p1Sign,
+      demo: !live, live, now, connected, p1Sign,
       readings: Object.freeze(r),
       grid: Object.freeze({ direction, importW }),
       balance, warnings: Object.freeze(warnings), critical,
@@ -231,9 +253,9 @@
     });
   }
 
-  function summarize({ connected, critical, routes, direction, importW }) {
+  function summarize({ connected, critical, routes, direction, importW, live }) {
     if (!connected) return 'Geen verbinding. Er worden geen stroomrichtingen getoond.';
-    if (critical) return 'De fictieve meetketen is tegenstrijdig. Stroomroutes staan stil.';
+    if (critical) return (live ? 'De meetketen' : 'De fictieve meetketen') + ' is tegenstrijdig. Stroomroutes staan stil.';
     const p = [];
     if (routes['sun-home'].active) p.push('de zon levert ' + formatPower(routes['sun-home'].watts));
     if (direction === 'export') p.push(formatPower(importW) + ' gaat terug naar het net');
@@ -292,5 +314,5 @@
     return { now, connected: j.connected !== false, config: j.config || {}, states: j.states, cupra: j.cupra || {} };
   }
 
-  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, formatPower, formatNet, formatPct, gridDirection, computeModel, scenarioInput, ageLabel });
+  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, freshness, formatPower, formatNet, formatPct, gridDirection, computeModel, scenarioInput, ageLabel });
 });
