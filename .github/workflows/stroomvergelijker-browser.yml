@@ -8,7 +8,7 @@ on:
       - 'energiehuis-card.js'
       - 'src/**'
       - 'scripts/build.cjs'
-      - 'tests/browser/**'
+      - 'tests/**'
       - '.github/workflows/stroomvergelijker-browser.yml'
   workflow_dispatch:
 permissions:
