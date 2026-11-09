@@ -2,7 +2,7 @@
 
 ## Actuele status — 9 november 2026
 
-Gecontroleerd door Claude Code via git (`git ls-remote`, lokale checkout). In deze sessie was **geen GitHub-API-toegang**; PR-, CI- en releasegegevens die alleen via de API zichtbaar zijn, zijn daarom niet geverifieerd. Werkwijze: zie [`AGENTS.md`](AGENTS.md).
+Gecontroleerd door Claude Code via git (`git ls-remote`, lokale checkout) en de GitHub REST-API (releases, check-runs). Werkwijze: zie [`AGENTS.md`](AGENTS.md).
 
 | Onderdeel | Status |
 |---|---|
@@ -10,17 +10,17 @@ Gecontroleerd door Claude Code via git (`git ls-remote`, lokale checkout). In de
 | Versie in broncode | `EH_VERSION = '1.25.0'` (`src/legacy/00-foundation.js`), kaartnaam `Energiehuis v1.25.0` (`src/legacy/02-card-shell.js`) |
 | Versie in HACS-bundel | `energiehuis-card.js`: `1.25.0`; byte-identiek aan `src/` volgens `node scripts/build.cjs --check` |
 | Hoogste geverifieerde tag | `v1.25.0` → commit `1b8ac34` (merge PR #49). Er bestaat ook een afwijkende tag `v1,0,0,` (`0d32530`); niet aangepast |
-| Laatst geverifieerde GitHub-release | **Niet geverifieerd in deze controle** (geen API-toegang). Het bestaan van tag `v1.25.0` bewijst niet dat de release `v1.25.0` is gepubliceerd |
+| Laatst geverifieerde GitHub-release | `v1.25.0` ("latest", geen draft/prerelease), gepubliceerd 7 nov 2026 22:54 UTC op commit `1b8ac34`. Of HACS-installaties zijn bijgewerkt, is niet uit GitHub af te leiden |
 | PR #50 Visual Experience | Gemerged in `main`; PR-HEAD `61fe095` heeft dezelfde bestandsinhoud als mergecommit `7308d3a`. De Visual Experience RC staat in `main`, maar de versie blijft **1.25.0**: v1.26.0 heeft nog geen versie-update, tag, release of HACS-publicatie |
 | Premium Live Cockpit-preview | Afzonderlijke branch `preview/chatgpt-premium-pve01` (HEAD `7f04771`, gebaseerd op `7308d3a`); wijzigingen uitsluitend onder `preview/pve-01/`. Niet in `main`, geen PR |
 
 **Statusbegrippen voor v1.26.0 Visual Experience RC (in `main`):**
 - **Gebouwd:** ja, in `main` op `7308d3a`.
-- **Automatisch getest:** lokaal op `7308d3a` (9 nov 2026, Node 22): `build.cjs --check` geslaagd, `node --check` geslaagd, `node --test tests/*.test.cjs` 359/359 geslaagd in UTC en Europe/Amsterdam. Chromium-tests in deze controle niet uitgevoerd; CI-uitkomsten van PR #50 niet geverifieerd.
+- **Automatisch getest:** lokaal op `7308d3a` (9 nov 2026, Node 22): `build.cjs --check` geslaagd, `node --check` geslaagd, `node --test tests/*.test.cjs` 359/359 geslaagd in UTC en Europe/Amsterdam. CI op PR-HEAD `61fe095` (event `pull_request`): v1.7-regressie (UTC en Europe/Amsterdam), v1.15-regressie, Stroomvergelijker-browsercontrole (Chromium) en Energiehuis controles allemaal geslaagd. CI op mergecommit `7308d3a` (event `push`): alleen `Energiehuis controles` (build-check en HACS-validatie), geslaagd; de volledige regressie- en browsersuite draait niet automatisch na merge.
 - **Praktisch getest:** nee, niet vastgelegd (HA/iPhone-acceptatie open).
 - **Gepubliceerd:** nee.
 
-**Eerstvolgende stappen:** GitHub-API-toegang voor Claude Code herstellen; CI van PR #50 en de status van release `v1.25.0` controleren; daarna een aparte, expliciet goedgekeurde release-PR voor v1.26.0.
+**Eerstvolgende stappen:** praktijkacceptatie van de Visual Experience in Home Assistant/iPhone; daarna een aparte, expliciet goedgekeurde release-PR voor v1.26.0.
 
 ---
 
