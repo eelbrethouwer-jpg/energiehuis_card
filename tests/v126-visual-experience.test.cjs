@@ -32,7 +32,9 @@ test('v1.26 RC: legacy meter controls remain discoverable and stateful',()=>{
 });
 test('v1.26 RC: no new HA writes, storage or charging logic',()=>{
  assert.doesNotMatch(addition,/callService|localStorage|sessionStorage|sendMessage|charge_control_enabled/);
- assert.match(note,/NIET MERGEN/);
+ assert.match(note,/PR #50 is gemerged in `main`/);
+ assert.match(note,/NIET TAGGEN OF PUBLICEREN/);
+ assert.match(note,/nog geen definitieve versie-update, tag, release of HACS-publicatie/);
  assert.match(note,/geen nieuwe Home Assistant-servicecalls/i);
  assert.match(bundle,/const EH_VERSION = '1\.25\.0'/);
 });
