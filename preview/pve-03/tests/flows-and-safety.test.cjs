@@ -61,7 +61,9 @@ test('scène-ankers: beide composities, binnen beeld voor alle zichtbare objecte
   for (const layout of ['desktop', 'mobile']) {
     const A = ANCHORS[layout];
     assert.ok(A.practice.x < A.house.x && A.house.x < A.cupraPort.x + 0.2, layout);
-    assert.ok(Math.abs(A.house.x - 0.5) < 0.06, layout);
+    // huisanker = voordeur op de lange gevel; de woning zelf staat centraal (driekwartaanzicht)
+    assert.ok(A.house.x > 0.25 && A.house.x < 0.6, layout + ' huis ' + A.house.x);
+    assert.ok(A.pv.x > 0.25 && A.pv.x < 0.6, layout + ' panelen ' + A.pv.x);
   }
 });
 

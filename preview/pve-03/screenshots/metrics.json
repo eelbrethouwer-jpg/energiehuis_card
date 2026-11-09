@@ -4,39 +4,39 @@
     "320x700": {
       "layout": "mobile",
       "image": "scene-mobile-1080.webp",
-      "imageBytes": 43152,
+      "imageBytes": 63054,
       "belowFold": []
     },
     "390x844": {
       "layout": "mobile",
       "image": "scene-mobile-1080.webp",
-      "imageBytes": 43152,
+      "imageBytes": 63054,
       "belowFold": []
     },
     "768x1024": {
       "layout": "desktop",
       "image": "scene-desktop-2660.webp",
-      "imageBytes": 96764,
+      "imageBytes": 133000,
       "belowFold": []
     },
     "1330x748": {
       "layout": "desktop",
       "image": "scene-desktop-2660.webp",
-      "imageBytes": 96764,
+      "imageBytes": 133000,
       "belowFold": []
     },
     "1440x900": {
       "layout": "desktop",
       "image": "scene-desktop-2660.webp",
-      "imageBytes": 96764,
+      "imageBytes": 133000,
       "belowFold": []
     }
   },
   "performance": {
-    "fps1x": 60.2,
-    "fps4x": 60.1,
+    "fps1x": 59.5,
+    "fps4x": 57.5,
     "heapMB": 1.46,
-    "heapDeltaKB": 189
+    "heapDeltaKB": 192
   },
   "results": [
     {
@@ -77,6 +77,14 @@
     },
     {
       "name": "50 hertekeningen: geen DOM-rebuild, geen route-flikkering, deeltjes herstarten niet",
+      "ok": true
+    },
+    {
+      "name": "ongeldig/verouderd/offline: route direct uit en deeltjes staan onmiddellijk stil (alleen passieve fade)",
+      "ok": true
+    },
+    {
+      "name": "negatieve EV-meting, minteken bij teruglevering en scenario-overgangen in het DOM",
       "ok": true
     },
     {

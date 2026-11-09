@@ -197,7 +197,7 @@
     const tone = rd => rd.state === 'live' || rd.state === 'live-zero' ? 'ok' : rd.state === 'unlinked' ? 'muted' : 'warn';
     const tiles = {};
     tiles.pv = { title: 'Zonnepanelen', value: pv !== null && pv >= 0 ? formatPower(pv) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: SPECS.pv.entity };
-    tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: 'Simulatie · geen fysieke opslag', tone: 'sim', entity: SPECS.battery.entity };
+    tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: 'Geen fysieke opslag', tone: 'sim', entity: SPECS.battery.entity };
     tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (house !== null ? formatPower(house) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: SPECS.house.entity };
     const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
     tiles.net = { title: 'Net', value: importW === null ? '—' : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: SPECS.net.entity, p1Sign };

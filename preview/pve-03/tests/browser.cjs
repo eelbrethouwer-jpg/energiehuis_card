@@ -152,7 +152,7 @@ const MEASURE = () => {
         const dom = Object.fromEntries([...document.querySelectorAll('.route')].map(g => [g.dataset.route, g.dataset.active === 'true']));
         const model = Object.fromEntries(Object.values(m.routes).map(r => [r.id, r.active]));
         const tiles = Object.fromEntries([...document.querySelectorAll('.tile')].map(b => [b.dataset.key, b.querySelector('.t-value').textContent]));
-        res[id] = { dom, model, tilesOk: Object.keys(tiles).every(k => tiles[k] === m.tiles[k].value), warn: !document.querySelector('.ehc-warn').hidden, critical: m.critical, pressed: document.querySelector(`[data-scenario="${id}"]`).getAttribute('aria-pressed') };
+        res[id] = { dom, model, tilesOk: Object.keys(tiles).every(k => tiles[k] === m.tiles[k].value), warn: !document.querySelector('.ehc-warn').hidden, critical: m.warnings.length > 0, pressed: document.querySelector(`[data-scenario="${id}"]`).getAttribute('aria-pressed') };
       }
       return res;
     });
@@ -202,6 +202,51 @@ const MEASURE = () => {
     assert.ok(out.sameTiles && out.sameRoutes, 'elementen vervangen');
     assert.ok(out.moved && !out.resetToInitial, 'deeltjes herstart of stil');
     assert.ok(out.animating);
+    assert.deepEqual(errors, []);
+    return out;
+  });
+
+  // ---------------------------------------------------------------- reviewcorrecties: deeltjes, EV, minteken, overgangen
+  await check('ongeldig/verouderd/offline: route direct uit en deeltjes staan onmiddellijk stil (alleen passieve fade)', async () => {
+    const { ctx, page, errors } = await open(browser, base, { width: 1440, height: 900, query: '?ticker=0&scenario=zon-export' });
+    await page.waitForTimeout(600);
+    const out = await page.evaluate(async () => {
+      const c = window.__cockpits[0], sleep = ms => new Promise(r => setTimeout(r, ms)), res = {};
+      for (const [to, route] of [['offline', 'sun-home'], ['verouderd', 'home-grid'], ['onbekende-eenheid', 'sun-home'], ['ev-negatief', 'home-ev']]) {
+        c.setScenario('zon-export'); await sleep(400);
+        const moving0 = c.flows.phases(route); await sleep(120); const moving1 = c.flows.phases(route);
+        c.setScenario(to);
+        const domOff = document.querySelector(`.route[data-route="${route}"]`).dataset.active === 'false';
+        const p0 = c.flows.phases(route); await sleep(250); const p1 = c.flows.phases(route);
+        res[to] = { wasMoving: moving0.some((v, i) => v !== moving1[i]), domOff, frozen: p0.every((v, i) => v === p1[i]) };
+      }
+      return res;
+    });
+    await ctx.close();
+    for (const [k, r] of Object.entries(out)) { assert.ok(r.wasMoving, k + ' bewoog eerst niet'); assert.ok(r.domOff, k + ' route nog actief'); assert.ok(r.frozen, k + ' deeltjes bewegen nog'); }
+    assert.deepEqual(errors, []);
+    return out;
+  });
+
+  await check('negatieve EV-meting, minteken bij teruglevering en scenario-overgangen in het DOM', async () => {
+    const { ctx, page, errors } = await open(browser, base, { width: 390, height: 844, query: '?ticker=0&scenario=zon-export' });
+    const out = await page.evaluate(() => {
+      const c = window.__cockpits[0], q = s => document.querySelector(s);
+      const net = q('.tile[data-key="net"] .t-value').textContent, netSub = q('.tile[data-key="net"] .t-sub').textContent;
+      c.setScenario('ev-negatief');
+      const ev = { value: q('.tile[data-key="cupra"] .t-value').textContent, sub: q('.tile[data-key="cupra"] .t-sub').textContent, route: q('.route[data-route="home-ev"]').dataset.active, tone: q('.tile[data-key="cupra"]').dataset.tone };
+      c.setScenario('net-laden');
+      const imp = q('.tile[data-key="net"] .t-value').textContent;
+      const seq = ['zon-export', 'offline', 'nacht', 'p1-omgekeerd', 'p1-fout', 'zon-export'].map(id => { c.setScenario(id); return [id, [...document.querySelectorAll('.route[data-active="true"]')].map(g => g.dataset.route).sort().join(',')]; });
+      return { net, netSub, ev, imp, seq };
+    });
+    await ctx.close();
+    assert.equal(out.net, '−1,88 kW'); assert.match(out.netSub, /Teruglevering/);
+    assert.equal(out.ev.value, '—'); assert.match(out.ev.sub, /negatief/); assert.equal(out.ev.route, 'false'); assert.equal(out.ev.tone, 'bad');
+    assert.equal(out.imp, '7,60 kW');
+    const seq = Object.fromEntries(out.seq);
+    assert.equal(seq.offline, ''); assert.equal(seq['p1-fout'], '');
+    assert.equal(seq.nacht, 'grid-home'); assert.equal(seq['p1-omgekeerd'], 'home-ev,home-grid,sun-home');
     assert.deepEqual(errors, []);
     return out;
   });

@@ -16,7 +16,7 @@ test('alle scenario’s rekenen en leveren alleen bekende routes; batterij is no
     assert.deepEqual(Object.keys(m.routes).sort(), [...M.ROUTES].sort(), id);
     assert.ok(!Object.keys(m.routes).some(k => /batter/i.test(k)), id);
     assert.equal(m.tiles.battery.tone, 'sim');
-    assert.match(m.tiles.battery.sub, /geen fysieke opslag/);
+    assert.match(m.tiles.battery.sub, /geen fysieke opslag/i);
     for (const r of Object.values(m.routes)) {
       if (r.active) { assert.ok(Number.isFinite(r.watts) && r.watts >= M.T.routeMinW, id + ' ' + r.id); assert.ok(r.intensity > 0 && r.intensity <= 1); }
       else { assert.equal(r.watts, null); assert.equal(r.intensity, 0); }

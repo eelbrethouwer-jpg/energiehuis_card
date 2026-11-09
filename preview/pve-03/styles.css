@@ -83,22 +83,23 @@ body {
 /* ---------------- tiles */
 .ehc-tiles {
   position: relative; z-index: 2; display: grid; gap: .75rem; padding: clamp(.75rem, 1.6cqi, 1.5rem);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas: "pv . battery" ". house ." "practice net cupra";
+  /* Naar de goedgekeurde referentie: kaarten zweven naast de objecten, niet eroverheen. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "pv . battery" "practice . cupra" ". house ." ". net .";
   min-height: 100%;
 }
-.tile[data-key="pv"] { grid-area: pv; justify-self: start; align-self: start; }
+.tile[data-key="pv"] { grid-area: pv; justify-self: start; align-self: start; margin-left: 6%; margin-top: 4%; }
 .tile[data-key="battery"] { grid-area: battery; justify-self: end; align-self: start; }
-.tile[data-key="house"] { grid-area: house; justify-self: center; align-self: center; }
+.tile[data-key="house"] { grid-area: house; justify-self: center; align-self: end; margin-bottom: 3%; }
 .tile[data-key="practice"] { grid-area: practice; justify-self: start; align-self: end; }
 .tile[data-key="net"] { grid-area: net; justify-self: center; align-self: end; }
-.tile[data-key="cupra"] { grid-area: cupra; justify-self: end; align-self: end; }
+.tile[data-key="cupra"] { grid-area: cupra; justify-self: end; align-self: end; margin-right: 6%; }
 
 .tile {
   --accent: var(--text);
-  display: flex; flex-wrap: wrap; align-items: flex-start; gap: .7rem; min-width: 0; max-width: min(100%, 19rem); min-height: 48px;
-  padding: .75rem .95rem .8rem .8rem; border-radius: var(--radius); border: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6rem; min-width: 0; max-width: min(100%, 15rem); min-height: 48px;
+  padding: .6rem .8rem .65rem .65rem; border-radius: var(--radius); border: 1px solid var(--line);
   background: var(--glass); color: inherit; font: inherit; text-align: left; cursor: pointer;
   -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
   box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
@@ -114,7 +115,7 @@ body {
 .t-icon svg { width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .t-body { display: flex; flex-direction: column; flex: 1 1 6.5rem; min-width: 0; }
 .t-title { font-size: .72rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
-.t-value { font-size: 1.75rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: .1rem; overflow-wrap: normal; word-break: keep-all; }
+.t-value { font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: .1rem; overflow-wrap: normal; word-break: keep-all; }
 .t-extra { align-self: flex-start; margin-top: .3rem; padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 650; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .t-extra[hidden] { display: none; }
 .t-sub { margin-top: .25rem; font-size: .82rem; color: var(--muted); overflow-wrap: anywhere; }
@@ -132,7 +133,7 @@ body {
 .tile[data-tone="warn"] .t-sub { color: var(--warn); }
 .tile[data-tone="bad"] { border-color: rgba(255,107,107,.65); }
 .tile[data-tone="bad"] .t-sub { color: var(--bad); }
-.tile[data-key="house"] .t-value { font-size: 1.55rem; }
+.tile[data-key="house"] .t-value { font-size: 1.45rem; }
 
 /* ---------------- text below the stage */
 .ehc-summary { margin: .9rem .25rem .25rem; font-size: 1rem; color: var(--text); }
