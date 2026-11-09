@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Energiehuis Live Cockpit — PVE-04 DEMO</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <p class="page-note"><strong>DEMO — fictieve meetwaarden.</strong> Zelfstandige preview zonder Home Assistant-verbinding, zonder bediening en zonder opslag. Niet de productiekaart.</p>
+  <div id="mount"></div>
+</main>
+<script src="scene-manifest.js"></script>
+<script src="model.js"></script>
+<script src="flows.js"></script>
+<script src="app.js"></script>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var n = Math.max(1, Math.min(4, parseInt(q.get('instances') || '1', 10) || 1));
+    var mount = document.getElementById('mount');
+    // Testhaak: ?manifest=0 simuleert een ontbrekend scènemanifest (terugvalgedrag).
+    if (q.get('manifest') === '0') { try { delete window.EhPve04Manifest; } catch (e) { window.EhPve04Manifest = undefined; } }
+    window.__cockpits = [];
+    for (var i = 0; i < n; i++) {
+      window.__cockpits.push(EhPve04.createCockpit(mount, {
+        scenario: q.get('scenario') || (i ? 'net-laden' : 'zon-export'),
+        ticker: q.get('ticker') !== '0'
+      }));
+    }
+  })();
+</script>
+</body>
+</html>

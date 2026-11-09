@@ -1,0 +1,31 @@
+# PVE-04: betaalde of externe RUWE bronbestanden horen nooit in de (publieke) repository.
+# Alleen gerenderde, tekstvrije beeldlagen met een regel in ASSET_RIGHTS.md worden gecommit.
+*.blend
+*.blend[0-9]
+*.fbx
+*.obj
+*.mtl
+*.max
+*.c4d
+*.ma
+*.mb
+*.3ds
+*.dae
+*.glb
+*.gltf
+*.usd
+*.usda
+*.usdc
+*.usdz
+*.abc
+*.exr
+*.hdr
+*.psd
+*.tif
+*.tiff
+*.zip
+*.7z
+*.rar
+raw/
+source-assets/
+licenses-private/

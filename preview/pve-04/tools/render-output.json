@@ -1,0 +1,78 @@
+{
+  "generator": "preview/pve-04/tools/scene.html",
+  "status": "placeholder",
+  "compositions": {
+    "desktop": {
+      "natural": {
+        "w": 2660,
+        "h": 1496
+      },
+      "anchors": {
+        "pv": {
+          "x": 0.4527,
+          "y": 0.2952
+        },
+        "house": {
+          "x": 0.4289,
+          "y": 0.6307
+        },
+        "charger": {
+          "x": 0.9098,
+          "y": 0.6862
+        },
+        "practice": {
+          "x": 0.1246,
+          "y": 0.639
+        },
+        "cupra": {
+          "x": 0.7849,
+          "y": 0.7291
+        },
+        "cupraPort": {
+          "x": 0.888,
+          "y": 0.7163
+        },
+        "cupraFront": {
+          "x": 0.7277,
+          "y": 0.7675
+        }
+      }
+    },
+    "mobile": {
+      "natural": {
+        "w": 1080,
+        "h": 1920
+      },
+      "anchors": {
+        "pv": {
+          "x": 0.3636,
+          "y": 0.2805
+        },
+        "house": {
+          "x": 0.3026,
+          "y": 0.4874
+        },
+        "charger": {
+          "x": 1.0235,
+          "y": 0.5359
+        },
+        "practice": {
+          "x": 0.1089,
+          "y": 0.5619
+        },
+        "cupra": {
+          "x": 0.7595,
+          "y": 0.5781
+        },
+        "cupraPort": {
+          "x": 0.969,
+          "y": 0.5702
+        },
+        "cupraFront": {
+          "x": 0.6201,
+          "y": 0.6015
+        }
+      }
+    }
+  }
+}

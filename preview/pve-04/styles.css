@@ -1,0 +1,245 @@
+/* Energiehuis PVE-04 · styles.css — Cinematic Energy Experience (DEMO). */
+:root {
+  color-scheme: dark;
+  --bg: #070a11;
+  --bg-2: #0d121c;
+  --glass: rgba(12, 16, 26, 0.58);
+  --glass-hi: rgba(22, 28, 42, 0.72);
+  --line: rgba(255, 255, 255, 0.14);
+  --line-hi: rgba(255, 255, 255, 0.32);
+  --text: #f4f6f9;
+  --muted: #b4bccb;
+  --dim: #8590a3;
+  --sun: #ffc23d;
+  --import: #ff8a5b;
+  --export: #4be38a;
+  --ev: #33ddff;
+  --cupra: #3ee05a;
+  --practice: #2fd4c0;
+  --battery: #b07cff;
+  --warn: #ffb547;
+  --bad: #ff6b6b;
+  --radius: 1.15rem;
+  --font: "Inter", "SF Pro Display", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; background: radial-gradient(120% 80% at 50% 0%, #121a2b 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text); font-family: var(--font); line-height: 1.35;
+}
+.page { padding: 1rem; max-width: 1480px; margin: 0 auto; }
+.page-note { margin: 0 0 .75rem; color: var(--muted); font-size: .85rem; }
+.page-note strong { color: var(--warn); }
+
+/* ---------------- cockpit shell */
+.ehc { position: relative; container-type: inline-size; margin: 0 auto 2rem; }
+/* Desktop: houd de volledige 16:9-scène binnen de viewporthoogte (tekst mag de scène wel laten groeien). */
+@media (min-width: 700px) { .ehc { max-width: max(44rem, calc((100svh - 7.5rem) * 16 / 9)); } }
+.ehc + .ehc { margin-top: 2rem; }
+.ehc-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: .75rem; }
+.ehc-brand { flex: 1 1 auto; min-width: 0; }
+.ehc-title { margin: 0; font-size: 1.35rem; font-weight: 650; letter-spacing: -.01em; }
+.ehc-title span { color: var(--muted); font-weight: 450; }
+.ehc-demo {
+  margin: 0; padding: .35rem .75rem; border-radius: 999px; font-size: .8rem; font-weight: 650; letter-spacing: .02em;
+  color: #1b1200; background: var(--warn); box-shadow: 0 0 0 1px rgba(255,181,71,.4), 0 6px 20px rgba(255,181,71,.18);
+}
+.ehc-scene-note {
+  margin: 0; padding: .3rem .7rem; border-radius: 999px; font-size: .78rem; font-weight: 600;
+  color: #ffe2b0; background: rgba(255,181,71,.12); border: 1px dashed rgba(255,181,71,.7);
+}
+.ehc-scene-note[hidden] { display: none; }
+/* Terugval: geen of kapotte scènelaag ⇒ rustige gradient, interface blijft volledig werken. */
+.ehc[data-scene="missing"] .ehc-stage, .ehc[data-scene="error"] .ehc-stage { background: radial-gradient(120% 90% at 50% 20%, #2a2440 0%, #121722 70%); }
+.ehc-scene[hidden], .ehc-flows[hidden] { display: none; }
+.ehc-status { margin: 0; font-size: .82rem; color: var(--muted); }
+.ehc-status[data-tone="bad"] { color: var(--bad); }
+.ehc-status[data-tone="warn"] { color: var(--warn); }
+
+/* ---------------- stage: scene + overlays */
+.ehc-stage {
+  position: relative; display: grid; border-radius: 1.6rem; overflow: hidden; isolation: isolate;
+  background: #121722; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06);
+}
+/* Minimale hoogte = beeldverhouding van de scène; grotere tekst laat de scène meegroeien. */
+.ehc-stage { grid-template-columns: minmax(0, 1fr); }
+.ehc-stage::before { content: ""; grid-area: 1 / 1; aspect-ratio: 16 / 9; }
+.ehc-tiles { grid-area: 1 / 1; }
+.ehc-scene, .ehc-scene img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ehc-scene img { object-fit: cover; object-position: 50% 50%; display: block; }
+.ehc-shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(6,8,16,.55) 0%, rgba(6,8,16,0) 24%),
+    linear-gradient(to top, rgba(6,8,16,.62) 0%, rgba(6,8,16,0) 30%);
+}
+.ehc-flows { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.ehc-flows svg, .ehc-flows canvas { position: absolute; left: 0; top: 0; }
+
+.route path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: opacity .7s ease, stroke-width .7s ease; }
+.route .r-groove { stroke: rgba(0,0,0,.35); stroke-width: 7; opacity: 0; }
+.route .r-glow { stroke: var(--route); stroke-width: 12; opacity: 0; filter: blur(5px); }
+.route .r-core { stroke: var(--route); stroke-width: 2; opacity: 0; }
+.route .r-chev path { stroke: var(--route); stroke-width: 2.4; opacity: 0; }
+.route[data-active="true"] .r-groove { opacity: 1; }
+.route[data-active="true"] .r-glow { opacity: calc(.18 + var(--i, 0) * .3); }
+.route[data-active="true"] .r-core { opacity: .9; stroke-width: calc(2px + var(--i, 0) * 2.5px); }
+.route[data-active="true"] .r-chev path { opacity: .95; }
+.route.is-sim .r-core { stroke-dasharray: 7 7; }
+
+/* ---------------- tiles */
+.ehc-tiles {
+  position: relative; z-index: 2; display: grid; gap: .75rem; padding: clamp(.75rem, 1.6cqi, 1.5rem);
+  /* Naar de goedgekeurde referentie: kaarten zweven naast de objecten, niet eroverheen. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "pv . ." "practice . cupra" ". house ." "battery net .";
+  min-height: 100%;
+}
+.tile[data-key="pv"] { grid-area: pv; justify-self: start; align-self: start; margin-left: 6%; margin-top: 4%; }
+.tile[data-key="battery"] { grid-area: battery; justify-self: start; align-self: end; }
+.tile[data-key="house"] { grid-area: house; justify-self: center; align-self: end; margin-bottom: 3%; }
+.tile[data-key="practice"] { grid-area: practice; justify-self: start; align-self: end; }
+.tile[data-key="net"] { grid-area: net; justify-self: center; align-self: end; }
+.tile[data-key="cupra"] { grid-area: cupra; justify-self: end; align-self: end; margin-right: 6%; }
+
+.tile {
+  --accent: var(--text);
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: .6rem; min-width: 0; max-width: min(100%, 15rem); min-height: 48px;
+  padding: .6rem .8rem .65rem .65rem; border-radius: var(--radius); border: 1px solid var(--line);
+  background: var(--glass); color: inherit; font: inherit; text-align: left; cursor: pointer;
+  -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.tile:hover { background: var(--glass-hi); border-color: var(--line-hi); }
+.tile:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.tile[aria-expanded="true"] { border-color: var(--accent); background: var(--glass-hi); }
+.t-icon {
+  flex: none; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: .8rem;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.t-icon svg { width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.t-body { display: flex; flex-direction: column; flex: 1 1 6.5rem; min-width: 0; }
+.t-title { font-size: .72rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
+.t-value { font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: .1rem; overflow-wrap: normal; word-break: keep-all; }
+.t-extra { align-self: flex-start; margin-top: .3rem; padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 650; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.t-extra[hidden] { display: none; }
+.t-sub { margin-top: .25rem; font-size: .82rem; color: var(--muted); overflow-wrap: anywhere; }
+
+.tile[data-key="pv"] { --accent: var(--sun); }
+.tile[data-key="battery"] { --accent: var(--battery); }
+.tile[data-key="house"] { --accent: #ffd9a8; }
+.tile[data-key="practice"] { --accent: var(--practice); }
+.tile[data-key="cupra"] { --accent: var(--cupra); }
+.tile[data-key="net"] { --accent: var(--muted); }
+.tile[data-key="net"][data-direction="import"] { --accent: var(--import); }
+.tile[data-key="net"][data-direction="export"] { --accent: var(--export); }
+.tile[data-tone="muted"] .t-value { color: var(--dim); }
+.tile[data-tone="warn"] { border-color: rgba(255,181,71,.55); }
+.tile[data-tone="warn"] .t-sub { color: var(--warn); }
+.tile[data-tone="bad"] { border-color: rgba(255,107,107,.65); }
+.tile[data-tone="bad"] .t-sub { color: var(--bad); }
+.tile[data-key="house"] .t-value { font-size: 1.45rem; }
+
+/* ---------------- text below the stage */
+.ehc-summary { margin: .9rem .25rem .25rem; font-size: 1rem; color: var(--text); }
+.ehc-warn { margin: .5rem .25rem; padding: .6rem .8rem; border-radius: .8rem; background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.45); color: #ffd1d1; font-size: .9rem; }
+.ehc-warn[hidden] { display: none; }
+.ehc-controls { margin-top: 1rem; padding: 1rem; border-radius: var(--radius); background: var(--bg-2); border: 1px solid var(--line); }
+.ehc-controls-title { margin: 0 0 .6rem; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ehc-scenarios { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chip {
+  min-height: 48px; padding: .55rem .95rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04);
+  color: var(--text); font: inherit; font-size: .88rem; cursor: pointer;
+}
+.chip:hover { border-color: var(--line-hi); }
+.chip[aria-pressed="true"] { background: #f4f6f9; color: #0b0f17; border-color: #f4f6f9; font-weight: 650; }
+.chip:focus-visible, .d-close:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.chip-play { margin-top: .75rem; }
+
+/* ---------------- detail panel */
+.ehc-detail {
+  position: absolute; z-index: 5; top: 3.5rem; right: 1rem; width: min(24rem, calc(100% - 2rem)); max-height: calc(100% - 4.5rem); overflow: auto;
+  padding: 1rem 1.1rem 1.1rem; border-radius: var(--radius); background: rgba(13,18,28,.94); border: 1px solid var(--line-hi);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 24px 60px rgba(0,0,0,.6);
+}
+.ehc-detail[hidden] { display: none; }
+.d-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.d-title { margin: 0; font-size: 1.1rem; }
+.d-close { flex: none; width: 48px; height: 48px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.d-value { margin: .35rem 0 .8rem; font-size: 1.6rem; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.d-list { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: .4rem .9rem; margin: 0; font-size: .88rem; }
+.d-list dt { color: var(--muted); }
+.d-list dd { margin: 0; overflow-wrap: anywhere; }
+.d-note { margin: .9rem 0 0; font-size: .78rem; color: var(--warn); }
+
+/* ---------------- tablet (container 700–979px): compactere tegels, scène blijft zichtbaar */
+@container (min-width: 700px) and (max-width: 979px) {
+  .ehc-tiles { gap: .5rem; padding: .7rem; }
+  .tile { max-width: 13.5rem; padding: .55rem .7rem .6rem .55rem; gap: .5rem; border-radius: .95rem; }
+  .t-icon { width: 1.9rem; height: 1.9rem; border-radius: .6rem; }
+  .t-icon svg { width: 1.1rem; height: 1.1rem; }
+  .t-title { font-size: .64rem; }
+  .t-value, .tile[data-key="house"] .t-value { font-size: 1.3rem; }
+  .t-sub { font-size: .74rem; }
+  .t-extra { font-size: .66rem; }
+}
+/* ---------------- mobile composition (container < 700px) */
+@container (max-width: 699px) {
+  .ehc-title { font-size: 1.15rem; }
+  .ehc-stage { border-radius: 1.25rem; }
+  .ehc-stage::before { aspect-ratio: 9 / 16; }
+  /* Eigen mobiele compositie: zon + batterij boven in de lucht, huis midden op de gevel,
+     onderaan praktijk | Net (midden onder het huis) | Cupra op de bestrating. */
+  .ehc-tiles {
+    gap: .45rem; padding: .55rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "pv pv pv battery battery battery"
+      "house house house house house house"
+      "practice practice net net cupra cupra";
+  }
+  .tile { justify-self: stretch; max-width: 100%; padding: .55rem .6rem .6rem .55rem; gap: .5rem; border-radius: .95rem; }
+  .t-body { flex-basis: 4.5rem; }
+  .tile[data-key="practice"], .tile[data-key="net"], .tile[data-key="cupra"] { flex-direction: column; gap: .3rem; padding: .5rem .5rem .55rem; }
+  .tile[data-key="practice"] .t-icon, .tile[data-key="net"] .t-icon, .tile[data-key="cupra"] .t-icon { width: 1.7rem; height: 1.7rem; }
+  .tile[data-key="house"] { justify-self: center; align-self: center; }
+  .t-icon { width: 2rem; height: 2rem; border-radius: .65rem; }
+  .t-icon svg { width: 1.15rem; height: 1.15rem; }
+  .t-title { font-size: .66rem; letter-spacing: .06em; }
+  .t-value { font-size: 1.3rem; }
+  .tile[data-key="house"] .t-value { font-size: 1.2rem; }
+  .t-sub { font-size: .74rem; }
+  .t-extra { font-size: .66rem; }
+  .ehc-detail { position: fixed; top: auto; right: 0; left: 0; bottom: 0; width: auto; max-height: 72vh; border-radius: 1.25rem 1.25rem 0 0; }
+}
+@container (max-width: 379px) {
+  .ehc-tiles { grid-template-areas: "pv pv pv battery battery battery" "house house house house house house" "practice practice practice cupra cupra cupra" "net net net net net net"; grid-template-rows: auto minmax(0, 1fr) auto auto; }
+  .tile[data-key="net"] { flex-direction: row; justify-self: center; min-width: 60%; }
+  .t-title { letter-spacing: .03em; }
+}
+@container (max-width: 339px) {
+  .t-icon { display: none; }
+  .t-value { font-size: 1.2rem; }
+}
+@media (max-width: 480px) {
+  .page { padding: .75rem; }
+  .page-note { display: none; } /* op smalle schermen volstaat de permanente DEMO-badge in de cockpit */
+  .ehc-head { gap: .35rem .6rem; margin-bottom: .5rem; }
+  .ehc-brand { flex-basis: 100%; }
+  .ehc-demo { font-size: .74rem; padding: .25rem .6rem; }
+}
+
+/* Grote tekst (bijv. 200 %) op smalle schermen: rem schaalt mee met de tekstgrootte,
+   dus deze regel geldt alleen bij vergrote tekst. Eén kolom, niets afgekapt. */
+@container (max-width: 15rem) {
+  .ehc-tiles { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "pv" "battery" "house" "practice" "net" "cupra"; }
+  .tile, .tile[data-key="net"] { justify-self: stretch; align-self: start; min-width: 0; flex-direction: row; }
+  .t-icon { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route path, .tile { transition: none; }
+}

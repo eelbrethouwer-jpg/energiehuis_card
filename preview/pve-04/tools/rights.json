@@ -1,0 +1,14 @@
+{
+  "R-PVE04-PLACEHOLDER-CGI": {
+    "title": "Tijdelijke CGI-scènelaag en occlusiemaskers (placeholder)",
+    "origin": "Eigen procedurele render: preview/pve-04/tools/scene.html via tools/render-scene.cjs (vaste seeds, reproduceerbaar). Geen foto's, logo's, kentekens, scans of modellen van derden.",
+    "author": "Claude Code in opdracht van de repository-eigenaar",
+    "holder": "eelbrethouwer-jpg (repository-eigenaar)",
+    "license": "Eigen werk; vrij te gebruiken en te publiceren binnen dit project",
+    "proof": "preview/pve-04/tools/scene.html en preview/pve-04/tools/render-scene.cjs (bron in deze repository)",
+    "toolsUsed": "three.js 0.170.0 (MIT) uitsluitend als renderbibliotheek tijdens het genereren; niet meegeleverd",
+    "publicAllowed": true,
+    "rawSourceInRepo": "Ja: de generatorbron zelf (geen betaalde of externe ruwe modellen)",
+    "visualStatus": "placeholder — NIET visueel goedgekeurd (fotorealisme vereist)"
+  }
+}
