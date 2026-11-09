@@ -1,0 +1,103 @@
+{
+  "chromium": "153.0.8010.12",
+  "viewports": {
+    "320x700": {
+      "layout": "mobile",
+      "image": "scene-mobile-1080.webp",
+      "imageBytes": 43152,
+      "belowFold": []
+    },
+    "390x844": {
+      "layout": "mobile",
+      "image": "scene-mobile-1080.webp",
+      "imageBytes": 43152,
+      "belowFold": []
+    },
+    "768x1024": {
+      "layout": "desktop",
+      "image": "scene-desktop-2660.webp",
+      "imageBytes": 96764,
+      "belowFold": []
+    },
+    "1330x748": {
+      "layout": "desktop",
+      "image": "scene-desktop-2660.webp",
+      "imageBytes": 96764,
+      "belowFold": []
+    },
+    "1440x900": {
+      "layout": "desktop",
+      "image": "scene-desktop-2660.webp",
+      "imageBytes": 96764,
+      "belowFold": []
+    }
+  },
+  "performance": {
+    "fps1x": 60.2,
+    "fps4x": 60.1,
+    "heapMB": 1.46,
+    "heapDeltaKB": 189
+  },
+  "results": [
+    {
+      "name": "viewport 320x700: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 390x844: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 768x1024: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1330x748: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1440x900: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 390x844: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 1440x900: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 320x700: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "alle scenario’s: DOM-routes en tegels volgen exact het model (incl. offline/stale/nacht/P1/negatief)",
+      "ok": true
+    },
+    {
+      "name": "50 hertekeningen: geen DOM-rebuild, geen route-flikkering, deeltjes herstarten niet",
+      "ok": true
+    },
+    {
+      "name": "toetsenbord: Tab → tegel, Enter opent detail, focus op Sluiten, Escape sluit en herstelt focus; klik buiten sluit",
+      "ok": true
+    },
+    {
+      "name": "prefers-reduced-motion: geen deeltjesanimatie, richting blijft zichtbaar via pijlen",
+      "ok": true
+    },
+    {
+      "name": "verborgen tab pauzeert animatie en schommeling; zichtbaar hervat",
+      "ok": true
+    },
+    {
+      "name": "twee gelijktijdige instanties: onafhankelijk; destroy() ruimt timers, rAF en listeners op",
+      "ok": true
+    },
+    {
+      "name": "performance: fps onder 4× CPU-throttling, geheugen na 200 updates, beeldgewicht",
+      "ok": true
+    }
+  ]
+}
