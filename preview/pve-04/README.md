@@ -29,7 +29,8 @@ fotorealistische, tekstvrije beeldlaag (<picture>, WebP + JPEG, 1×/2×)     ←
 
 | Bestand | Rol |
 |---|---|
-| `scene-manifest.js` | **Gegenereerd.** Per compositie (desktop 16:9, mobiel 9:16): beeldlagen en maskers met type, afmetingen, bytes en SHA-256, budget, ankerpunten, rechten-ID; plus de status (`placeholder`/`approved`) en de rechtenregels. Puur data, laadt als script. |
+| `scene-manifest.js` | **Gegenereerd, schema v2.** Coördinatenstelsel `normalized-image`. Per compositie (desktop 16:9, mobiel 9:16): beeldlagen en maskers (type, afmetingen, bytes, SHA-256, maskerkader), budget, ankerpunten, `uiZones`, `keyObjects`, `protectedAreas`, optionele `lightLayers`; plus status en rechten. Puur data, laadt als script. |
+| `manifest-validate.js` | Pure `validateManifest()`: gooit nooit, accepteert v1 en v2; de runtime bouwt de scène alleen bij een geldig manifest. |
 | `ASSET_RIGHTS.md` | Rechtenregister met per asset de herkomst, licentie, bewijs en SHA-256, plus het sjabloon voor stap 1. |
 | `.gitignore` | Blokkeert ruwe en betaalde bronbestanden (`.blend`, `.fbx`, `.glb`, `.exr`, `.hdr`, `.psd`, …). |
 | `tools/build-manifest.cjs` | Bouwt het manifest uit de echte bestanden; `--check` faalt bij elke afwijking. |
@@ -43,6 +44,7 @@ fotorealistische, tekstvrije beeldlaag (<picture>, WebP + JPEG, 1×/2×)     ←
 |---|---|
 | Manifest ontbreekt | Melding "Scènelaag ontbreekt — alleen interface"; geen scène of routes; kaarten en waarden werken volledig |
 | Beeldlaag laadt niet | Melding "Beeldlaag kon niet laden — alleen interface"; scène en routes verborgen |
+| Manifest ongeldig | Melding "Scènemanifest ongeldig — alleen interface"; geen scène of routes; interface volledig |
 | Masker laadt niet | Scène en routes blijven; deeltjes worden niet gemaskeerd (alleen visueel, nooit een datawijziging) |
 | Status `placeholder` | Permanente melding "Tijdelijk beeld — niet visueel goedgekeurd" |
 
@@ -56,22 +58,39 @@ node preview/pve-04/tools/build-manifest.cjs
 
 Bij stap 1 vervangen de Blender-renders de bestanden. Daarna worden `tools/render-output.json` (ankerpunten), `tools/rights.json` en het `SCENE`-blok in `build-manifest.cjs` bijgewerkt en het manifest opnieuw gebouwd. De UI en de tests blijven gelijk.
 
+## Coördinaten, zones en beschermde gebieden (v2)
+
+- **Coördinaten:** alles in fracties (0..1) van de natuurlijke beeldmaat, met de oorsprong linksboven, x naar rechts en y naar beneden. Op het scherm via `object-fit: cover`, gecentreerd (`flows.coverTransform`).
+- **`uiZones`:** per kaart een gebied waarin het midden van die kaart moet liggen. Zones overlappen onderling niet.
+- **`keyObjects`:** kaders van woning, garage, auto, praktijk, panelen en wandlader, geprojecteerd vanuit de 3D-scène. Objecten volledig buiten beeld staan in `outOfView`.
+- **`protectedAreas`:** de herkenbare kern van auto, praktijkpui, panelen en dak/topgevel (een kader minus marges per object). **Geen kaart mag een beschermd gebied raken**; dit wordt getest op 320, 390, 768, 1330 en 1440 px.
+- **`lightLayers`:** optioneel. Nu wordt alleen trigger `always` getoond; andere triggers zijn voor later en worden genegeerd. Extra velden breken niets.
+
+## Prestaties en maskeringsmodus
+
+Standaard is de modus `bbox`: het masker wordt per resize één keer voorgeschaald, en per frame wordt alleen het maskerkader weggesneden. De SVG-routelaag heeft een eigen compositielaag. Alternatieven voor metingen: `?maskmode=full|css` en `?svgmask=0`. Meten:
+
+```sh
+node preview/pve-04/tests/perf.cjs --write     # PVE-03 vs PVE-04-varianten, 3 runs, 1× en 4× CPU
+```
+
+Doel bij 4×: ≥ 50 fps en p95 ≤ 33 ms (45–49 fps = waarschuwing, < 45 = doel niet gehaald, < 30 = harde fout). Laatste resultaten: `screenshots/perf.json`.
+
 ## Tests
 
 ```sh
 TZ=UTC node --test preview/pve-04/tests/*.test.cjs
 TZ=Europe/Amsterdam node --test preview/pve-04/tests/*.test.cjs
-node preview/pve-04/tests/browser.cjs --screenshots
+node preview/pve-04/tests/browser.cjs --screenshots                   # Chromium
+node preview/pve-04/tests/browser.cjs --browser=webkit --screenshots  # WebKit (Playwright)
+node preview/pve-04/tests/perf.cjs --write
 ```
 
-- **Node (38 tests):** model en veiligheid (uit PVE-03), routes, plus het manifest: actualiteit, bytes, SHA-256, type en afmetingen, WebP+JPEG, beeldverhouding, maskers met alfa, budgetten, rechtenvelden, kruiscontrole met `ASSET_RIGHTS.md`, geen ongeregistreerde of ruwe bestanden, ankerpunten, en laden zonder netwerk.
-- **Browser (21 controles):** alles uit PVE-03, plus:
-  - maskers op desktop en mobiel: pixelmeting met 0 deeltjespixels onder het masker, het SVG-masker op de routelijnen, en de kaarten bovenop;
-  - de placeholdermelding en de batterij linksonder;
-  - het terugvalgedrag (geen manifest, beeldlaag 404, masker 404).
+- **Node (70 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting.
+- **Browser (25 controles, Chromium én WebKit):** viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
 
 ## Beperkingen
 
 - De scènelaag is een **placeholder** (CGI) en geen visueel eindbeeld.
-- Alleen getest in Chromium 153 headless; Safari/WebKit en echte apparaten zijn niet getest.
-- Het maskeren per frame kost rekentijd: onder 4× CPU-throttling ~39 fps (zonder masker ~58).
+- Getest in Chromium 153 en Playwright-WebKit 26.6 (Linux, headless). **Echte Safari op iPhone/macOS is niet getest** en blijft vereist vóór acceptatie.
+- Fps-metingen zijn headless-metingen en geen meting op een echt toestel.

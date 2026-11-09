@@ -4,7 +4,14 @@
 (function (root) {
   'use strict';
   const MANIFEST = {
-    "schema": "energiehuis.scene-manifest/1",
+    "schema": "energiehuis.scene-manifest/2",
+    "coordinateSystem": {
+      "id": "normalized-image",
+      "origin": "linksboven van de natuurlijke beeldlaag",
+      "axes": "x naar rechts, y naar beneden",
+      "unit": "fractie van natural.w (x, w) en natural.h (y, h); 0..1 = binnen beeld",
+      "mapping": "object-fit: cover, gecentreerd (50% 50%): scherm = offset + waarde × geschaalde beeldmaat (flows.coverTransform)"
+    },
     "sceneId": "pve04-placeholder-cgi",
     "status": "placeholder",
     "statusLabel": "Tijdelijk beeld — niet visueel goedgekeurd",
@@ -69,7 +76,13 @@
             "alpha": true,
             "bytes": 41420,
             "sha256": "27e06347c3af630d19156711947c9bd50e1b083a9b66576094c5c3b9f8783f6e",
-            "rights": "R-PVE04-PLACEHOLDER-CGI"
+            "rights": "R-PVE04-PLACEHOLDER-CGI",
+            "bbox": {
+              "x": 0.0083,
+              "y": 0.6457,
+              "w": 0.903,
+              "h": 0.2326
+            }
           }
         ],
         "anchors": {
@@ -101,7 +114,141 @@
             "x": 0.7277,
             "y": 0.7675
           }
-        }
+        },
+        "uiZones": [
+          {
+            "id": "pv",
+            "x": 0,
+            "y": 0,
+            "w": 0.35,
+            "h": 0.25,
+            "purpose": "Zonnepanelen-kaart linksboven, naast het dak"
+          },
+          {
+            "id": "practice",
+            "x": 0,
+            "y": 0.25,
+            "w": 0.35,
+            "h": 0.35,
+            "purpose": "Praktijkkaart links, boven het bijgebouw"
+          },
+          {
+            "id": "battery",
+            "x": 0,
+            "y": 0.7,
+            "w": 0.35,
+            "h": 0.3,
+            "purpose": "Virtuele batterij linksonder"
+          },
+          {
+            "id": "house",
+            "x": 0.35,
+            "y": 0.55,
+            "w": 0.3,
+            "h": 0.25,
+            "purpose": "Huiskaart midden op de gevel"
+          },
+          {
+            "id": "net",
+            "x": 0.35,
+            "y": 0.82,
+            "w": 0.3,
+            "h": 0.18,
+            "purpose": "Net midden onder de woning"
+          },
+          {
+            "id": "cupra",
+            "x": 0.65,
+            "y": 0.1,
+            "w": 0.35,
+            "h": 0.45,
+            "purpose": "Cupra-kaart boven de auto"
+          }
+        ],
+        "keyObjects": {
+          "pv": {
+            "x": 0.3137,
+            "y": 0.2202,
+            "w": 0.2841,
+            "h": 0.1545,
+            "clipped": false
+          },
+          "house": {
+            "x": 0.2448,
+            "y": 0.0123,
+            "w": 0.4947,
+            "h": 0.7653,
+            "clipped": false
+          },
+          "garage": {
+            "x": 0.7051,
+            "y": 0.4761,
+            "w": 0.2949,
+            "h": 0.3601,
+            "clipped": true
+          },
+          "charger": {
+            "x": 0.8943,
+            "y": 0.6503,
+            "w": 0.0334,
+            "h": 0.0718,
+            "clipped": false
+          },
+          "practice": {
+            "x": 0,
+            "y": 0.4692,
+            "w": 0.2642,
+            "h": 0.3374,
+            "clipped": true
+          },
+          "car": {
+            "x": 0.673,
+            "y": 0.6454,
+            "w": 0.2292,
+            "h": 0.2212,
+            "clipped": false
+          }
+        },
+        "outOfView": [],
+        "protectedAreas": [
+          {
+            "id": "car",
+            "from": "car",
+            "purpose": "Groene auto: carrosserie en ruiten",
+            "x": 0.7074,
+            "y": 0.6786,
+            "w": 0.1604,
+            "h": 0.1548
+          },
+          {
+            "id": "practice-front",
+            "from": "practice",
+            "purpose": "Praktijk: verlichte schuifpui",
+            "x": 0.0528,
+            "y": 0.5367,
+            "w": 0.1585,
+            "h": 0.2024
+          },
+          {
+            "id": "pv",
+            "from": "pv",
+            "purpose": "Zonnepanelen",
+            "x": 0.3563,
+            "y": 0.2434,
+            "w": 0.1989,
+            "h": 0.1081
+          },
+          {
+            "id": "house-upper",
+            "from": "house",
+            "purpose": "Woning: dak, dakkapel en topgevel",
+            "x": 0.3685,
+            "y": 0.1271,
+            "w": 0.2473,
+            "h": 0.3061
+          }
+        ],
+        "lightLayers": []
       },
       "mobile": {
         "minContainerWidth": 0,
@@ -163,7 +310,13 @@
             "alpha": true,
             "bytes": 22418,
             "sha256": "136cc8ebed7dba35e916bc4ccb64da89b4d02b4bafe290cbb0535e52012f1126",
-            "rights": "R-PVE04-PLACEHOLDER-CGI"
+            "rights": "R-PVE04-PLACEHOLDER-CGI",
+            "bbox": {
+              "x": 0.1148,
+              "y": 0.5042,
+              "w": 0.8852,
+              "h": 0.2531
+            }
           }
         ],
         "anchors": {
@@ -195,7 +348,136 @@
             "x": 0.6201,
             "y": 0.6015
           }
-        }
+        },
+        "uiZones": [
+          {
+            "id": "pv",
+            "x": 0,
+            "y": 0,
+            "w": 0.5,
+            "h": 0.22,
+            "purpose": "Zonnepanelen-kaart linksboven (lucht)"
+          },
+          {
+            "id": "battery",
+            "x": 0.5,
+            "y": 0,
+            "w": 0.5,
+            "h": 0.22,
+            "purpose": "Virtuele batterij rechtsboven (lucht)"
+          },
+          {
+            "id": "house",
+            "x": 0.2,
+            "y": 0.3,
+            "w": 0.6,
+            "h": 0.22,
+            "purpose": "Huiskaart midden op de gevel"
+          },
+          {
+            "id": "practice",
+            "x": 0,
+            "y": 0.58,
+            "w": 0.5,
+            "h": 0.25,
+            "purpose": "Praktijkkaart linksonder, onder het bijgebouw"
+          },
+          {
+            "id": "cupra",
+            "x": 0.5,
+            "y": 0.58,
+            "w": 0.5,
+            "h": 0.25,
+            "purpose": "Cupra-kaart rechtsonder, onder de auto"
+          },
+          {
+            "id": "net",
+            "x": 0.15,
+            "y": 0.83,
+            "w": 0.7,
+            "h": 0.17,
+            "purpose": "Net midden onder"
+          }
+        ],
+        "keyObjects": {
+          "pv": {
+            "x": 0.1002,
+            "y": 0.2323,
+            "w": 0.5333,
+            "h": 0.0989,
+            "clipped": false
+          },
+          "house": {
+            "x": 0,
+            "y": 0.1491,
+            "w": 0.9532,
+            "h": 0.4245,
+            "clipped": true
+          },
+          "garage": {
+            "x": 0.7506,
+            "y": 0.4157,
+            "w": 0.2494,
+            "h": 0.2002,
+            "clipped": true
+          },
+          "practice": {
+            "x": 0,
+            "y": 0.4825,
+            "w": 0.2634,
+            "h": 0.1496,
+            "clipped": true
+          },
+          "car": {
+            "x": 0.5482,
+            "y": 0.5228,
+            "w": 0.4518,
+            "h": 0.1316,
+            "clipped": true
+          }
+        },
+        "outOfView": [
+          "charger"
+        ],
+        "protectedAreas": [
+          {
+            "id": "car",
+            "from": "car",
+            "purpose": "Groene auto: silhouet, dak en ruiten",
+            "x": 0.6386,
+            "y": 0.536,
+            "w": 0.2711,
+            "h": 0.0592
+          },
+          {
+            "id": "practice-front",
+            "from": "practice",
+            "purpose": "Praktijk: dak en verlichte pui",
+            "x": 0.0395,
+            "y": 0.4975,
+            "w": 0.1712,
+            "h": 0.0823
+          },
+          {
+            "id": "pv",
+            "from": "pv",
+            "purpose": "Zonnepanelen",
+            "x": 0.1802,
+            "y": 0.2471,
+            "w": 0.3733,
+            "h": 0.0692
+          },
+          {
+            "id": "house-upper",
+            "from": "house",
+            "purpose": "Woning: dakkapel en topgevel",
+            "x": 0.286,
+            "y": 0.2128,
+            "w": 0.3813,
+            "h": 0.1061
+          }
+        ],
+        "lightLayers": []
       }
     },
     "rights": {

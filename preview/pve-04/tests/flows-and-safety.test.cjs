@@ -12,7 +12,7 @@ const DIR = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
 // Code zonder commentaar: commentaar mag de verboden API's wél benoemen.
 const code = f => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
-const RUNTIME = ['index.html', 'app.js', 'model.js', 'flows.js', 'styles.css', 'scene-manifest.js'];
+const RUNTIME = ['index.html', 'app.js', 'model.js', 'flows.js', 'styles.css', 'scene-manifest.js', 'manifest-validate.js'];
 
 test('routecontract: kleuren per route, praktijk gestippeld, batterij nooit een route', () => {
   assert.deepEqual(Object.keys(F.STYLE).sort(), ['grid-home', 'home-ev', 'home-grid', 'home-practice', 'sun-home']);

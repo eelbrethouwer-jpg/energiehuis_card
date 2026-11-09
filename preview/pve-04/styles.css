@@ -52,7 +52,10 @@ body {
 .ehc-scene-note[hidden] { display: none; }
 /* Terugval: geen of kapotte scènelaag ⇒ rustige gradient, interface blijft volledig werken. */
 .ehc[data-scene="missing"] .ehc-stage, .ehc[data-scene="error"] .ehc-stage { background: radial-gradient(120% 90% at 50% 20%, #2a2440 0%, #121722 70%); }
-.ehc-scene[hidden], .ehc-flows[hidden] { display: none; }
+.ehc-scene[hidden], .ehc-flows[hidden], .ehc-lights[hidden] { display: none; }
+.ehc[data-scene="invalid"] .ehc-stage { background: radial-gradient(120% 90% at 50% 20%, #2a2440 0%, #121722 70%); }
+.ehc-lights, .ehc-light { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ehc-light { object-fit: cover; object-position: 50% 50%; opacity: .9; }
 .ehc-status { margin: 0; font-size: .82rem; color: var(--muted); }
 .ehc-status[data-tone="bad"] { color: var(--bad); }
 .ehc-status[data-tone="warn"] { color: var(--warn); }
@@ -76,6 +79,9 @@ body {
 }
 .ehc-flows { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .ehc-flows svg, .ehc-flows canvas { position: absolute; left: 0; top: 0; }
+/* Eigen compositielaag: de (statische, gemaskeerde) SVG-routelaag wordt niet elk frame opnieuw gerasterd
+   doordat het deeltjescanvas erboven verandert. Gemeten in tests/perf.cjs. */
+.ehc-flows svg, .ehc-flows canvas { will-change: transform; }
 
 .route path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: opacity .7s ease, stroke-width .7s ease; }
 .route .r-groove { stroke: rgba(0,0,0,.35); stroke-width: 7; opacity: 0; }

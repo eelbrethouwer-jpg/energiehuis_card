@@ -102,7 +102,14 @@
     svg.appendChild(defs);
     const maskEl = defs.querySelector('mask'), maskRect = defs.querySelector('.m-all'), maskImgEl = defs.querySelector('.m-img');
     const routesG = doc.createElementNS(SVGNS, 'g'); routesG.setAttribute('class', 'routes'); svg.appendChild(routesG);
-    let mask = null, cover = null;
+    // Maskeringsmodus (gemeten in tests/perf.cjs): 'bbox' (standaard) = masker één keer per resize voorgeschaald
+    // naar canvaspixels en per frame alleen het maskerkader wegsnijden; 'full' = hele masker elk frame
+    // herschalen (PVE-04 v1); 'css' = CSS mask-image op het canvas (geen werk per frame; valt terug op 'bbox'
+    // als de maskerpixels niet leesbaar zijn, bijv. via file://).
+    const MODES = ['bbox', 'full', 'css'];
+    const maskMode = MODES.includes(opts.maskMode) ? opts.maskMode : 'bbox';
+    const svgMaskOn = opts.svgMask !== false;   // routelijnen maskeren (SVG); uit = lijnen ongemaskeerd, alleen visueel
+    let mask = null, maskMeta = null, cover = null, pre = null, effMode = maskMode;
     const ctx = canvas.getContext('2d');
 
     const R = {};
@@ -139,6 +146,7 @@
       dpr = Math.min(2, win.devicePixelRatio || 1);
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`); svg.setAttribute('width', w); svg.setAttribute('height', h);
       canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      prepare();
       for (const r of Object.values(R)) {
         const p = routePoints(r.id, points);
         if (!p || p.some(x => !x)) { r.poly = null; r.g.style.display = 'none'; continue; }
@@ -198,14 +206,46 @@
         ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
       }
       // Occlusie: deeltjes achter voorgrondobjecten wegsnijden (alleen deze canvaslaag, nooit de UI).
-      if (mask && cover && !still) {
+      if (mask && cover && !still && effMode !== 'css') {
         ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1;
-        ctx.drawImage(mask, cover.ox, cover.oy, cover.w, cover.h);
+        if (effMode === 'bbox' && pre) {
+          const b = pre.box;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (b.w > 0 && b.h > 0) ctx.drawImage(pre.canvas, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        } else ctx.drawImage(mask, cover.ox, cover.oy, cover.w, cover.h);
         ctx.globalCompositeOperation = 'source-over';
       }
     }
+    // Voorbereiding per resize/masker: masker op canvasresolutie + pixelkader van de occlusie.
+    function prepare() {
+      pre = null; effMode = maskMode;
+      canvas.style.removeProperty('mask-image'); canvas.style.removeProperty('-webkit-mask-image');
+      if (!mask || !cover || maskMode === 'full' || !canvas.width || !canvas.height) return;
+      const mc = doc.createElement('canvas'); mc.width = canvas.width; mc.height = canvas.height;
+      const g = mc.getContext('2d');
+      g.drawImage(mask, cover.ox * dpr, cover.oy * dpr, cover.w * dpr, cover.h * dpr);
+      const nb = maskMeta && maskMeta.bbox;
+      let box = { x: 0, y: 0, w: mc.width, h: mc.height };
+      if (nb) {
+        const x0 = Math.max(0, Math.floor((cover.ox + nb.x * cover.w) * dpr) - 2), y0 = Math.max(0, Math.floor((cover.oy + nb.y * cover.h) * dpr) - 2);
+        const x1 = Math.min(mc.width, Math.ceil((cover.ox + (nb.x + nb.w) * cover.w) * dpr) + 2), y1 = Math.min(mc.height, Math.ceil((cover.oy + (nb.y + nb.h) * cover.h) * dpr) + 2);
+        box = { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+      }
+      pre = { canvas: mc, box };
+      if (maskMode === 'css') {
+        try {
+          const img = g.getImageData(0, 0, mc.width, mc.height), d = img.data;   // gooit bij een 'tainted' canvas (file://)
+          for (let i = 3; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i - 1] = d[i - 2] = d[i - 3] = 0; }
+          const inv = doc.createElement('canvas'); inv.width = mc.width; inv.height = mc.height; inv.getContext('2d').putImageData(img, 0, 0);
+          const url = `url(${inv.toDataURL('image/png')})`;
+          for (const [k, v] of [['mask-image', url], ['-webkit-mask-image', url], ['mask-size', '100% 100%'], ['-webkit-mask-size', '100% 100%'], ['mask-repeat', 'no-repeat'], ['-webkit-mask-repeat', 'no-repeat']]) canvas.style.setProperty(k, v);
+          effMode = 'css';
+        } catch (e) { effMode = 'bbox'; }
+      }
+    }
     function applyMask() {
-      const on = !!(mask && cover);
+      const on = !!(mask && cover) && svgMaskOn;
       if (on) {
         maskImgEl.setAttribute('href', mask.src);
         maskImgEl.setAttribute('x', cover.ox); maskImgEl.setAttribute('y', cover.oy);
@@ -213,7 +253,7 @@
         routesG.setAttribute('mask', `url(#${pfx}-mask)`);
       } else routesG.removeAttribute('mask');
     }
-    function setMask(img) { mask = img && img.complete && img.naturalWidth ? img : null; applyMask(); draw(0); kick(); }
+    function setMask(img, meta) { mask = img && img.complete && img.naturalWidth ? img : null; maskMeta = mask ? (meta || null) : null; applyMask(); prepare(); draw(0); kick(); }
 
     const onVis = () => kick();
     const onReduced = () => kick();
@@ -222,7 +262,7 @@
 
     return {
       setGeometry, setRoutes, setMask,
-      maskInfo: () => ({ active: !!(mask && cover), href: mask ? mask.src : null, rect: cover ? { x: cover.ox, y: cover.oy, w: cover.w, h: cover.h } : null, maskId: pfx + '-mask' }),
+      maskInfo: () => ({ active: !!(mask && cover), svgMask: !!(mask && cover) && svgMaskOn, mode: maskMode, effectiveMode: mask && cover ? effMode : null, box: pre ? pre.box : null, href: mask ? mask.src : null, rect: cover ? { x: cover.ox, y: cover.oy, w: cover.w, h: cover.h } : null, maskId: pfx + '-mask' }),
       setPaused(v) { paused = !!v; if (paused && raf) { win.cancelAnimationFrame(raf); raf = 0; } kick(); },
       isAnimating: () => !!raf,
       phases: id => R[id] ? R[id].phase.slice() : null,

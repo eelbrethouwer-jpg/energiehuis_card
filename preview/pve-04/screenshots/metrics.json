@@ -1,5 +1,6 @@
 {
-  "chromium": "153.0.8010.12",
+  "engine": "chromium",
+  "version": "153.0.8010.12",
   "viewports": {
     "320x700": {
       "layout": "mobile",
@@ -33,10 +34,10 @@
     }
   },
   "performance": {
-    "fps1x": 55.7,
-    "fps4x": 39.6,
-    "heapMB": 1.48,
-    "heapDeltaKB": 123
+    "fps1x": 58.6,
+    "fps4x": 58.5,
+    "heapMB": 1.53,
+    "heapDeltaKB": 133
   },
   "results": [
     {
@@ -101,6 +102,22 @@
     },
     {
       "name": "terugval: geen manifest, kapotte beeldlaag of kapot masker ⇒ interface blijft werken, geen JS-fouten",
+      "ok": true
+    },
+    {
+      "name": "manifestvalidatie in de browser: ongeldig/null ⇒ veilige terugval; v1 en lichtlagen laden; geen excepties",
+      "ok": true
+    },
+    {
+      "name": "beschermde gebieden en UI-zones op 320/390/768/1330/1440: geen kaart raakt een beschermd gebied; kaartmidden in eigen zone",
+      "ok": true
+    },
+    {
+      "name": "SVG-routelijnen visueel gemaskeerd 1440x900 (screenshotvergelijking met/zonder routes)",
+      "ok": true
+    },
+    {
+      "name": "SVG-routelijnen visueel gemaskeerd 390x844 (screenshotvergelijking met/zonder routes)",
       "ok": true
     },
     {

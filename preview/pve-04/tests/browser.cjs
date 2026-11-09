@@ -2,14 +2,32 @@
 /*
  * PVE-04 · browseracceptatie (Playwright + Chromium).
  *   node preview/pve-03/tests/browser.cjs               # alle controles
- *   node preview/pve-03/tests/browser.cjs --screenshots # idem + screenshots naar preview/pve-03/screenshots/
+ *   node preview/pve-04/tests/browser.cjs --screenshots # idem + screenshots naar preview/pve-04/screenshots/
+ *   node preview/pve-04/tests/browser.cjs --browser=webkit   # WebKit (Playwright); CDP-metingen worden overgeslagen
  * Exit-code 0 = alle controles geslaagd. Elke controle print PASS/FAIL met meetwaarden.
  */
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { chromium } = require(require.resolve('playwright', { paths: [process.cwd(), __dirname] }));
+const PW = require(require.resolve('playwright', { paths: [process.cwd(), __dirname] }));
+const zlib = require('node:zlib');
+const ENGINE = (process.argv.find(a => a.startsWith('--browser=')) || '--browser=chromium').split('=')[1];
+const IS_CHROMIUM = ENGINE === 'chromium';
+
+// Minimale PNG-decoder (8-bit RGB/RGBA, niet-interlaced) voor screenshotvergelijkingen zonder extra dependencies.
+function decodePng(buf) {
+  let p = 8, w = 0, h = 0, ct = 0; const idat = [];
+  while (p < buf.length) { const len = buf.readUInt32BE(p), type = buf.toString('ascii', p + 4, p + 8), d = buf.slice(p + 8, p + 8 + len);
+    if (type === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; } else if (type === 'IDAT') idat.push(d); else if (type === 'IEND') break; p += 12 + len; }
+  const bpp = ct === 6 ? 4 : 3, raw = zlib.inflateSync(Buffer.concat(idat)), out = Buffer.alloc(w * h * 4), stride = w * bpp; let prev = Buffer.alloc(stride);
+  for (let y = 0; y < h; y++) { const f = raw[y * (stride + 1)], line = Buffer.from(raw.slice(y * (stride + 1) + 1, (y + 1) * (stride + 1)));
+    for (let i = 0; i < stride; i++) { const a = i >= bpp ? line[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+      line[i] = (line[i] + (f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : f === 4 ? ((pa, pb, pc) => pa <= pb && pa <= pc ? a : pb <= pc ? b : c)(Math.abs(b - c), Math.abs(a - c), Math.abs(a + b - 2 * c)) : 0)) & 255; }
+    for (let x = 0; x < w; x++) { out[(y * w + x) * 4] = line[x * bpp]; out[(y * w + x) * 4 + 1] = line[x * bpp + 1]; out[(y * w + x) * 4 + 2] = line[x * bpp + 2]; out[(y * w + x) * 4 + 3] = 255; }
+    prev = line; }
+  return { w, h, data: out };
+}
 
 const DIR = path.join(__dirname, '..');
 const SHOTS = path.join(DIR, 'screenshots');
@@ -95,9 +113,10 @@ const MEASURE = () => {
   if (WANT_SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   const srv = await serve();
   const base = 'http://127.0.0.1:' + srv.address().port;
-  const browser = await chromium.launch();
-  console.log('Chromium', browser.version());
-  const metrics = { chromium: browser.version(), viewports: {} };
+  const browser = await PW[ENGINE].launch();
+  console.log(ENGINE, browser.version());
+  const metrics = { engine: ENGINE, version: browser.version(), viewports: {} };
+  const chromiumOnly = async (name, fn) => IS_CHROMIUM ? check(name, fn) : (results.push({ name, ok: true, info: 'overgeslagen (alleen Chromium/CDP)' }), console.log('SKIP', name, '(alleen Chromium/CDP)'));
 
   // ---------------------------------------------------------------- viewports
   const VIEWPORTS = [[320, 700, 'mobile'], [390, 844, 'mobile'], [768, 1024, 'desktop'], [1330, 748, 'desktop'], [1440, 900, 'desktop']];
@@ -106,7 +125,7 @@ const MEASURE = () => {
       served = [];
       const { ctx, page, errors } = await open(browser, base, { width: w, height: h, query: '?ticker=0', dpr: WANT_SHOTS ? 2 : 1 });
       const m = await page.evaluate(MEASURE);
-      if (WANT_SHOTS) await page.screenshot({ path: path.join(SHOTS, `pve04-${w}x${h}.jpg`), type: 'jpeg', quality: 82 });
+      if (WANT_SHOTS) await page.screenshot({ path: path.join(SHOTS, `pve04-${w}x${h}${IS_CHROMIUM ? '' : '-' + ENGINE}.jpg`), type: 'jpeg', quality: 82 });
       const imgBytes = served.filter(s => /\.(webp|jpg)$/.test(s.path)).reduce((a, s) => a + s.bytes, 0);
       await ctx.close();
       assert.equal(m.layout, layout);
@@ -131,7 +150,7 @@ const MEASURE = () => {
       await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
       await page.waitForTimeout(400);
       const m = await page.evaluate(MEASURE);
-      if (WANT_SHOTS && w === 390) await page.screenshot({ path: path.join(SHOTS, `pve04-${w}x${h}-tekst200.jpg`), type: 'jpeg', quality: 82, fullPage: true });
+      if (WANT_SHOTS && w === 390) await page.screenshot({ path: path.join(SHOTS, `pve04-${w}x${h}-tekst200${IS_CHROMIUM ? '' : '-' + ENGINE}.jpg`), type: 'jpeg', quality: 82, fullPage: true });
       await ctx.close();
       assert.ok(m.scrollW <= m.innerW, `scroll ${m.scrollW}>${m.innerW}`);
       assert.deepEqual(m.clipped, [], 'afgekapt ' + m.clipped);
@@ -329,6 +348,76 @@ const MEASURE = () => {
     return Object.fromEntries(Object.entries(res).map(([k, r]) => [k, { scene: r.scene, mask: r.mask, note: r.note }]));
   });
 
+  // ---------------------------------------------------------------- PVE-04 correctieronde: validatie, zones, SVG-masker visueel
+  await check('manifestvalidatie in de browser: ongeldig/null ⇒ veilige terugval; v1 en lichtlagen laden; geen excepties', async () => {
+    const res = {};
+    for (const q of ['invalid', 'null', 'v1', 'light']) {
+      const { ctx, page, errors } = await open(browser, base, { width: 1440, height: 900, query: '?ticker=0&manifest=' + q, waitImage: false });
+      await page.waitForTimeout(700);
+      res[q] = await page.evaluate(() => { const c = window.__cockpits[0]; return { scene: document.querySelector('.ehc').dataset.scene, ok: c.manifestCheck.ok, nErr: c.manifestCheck.errors.length, note: document.querySelector('.ehc-scene-note').textContent, pv: document.querySelector('.tile[data-key="pv"] .t-value').textContent, lights: [...document.querySelectorAll('.ehc-light')].map(i => i.dataset.light), js: window.__errors }; });
+      res[q].console = errors;
+      await ctx.close();
+    }
+    for (const [q, r] of Object.entries(res)) { assert.equal(r.pv, '4,82 kW', q); assert.deepEqual(r.js, [], q); assert.deepEqual(r.console, [], q); }
+    assert.equal(res.invalid.ok, false); assert.equal(res.invalid.scene, 'invalid'); assert.match(res.invalid.note, /ongeldig/); assert.ok(res.invalid.nErr >= 2);
+    assert.equal(res.null.scene, 'missing');
+    assert.equal(res.v1.ok, true); assert.equal(res.v1.scene, 'ok');
+    assert.equal(res.light.ok, true); assert.deepEqual(res.light.lights, ['test-always'], 'alleen trigger always getoond; onbekende trigger genegeerd');
+    return Object.fromEntries(Object.entries(res).map(([k, r]) => [k, { scene: r.scene, ok: r.ok, lights: r.lights }]));
+  });
+
+  await check('beschermde gebieden en UI-zones op 320/390/768/1330/1440: geen kaart raakt een beschermd gebied; kaartmidden in eigen zone', async () => {
+    const out = {};
+    for (const [w, h] of [[320, 700], [390, 844], [768, 1024], [1330, 748], [1440, 900]]) {
+      const { ctx, page, errors } = await open(browser, base, { width: w, height: h, query: '?ticker=0' });
+      out[w] = await page.evaluate(() => {
+        const c = window.__cockpits[0], L = document.querySelector('.ehc').dataset.layout, comp = c.manifest.compositions[L];
+        const st = document.querySelector('.ehc-stage').getBoundingClientRect(), t = window.EhPve04Flows.coverTransform(st.width, st.height, comp.natural.w, comp.natural.h);
+        const toScr = r => ({ x: st.left + t.ox + r.x * t.w, y: st.top + t.oy + r.y * t.h, w: r.w * t.w, h: r.h * t.h });
+        const inter = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const tiles = [...document.querySelectorAll('.tile')].map(b => { const r = b.getBoundingClientRect(); return { key: b.dataset.key, x: r.left, y: r.top, w: r.width, h: r.height }; });
+        const hits = [], outside = [];
+        for (const pa of comp.protectedAreas) { const ps = toScr(pa); for (const tl of tiles) { const a = inter(ps, tl); if (a > 1) hits.push(`${tl.key}↔${pa.id} ${Math.round(a)}px²`); } }
+        for (const tl of tiles) { const z = comp.uiZones.find(z => z.id === tl.key), zs = toScr(z), cx = tl.x + tl.w / 2, cy = tl.y + tl.h / 2; if (!(cx >= zs.x && cx <= zs.x + zs.w && cy >= zs.y && cy <= zs.y + zs.h)) outside.push(tl.key); }
+        return { layout: L, hits, outside };
+      });
+      out[w].errors = errors;
+      await ctx.close();
+    }
+    for (const [w, r] of Object.entries(out)) { assert.deepEqual(r.hits, [], `${w}px: kaart raakt beschermd gebied: ${r.hits.join(', ')}`); assert.deepEqual(r.outside, [], `${w}px: kaartmidden buiten zone: ${r.outside}`); assert.deepEqual(r.errors, []); }
+    return Object.fromEntries(Object.entries(out).map(([w, r]) => [w, r.layout]));
+  });
+
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    await check(`SVG-routelijnen visueel gemaskeerd ${w}x${h} (screenshotvergelijking met/zonder routes)`, async () => {
+      const { ctx, page, errors } = await open(browser, base, { width: w, height: h, query: '?ticker=0&scenario=zon-export', reducedMotion: 'reduce' });
+      await page.waitForTimeout(900);                                  // CSS-transities van de routes uitlopen
+      const info = await page.evaluate(async () => {
+        const c = window.__cockpits[0], mi = c.flows.maskInfo(), st = document.querySelector('.ehc-stage').getBoundingClientRect();
+        const img = new Image(); img.src = mi.href; await img.decode();
+        const off = document.createElement('canvas'); off.width = Math.round(st.width); off.height = Math.round(st.height);
+        const g = off.getContext('2d'); g.drawImage(img, mi.rect.x, mi.rect.y, mi.rect.w, mi.rect.h);
+        const A = g.getImageData(0, 0, off.width, off.height).data, pts = [];
+        for (const path of document.querySelectorAll('.route[data-active="true"] .r-core')) { const L = path.getTotalLength(); for (let k = 2; k <= 118; k++) { const p = path.getPointAtLength(L * k / 120); const x = Math.round(p.x), y = Math.round(p.y); let a = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) a = Math.max(a, A[((y + dy) * off.width + x + dx) * 4 + 3] || 0); let amin = 255; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) amin = Math.min(amin, A[((y + dy) * off.width + x + dx) * 4 + 3] || 0); pts.push({ x, y, under: amin >= 250, free: a === 0 }); } }
+        return { pts, clip: { x: st.left, y: st.top, width: st.width, height: st.height }, svgMask: mi.svgMask };
+      });
+      const a = decodePng(await page.screenshot({ clip: info.clip }));
+      await page.evaluate(() => { document.querySelector('.ehc-flows svg g.routes').style.display = 'none'; });
+      await page.waitForTimeout(100);
+      const b = decodePng(await page.screenshot({ clip: info.clip }));
+      await ctx.close();
+      const diff = (x, y) => { let m = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const i = ((y + dy) * a.w + x + dx) * 4; if (i < 0 || i >= a.data.length) continue; m = Math.max(m, Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2])); } return m; };
+      const under = info.pts.filter(p => p.under), free = info.pts.filter(p => p.free);
+      const underVisible = under.filter(p => diff(p.x, p.y) > 40).length, freeVisible = free.filter(p => diff(p.x, p.y) > 40).length;
+      assert.ok(info.svgMask, 'SVG-masker niet actief');
+      assert.ok(under.length >= 5, 'te weinig routepunten onder het masker om te toetsen');
+      assert.ok(underVisible <= Math.ceil(under.length * 0.05), `${underVisible}/${under.length} routepunten onder het masker zichtbaar`);
+      assert.ok(freeVisible >= free.length * 0.6, `slechts ${freeVisible}/${free.length} vrije routepunten zichtbaar`);
+      assert.deepEqual(errors, []);
+      return { under: under.length, underVisible, free: free.length, freeVisible };
+    });
+  }
+
   // ---------------------------------------------------------------- toetsenbord
   await check('toetsenbord: Tab → tegel, Enter opent detail, focus op Sluiten, Escape sluit en herstelt focus; klik buiten sluit', async () => {
     const { ctx, page, errors } = await open(browser, base, { width: 1440, height: 900, query: '?ticker=0' });
@@ -420,7 +509,7 @@ const MEASURE = () => {
   });
 
   // ---------------------------------------------------------------- performance
-  await check('performance: fps onder 4× CPU-throttling, geheugen na 200 updates, beeldgewicht', async () => {
+  await chromiumOnly('performance: fps onder 4× CPU-throttling, geheugen na 200 updates, beeldgewicht', async () => {
     const { ctx, page, errors } = await open(browser, base, { width: 1440, height: 900, query: '?scenario=praktijk-sim' });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Performance.enable');
@@ -446,7 +535,7 @@ const MEASURE = () => {
   await browser.close();
   srv.close();
   metrics.results = results.map(r => ({ name: r.name, ok: r.ok }));
-  if (WANT_SHOTS) fs.writeFileSync(path.join(SHOTS, 'metrics.json'), JSON.stringify(metrics, null, 2) + '\n');
-  console.log(`\n${results.length - failed}/${results.length} browsercontroles geslaagd`);
+  if (WANT_SHOTS) fs.writeFileSync(path.join(SHOTS, IS_CHROMIUM ? 'metrics.json' : `metrics-${ENGINE}.json`), JSON.stringify(metrics, null, 2) + '\n');
+  console.log(`\n${results.length - failed}/${results.length} browsercontroles geslaagd (${ENGINE} ${metrics.version})`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -198,6 +198,9 @@ const L = isMobile
       cam: { pos: [-3.0, 2.45, 23.5], look: [0.2, 3.65, 0], fov: 40 }, focus: 23 };
 
 const ANCHOR = {};
+// Objectkaders (lokale min/max + wereldmatrix); na het plaatsen van de camera geprojecteerd naar 0..1-beeldcoördinaten.
+const BOXES = {};
+function box(id, obj, min, max) { obj.updateMatrixWorld(true); BOXES[id] = { m: obj.matrixWorld.clone(), min, max }; }
 const glints = [];
 function glint(p, color, width, length, strength) { glints.push({ p: p.clone(), color, width, length, strength }); }
 const CONTACT = canvasTex(256, 256, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,.9)'); gr.addColorStop(0.55, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
@@ -260,6 +263,7 @@ const house = new THREE.Group(); house.rotation.y = L.houseRot; scene.add(house)
       for (let row = 0; row < 2; row++) for (let i = 0; i < 7; i++) { const pn = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.05, plen), pm); pn.position.set(-4.6 + i * (pw + 0.05), 0.13, -1.9 + row * (plen + 0.05)); pn.castShadow = true; pg.add(pn); }
       pg.updateMatrixWorld(true);
       ANCHOR.pv = V(-1.4, 0.15, -1.0).applyMatrix4(pg.matrixWorld);
+      box('pv', pg, [-4.6 - pw / 2, 0.1, -1.9 - plen / 2], [-4.6 + 6 * (pw + 0.05) + pw / 2, 0.16, -1.9 + plen * 1.5 + 0.05]);
       // dakkapel onder de panelen
       const dg = new THREE.Group(); house.add(dg);
       const dw = 2.6, dh = 1.6, dd = 2.2;
@@ -306,6 +310,9 @@ const house = new THREE.Group(); house.rotation.y = L.houseRot; scene.add(house)
   house.updateMatrixWorld(true);
   ANCHOR.house = V(1.55, 1.6, fz + 0.3).applyMatrix4(house.matrixWorld);
   ANCHOR.charger = V(Lh / 2 + 2.4 + gw - 2.6, 1.25, -0.6 + gd / 2 + 0.2).applyMatrix4(house.matrixWorld);
+  box('house', house, [-Lh / 2 - 0.35, 0, -D / 2 - 0.55], [Lh / 2 + 0.35, Hr + 0.4, D / 2 + 0.55]);
+  box('garage', house, [Lh / 2 + 2.4, 0, -0.6 - gd / 2], [Lh / 2 + 2.4 + gw, gh + 0.22, -0.6 + gd / 2]);
+  box('charger', house, [Lh / 2 + 2.4 + gw - 2.85, 0.9, -0.6 + gd / 2], [Lh / 2 + 2.4 + gw - 2.35, 1.6, -0.6 + gd / 2 + 0.2]);
   // glinsteringen onder ramen en lampen
   for (const [x, w] of [[-2.7, 2.6], [2.45, 0.4], [4.0, 1.1]]) glint(V(x, 0, fz + 0.3).applyMatrix4(house.matrixWorld), 0xffa860, w, 7, 0.34);
   glint(V(gx + 0.3, 0, 0.4).applyMatrix4(house.matrixWorld), 0xffa860, 2.8, 7, 0.32);
@@ -330,6 +337,7 @@ const house = new THREE.Group(); house.rotation.y = L.houseRot; scene.add(house)
   contact(g, w + 2, d + 2, 0.019);
   g.position.set(...L.practice); g.rotation.y = L.practiceRot; g.scale.setScalar(L.practiceScale); scene.add(g); g.updateMatrixWorld(true);
   ANCHOR.practice = V(0.7, 1.6, d / 2 + 0.3).applyMatrix4(g.matrixWorld);
+  box('practice', g, [-w / 2 - 0.5, 0, -d / 2], [w / 2 + 0.5, h + 0.3, d / 2 + 0.6]);
   glint(V(0.7, 0, d / 2 + 0.3).applyMatrix4(g.matrixWorld), 0xffe0b0, 3.0 * L.practiceScale, 6 * L.practiceScale, 0.32);
 }
 
@@ -411,6 +419,7 @@ function buildBorn() {
   contact(g, 5.2, 2.6, 0.024);
   g.position.copy(L.carWorld ? V(...L.carWorld) : V(...L.carLocal).applyMatrix4(house.matrixWorld)); g.rotation.y = L.carYaw; scene.add(g); g.updateMatrixWorld(true);
   ANCHOR.cupra = V(0.3, 0.9, 0).applyMatrix4(g.matrixWorld);
+  box('car', g, [-2.2, 0, -0.95], [2.2, 1.58, 0.95]);
   ANCHOR.cupraPort = V(-1.75, 0.95, -0.9).applyMatrix4(g.matrixWorld);            // laadklep rechtsachter
   ANCHOR.cupraFront = V(2.1, 0.7, 0).applyMatrix4(g.matrixWorld);
   glint(V(2.4, 0, 0.55).applyMatrix4(g.matrixWorld), 0xe8f4ff, 0.6, 5, 0.42);
@@ -506,6 +515,12 @@ composer.render();
 
 function project(v) { const p = v.clone().project(cam); return { x: +((p.x + 1) / 2).toFixed(4), y: +((1 - p.y) / 2).toFixed(4) }; }
 window.__anchors = Object.fromEntries(Object.entries(ANCHOR).map(([k, v]) => [k, project(v)]));
+window.__boxes = Object.fromEntries(Object.entries(BOXES).map(([k, b]) => {
+  const xs = [], ys = [];
+  for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) { const p = project(V(x, y, z).applyMatrix4(b.m)); xs.push(p.x); ys.push(p.y); }
+  const r = v => +v.toFixed(4);
+  return [k, { x: r(Math.min(...xs)), y: r(Math.min(...ys)), w: r(Math.max(...xs) - Math.min(...xs)), h: r(Math.max(...ys) - Math.min(...ys)) }];
+}));
 // Occlusiemasker: alleen voorgrondobjecten (auto, kabel, beplanting voor de gevel, potten, paaltjes) wit,
 // al het andere zwart. render-scene.cjs zet dit om naar een PNG met alfa = occlusie.
 window.renderMask = () => {

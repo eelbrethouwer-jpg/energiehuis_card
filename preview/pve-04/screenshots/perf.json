@@ -1,0 +1,352 @@
+{
+  "conditions": {
+    "browser": "chromium headless",
+    "runs": 3,
+    "seconds": 3,
+    "dpr": 1,
+    "scenario": "praktijk-sim",
+    "ticker": false
+  },
+  "results": [
+    {
+      "viewport": "desktop",
+      "rate": 1,
+      "variant": "pve03",
+      "default": false,
+      "mode": "geen masker",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 1,
+      "variant": "pve04-full",
+      "default": false,
+      "mode": "full",
+      "fps": 59.7,
+      "fpsRuns": [
+        60,
+        59.3,
+        59.7
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": -0.5,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 1,
+      "variant": "pve04-bbox",
+      "default": true,
+      "mode": "bbox",
+      "fps": 59.7,
+      "fpsRuns": [
+        59.7,
+        60,
+        57.7
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": -0.5,
+      "verdict": "standaard (1×: informatief)"
+    },
+    {
+      "viewport": "desktop",
+      "rate": 1,
+      "variant": "pve04-css",
+      "default": false,
+      "mode": "css",
+      "fps": 50.1,
+      "fpsRuns": [
+        50.1,
+        52.3,
+        50
+      ],
+      "p95ms": 33.4,
+      "errors": [],
+      "deltaPct": -16.5,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 1,
+      "variant": "pve04-bbox-nosvg",
+      "default": false,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 4,
+      "variant": "pve03",
+      "default": false,
+      "mode": "geen masker",
+      "fps": 60,
+      "fpsRuns": [
+        59.3,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 4,
+      "variant": "pve04-full",
+      "default": false,
+      "mode": "full",
+      "fps": 38.6,
+      "fpsRuns": [
+        41.4,
+        38.6,
+        38.6
+      ],
+      "p95ms": 33.4,
+      "errors": [],
+      "deltaPct": -35.7,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 4,
+      "variant": "pve04-bbox",
+      "default": true,
+      "mode": "bbox",
+      "fps": 59.7,
+      "fpsRuns": [
+        60,
+        58,
+        59.7
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": -0.5,
+      "verdict": "DOEL (≥ 50 fps) · p95 ≤ 33 ms"
+    },
+    {
+      "viewport": "desktop",
+      "rate": 4,
+      "variant": "pve04-css",
+      "default": false,
+      "mode": "css",
+      "fps": 48.7,
+      "fpsRuns": [
+        49.8,
+        48.7,
+        45.3
+      ],
+      "p95ms": 33.4,
+      "errors": [],
+      "deltaPct": -18.8,
+      "verdict": ""
+    },
+    {
+      "viewport": "desktop",
+      "rate": 4,
+      "variant": "pve04-bbox-nosvg",
+      "default": false,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 1,
+      "variant": "pve03",
+      "default": false,
+      "mode": "geen masker",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 1,
+      "variant": "pve04-full",
+      "default": false,
+      "mode": "full",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 1,
+      "variant": "pve04-bbox",
+      "default": true,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        59.7
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": "standaard (1×: informatief)"
+    },
+    {
+      "viewport": "mobile",
+      "rate": 1,
+      "variant": "pve04-css",
+      "default": false,
+      "mode": "css",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 1,
+      "variant": "pve04-bbox-nosvg",
+      "default": false,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 4,
+      "variant": "pve03",
+      "default": false,
+      "mode": "geen masker",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 4,
+      "variant": "pve04-full",
+      "default": false,
+      "mode": "full",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 4,
+      "variant": "pve04-bbox",
+      "default": true,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": "DOEL (≥ 50 fps) · p95 ≤ 33 ms"
+    },
+    {
+      "viewport": "mobile",
+      "rate": 4,
+      "variant": "pve04-css",
+      "default": false,
+      "mode": "css",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.8,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    },
+    {
+      "viewport": "mobile",
+      "rate": 4,
+      "variant": "pve04-bbox-nosvg",
+      "default": false,
+      "mode": "bbox",
+      "fps": 60,
+      "fpsRuns": [
+        60,
+        60,
+        60
+      ],
+      "p95ms": 16.7,
+      "errors": [],
+      "deltaPct": 0,
+      "verdict": ""
+    }
+  ]
+}

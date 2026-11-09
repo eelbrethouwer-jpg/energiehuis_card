@@ -46,7 +46,12 @@
     const id = 'ehc' + (++seq);
     let scenario = M.SCENARIO_IDS.includes(options.scenario) ? options.scenario : 'zon-export';
     let tick = 0, model = null, layout = null, ticker = 0, geoRaf = 0, destroyed = false, openKey = null, opener = null, maskImg = null;
-    const MF = options.manifest !== undefined ? options.manifest : root.EhPve04Manifest;
+    const MF_RAW = options.manifest !== undefined ? options.manifest : root.EhPve04Manifest;
+    // Valideren vóór de scène wordt opgebouwd; validateManifest gooit nooit. Zonder validator: veilig weigeren.
+    const VAL = root.EhPve04ManifestValidate;
+    const check = MF_RAW == null ? { ok: false, errors: ['manifest ontbreekt'], missing: true }
+      : (VAL ? VAL.validateManifest(MF_RAW) : { ok: false, errors: ['validator ontbreekt'] });
+    const MF = check.ok ? MF_RAW : null;
     const comp = name => (MF && MF.compositions && MF.compositions[name]) || null;
     const listeners = [];
     const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); listeners.push(() => t.removeEventListener(type, fn, o)); };
@@ -65,6 +70,7 @@
     const source = el(doc, 'source', null, { type: 'image/webp' });
     const img = el(doc, 'img', null, { alt: 'Avondscène: woning met zonnepanelen, houten praktijkruimte links, groene Cupra bij de laadpaal rechts. Beeldlaag zonder meetwaarden.', decoding: 'async', fetchpriority: 'high' });
     pic.append(source, img);
+    const lights = el(doc, 'div', 'ehc-lights', { 'aria-hidden': 'true' });
     const shade = el(doc, 'div', 'ehc-shade', { 'aria-hidden': 'true' });
     const flowHost = el(doc, 'div', 'ehc-flows');
     const tiles = el(doc, 'div', 'ehc-tiles');
@@ -76,7 +82,7 @@
       tiles.appendChild(b);
       T[t.key] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
     }
-    stage.append(pic, shade, flowHost, tiles);
+    stage.append(pic, lights, shade, flowHost, tiles);
 
     const summary = el(doc, 'p', 'ehc-summary', { 'aria-live': 'polite' });
     const warn = el(doc, 'p', 'ehc-warn', { role: 'alert' }); warn.hidden = true;
@@ -97,15 +103,16 @@
 
     rootEl.append(head, stage, summary, warn, controls, detail);
     host.appendChild(rootEl);
-    const flows = F.createFlowLayer(flowHost, { idPrefix: id });
+    const flows = F.createFlowLayer(flowHost, { idPrefix: id, maskMode: options.maskMode, svgMask: options.svgMask });
 
     // ---------------- layout & geometry
     function note(text) { sceneNote.hidden = !text; setText(sceneNote, text || ''); }
     function sceneState(state) {
       rootEl.dataset.scene = state;
       const ok = state === 'ok' || state === 'loading';
-      pic.hidden = !ok; flowHost.hidden = !ok;
+      pic.hidden = !ok; flowHost.hidden = !ok; lights.hidden = !ok;
       if (state === 'missing') note('Scènelaag ontbreekt — alleen interface');
+      else if (state === 'invalid') note('Scènemanifest ongeldig — alleen interface');
       else if (state === 'error') note('Beeldlaag kon niet laden — alleen interface');
       else note(MF && MF.status !== 'approved' ? (MF.statusLabel || 'Tijdelijk beeld — niet visueel goedgekeurd') : '');
     }
@@ -113,7 +120,13 @@
       if (next === layout) return;
       layout = next; rootEl.dataset.layout = next;
       const c = comp(next);
-      if (!c) { sceneState('missing'); flows.setMask(null); return; }
+      if (!c) { sceneState(check.ok || check.missing ? 'missing' : 'invalid'); flows.setMask(null); return; }
+      // Optionele lichtlagen (v2): alleen trigger 'always' wordt nu getoond; andere triggers zijn voor later
+      // gereserveerd en worden genegeerd, zodat nieuwe lagen bestaande assets nooit breken.
+      lights.replaceChildren(...(c.lightLayers || []).filter(l => l.trigger === 'always').map(l => {
+        const li = el(doc, 'img', 'ehc-light', { src: l.file, alt: '', decoding: 'async', 'data-light': l.id });
+        li.style.mixBlendMode = l.blend || 'screen'; return li;
+      }));
       sceneState('loading');
       source.setAttribute('srcset', srcset(c, 'image/webp'));
       img.setAttribute('srcset', srcset(c, 'image/jpeg'));
@@ -125,7 +138,7 @@
       const mk = c.masks && c.masks[0];
       if (mk) {
         const mi = new win.Image(); maskImg = mi;
-        mi.onload = () => { if (maskImg === mi && !destroyed) { flows.setMask(mi); rootEl.dataset.mask = 'ok'; scheduleGeo(); } };
+        mi.onload = () => { if (maskImg === mi && !destroyed) { flows.setMask(mi, mk); rootEl.dataset.mask = 'ok'; scheduleGeo(); } };
         mi.onerror = () => { if (maskImg === mi && !destroyed) { flows.setMask(null); rootEl.dataset.mask = 'error'; } };
         mi.src = mk.file;
       }
@@ -237,6 +250,7 @@
       get model() { return model; },
       get scenario() { return scenario; },
       get manifest() { return MF; },
+      get manifestCheck() { return check; },
       setScenario(s) { if (M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       step() { tick++; compute(); },
       flows,

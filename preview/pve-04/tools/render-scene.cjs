@@ -58,7 +58,7 @@ const b64 = d => Buffer.from(d.split(',')[1], 'base64');
       page.on('pageerror', e => console.error('[scene] pageerror', e.message));
       await page.goto(`http://127.0.0.1:${port}/scene.html?layout=${job.layout}&w=${job.w}&h=${job.h}`);
       await page.waitForFunction('window.__done === true', null, { timeout: 600000 });
-      output.compositions[job.layout] = { natural: { w: job.w, h: job.h }, anchors: await page.evaluate('window.__anchors') };
+      output.compositions[job.layout] = { natural: { w: job.w, h: job.h }, anchors: await page.evaluate('window.__anchors'), boxes: await page.evaluate('window.__boxes') };
       for (const size of job.sizes) {
         const h = Math.round(job.h * size / job.w);
         const out = await page.evaluate(([w, h]) => {
@@ -79,11 +79,18 @@ const b64 = d => Buffer.from(d.split(',')[1], 'base64');
         const c = document.createElement('canvas'); c.width = w; c.height = h;
         const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(document.querySelector('canvas'), 0, 0, w, h);
         const img = g.getImageData(0, 0, w, h), d = img.data;
-        for (let i = 0; i < d.length; i += 4) { const a = Math.max(d[i], d[i + 1], d[i + 2]); d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = a; }
-        g.putImageData(img, 0, 0); return c.toDataURL('image/png');
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let i = 0; i < d.length; i += 4) {
+          const a = Math.max(d[i], d[i + 1], d[i + 2]); d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = a;
+          if (a > 0) { const p = i / 4, x = p % w, y = (p - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        }
+        g.putImageData(img, 0, 0);
+        const r = v => +v.toFixed(4);
+        return { url: c.toDataURL('image/png'), bbox: x1 < 0 ? null : { x: r(x0 / w), y: r(y0 / h), w: r((x1 - x0 + 1) / w), h: r((y1 - y0 + 1) / h) } };
       }, [job.mask, mh]);
       const mfile = path.join(OUT, `mask-${job.layout}-${job.mask}.png`);
-      fs.writeFileSync(mfile, b64(png));
+      fs.writeFileSync(mfile, b64(png.url));
+      output.compositions[job.layout].maskBoxes = { foreground: png.bbox };
       console.log(path.relative(process.cwd(), mfile), `${job.mask}x${mh}`);
       await page.close();
     }

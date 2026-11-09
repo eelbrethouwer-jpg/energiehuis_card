@@ -22,10 +22,60 @@ const SCENE = {
   statusLabel: 'Tijdelijk beeld — niet visueel goedgekeurd',
   rights: 'R-PVE04-PLACEHOLDER-CGI',
   compositions: {
-    desktop: { minContainerWidth: 700, budgetBytes: 1.5 * 1024 * 1024, base: ['placeholder-desktop-1330.webp', 'placeholder-desktop-2660.webp', 'placeholder-desktop-1330.jpg', 'placeholder-desktop-2660.jpg'], masks: [['foreground', 'mask-desktop-1330.png']] },
-    mobile: { minContainerWidth: 0, budgetBytes: 1.0 * 1024 * 1024, base: ['placeholder-mobile-540.webp', 'placeholder-mobile-1080.webp', 'placeholder-mobile-540.jpg', 'placeholder-mobile-1080.jpg'], masks: [['foreground', 'mask-mobile-540.png']] }
+    desktop: {
+      minContainerWidth: 700, budgetBytes: 1.5 * 1024 * 1024,
+      base: ['placeholder-desktop-1330.webp', 'placeholder-desktop-2660.webp', 'placeholder-desktop-1330.jpg', 'placeholder-desktop-2660.jpg'],
+      masks: [['foreground', 'mask-desktop-1330.png']],
+      // Gebieden waar het midden van elke UI-kaart moet liggen (onderling niet overlappend).
+      uiZones: [
+        { id: 'pv', x: 0, y: 0, w: 0.35, h: 0.25, purpose: 'Zonnepanelen-kaart linksboven, naast het dak' },
+        { id: 'practice', x: 0, y: 0.25, w: 0.35, h: 0.35, purpose: 'Praktijkkaart links, boven het bijgebouw' },
+        { id: 'battery', x: 0, y: 0.7, w: 0.35, h: 0.3, purpose: 'Virtuele batterij linksonder' },
+        { id: 'house', x: 0.35, y: 0.55, w: 0.3, h: 0.25, purpose: 'Huiskaart midden op de gevel' },
+        { id: 'net', x: 0.35, y: 0.82, w: 0.3, h: 0.18, purpose: 'Net midden onder de woning' },
+        { id: 'cupra', x: 0.65, y: 0.1, w: 0.35, h: 0.45, purpose: 'Cupra-kaart boven de auto' }
+      ],
+      // Beschermde visuele gebieden: herkenbare kern van een object (kader minus marges l/t/r/b als fractie
+      // van het kader). Geen enkele UI-kaart mag een beschermd gebied raken (standaard tekstgrootte).
+      protected: [
+        { id: 'car', from: 'car', inset: [0.15, 0.15, 0.15, 0.15], purpose: 'Groene auto: carrosserie en ruiten' },
+        { id: 'practice-front', from: 'practice', inset: [0.2, 0.2, 0.2, 0.2], purpose: 'Praktijk: verlichte schuifpui' },
+        { id: 'pv', from: 'pv', inset: [0.15, 0.15, 0.15, 0.15], purpose: 'Zonnepanelen' },
+        { id: 'house-upper', from: 'house', inset: [0.25, 0.15, 0.25, 0.45], purpose: 'Woning: dak, dakkapel en topgevel' }
+      ],
+      lightLayers: []
+    },
+    mobile: {
+      minContainerWidth: 0, budgetBytes: 1.0 * 1024 * 1024,
+      base: ['placeholder-mobile-540.webp', 'placeholder-mobile-1080.webp', 'placeholder-mobile-540.jpg', 'placeholder-mobile-1080.jpg'],
+      masks: [['foreground', 'mask-mobile-540.png']],
+      uiZones: [
+        { id: 'pv', x: 0, y: 0, w: 0.5, h: 0.22, purpose: 'Zonnepanelen-kaart linksboven (lucht)' },
+        { id: 'battery', x: 0.5, y: 0, w: 0.5, h: 0.22, purpose: 'Virtuele batterij rechtsboven (lucht)' },
+        { id: 'house', x: 0.2, y: 0.3, w: 0.6, h: 0.22, purpose: 'Huiskaart midden op de gevel' },
+        { id: 'practice', x: 0, y: 0.58, w: 0.5, h: 0.25, purpose: 'Praktijkkaart linksonder, onder het bijgebouw' },
+        { id: 'cupra', x: 0.5, y: 0.58, w: 0.5, h: 0.25, purpose: 'Cupra-kaart rechtsonder, onder de auto' },
+        { id: 'net', x: 0.15, y: 0.83, w: 0.7, h: 0.17, purpose: 'Net midden onder' }
+      ],
+      protected: [
+        { id: 'car', from: 'car', inset: [0.2, 0.1, 0.2, 0.45], purpose: 'Groene auto: silhouet, dak en ruiten' },
+        { id: 'practice-front', from: 'practice', inset: [0.15, 0.1, 0.2, 0.35], purpose: 'Praktijk: dak en verlichte pui' },
+        { id: 'pv', from: 'pv', inset: [0.15, 0.15, 0.15, 0.15], purpose: 'Zonnepanelen' },
+        { id: 'house-upper', from: 'house', inset: [0.3, 0.15, 0.3, 0.6], purpose: 'Woning: dakkapel en topgevel' }
+      ],
+      lightLayers: []
+    }
   }
 };
+const COORDINATES = {
+  id: 'normalized-image',
+  origin: 'linksboven van de natuurlijke beeldlaag',
+  axes: 'x naar rechts, y naar beneden',
+  unit: 'fractie van natural.w (x, w) en natural.h (y, h); 0..1 = binnen beeld',
+  mapping: 'object-fit: cover, gecentreerd (50% 50%): scherm = offset + waarde × geschaalde beeldmaat (flows.coverTransform)'
+};
+const r4 = v => +v.toFixed(4);
+const clip = b => { const x0 = Math.max(0, b.x), y0 = Math.max(0, b.y), x1 = Math.min(1, b.x + b.w), y1 = Math.min(1, b.y + b.h); return { x: r4(x0), y: r4(y0), w: r4(Math.max(0, x1 - x0)), h: r4(Math.max(0, y1 - y0)), clipped: x0 !== b.x || y0 !== b.y || x1 !== b.x + b.w || y1 !== b.y + b.h }; };
 
 // Minimale header-parsers (geen afhankelijkheden): afmetingen uit PNG/JPEG/WebP.
 function dims(buf) {
@@ -67,11 +117,19 @@ function build() {
       natural: r.natural,
       budgetBytes: c.budgetBytes,
       base: c.base.map(f => entry(f, SCENE.rights)),
-      masks: c.masks.map(([id, f]) => ({ id, semantics: 'alfa = voorgrond-occlusie (deeltjes en routelijnen verdwijnen erachter; UI-kaarten niet)', ...entry(f, SCENE.rights) })),
-      anchors: r.anchors
+      masks: c.masks.map(([id, f]) => ({ id, semantics: 'alfa = voorgrond-occlusie (deeltjes en routelijnen verdwijnen erachter; UI-kaarten niet)', ...entry(f, SCENE.rights), bbox: (r.maskBoxes || {})[id] || null })),
+      anchors: r.anchors,
+      uiZones: c.uiZones,
+      keyObjects: Object.fromEntries(Object.entries(r.boxes || {}).map(([k, b]) => [k, clip(b)]).filter(([, c]) => c.w > 0 && c.h > 0)),
+      outOfView: Object.entries(r.boxes || {}).filter(([, b]) => { const c = clip(b); return !(c.w > 0 && c.h > 0); }).map(([k]) => k),
+      protectedAreas: c.protected.map(pa => {
+        const k = clip(r.boxes[pa.from]); const [l, t, rr, bb] = pa.inset;
+        return { id: pa.id, from: pa.from, purpose: pa.purpose, x: r4(k.x + k.w * l), y: r4(k.y + k.h * t), w: r4(k.w * (1 - l - rr)), h: r4(k.h * (1 - t - bb)) };
+      }),
+      lightLayers: c.lightLayers
     };
   }
-  const manifest = { schema: 'energiehuis.scene-manifest/1', sceneId: SCENE.sceneId, status: SCENE.status, statusLabel: SCENE.statusLabel, compositions, rights };
+  const manifest = { schema: 'energiehuis.scene-manifest/2', coordinateSystem: COORDINATES, sceneId: SCENE.sceneId, status: SCENE.status, statusLabel: SCENE.statusLabel, compositions, rights };
   return '/* GEGENEREERD door tools/build-manifest.cjs — niet met de hand bewerken.\n' +
     ' * Energiehuis PVE-04 scènemanifest: beeldlagen, SHA-256, budgetten, maskers, ankerpunten en rechten.\n' +
     ' * Laadt als gewoon script (ook via file://), zonder netwerkverzoeken. */\n' +

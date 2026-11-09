@@ -16,7 +16,9 @@ const allAssets = () => COMPS.flatMap(([, c]) => [...c.base, ...c.masks]);
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
 
 test('schema en status: placeholder is gemarkeerd als niet visueel goedgekeurd', () => {
-  assert.equal(MF.schema, 'energiehuis.scene-manifest/1');
+  assert.equal(MF.schema, 'energiehuis.scene-manifest/2');
+  assert.equal(MF.coordinateSystem.id, 'normalized-image');
+  assert.match(MF.coordinateSystem.mapping, /cover/);
   assert.ok(['placeholder', 'approved'].includes(MF.status));
   assert.deepEqual(Object.keys(MF.compositions).sort(), ['desktop', 'mobile']);
   if (MF.status !== 'approved') assert.match(MF.statusLabel, /niet visueel goedgekeurd/);

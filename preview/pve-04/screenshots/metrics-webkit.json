@@ -1,0 +1,138 @@
+{
+  "engine": "webkit",
+  "version": "26.6",
+  "viewports": {
+    "320x700": {
+      "layout": "mobile",
+      "image": "placeholder-mobile-1080.webp",
+      "imageBytes": 63054,
+      "belowFold": []
+    },
+    "390x844": {
+      "layout": "mobile",
+      "image": "placeholder-mobile-1080.webp",
+      "imageBytes": 63054,
+      "belowFold": []
+    },
+    "768x1024": {
+      "layout": "desktop",
+      "image": "placeholder-desktop-2660.webp",
+      "imageBytes": 133000,
+      "belowFold": []
+    },
+    "1330x748": {
+      "layout": "desktop",
+      "image": "placeholder-desktop-2660.webp",
+      "imageBytes": 133000,
+      "belowFold": []
+    },
+    "1440x900": {
+      "layout": "desktop",
+      "image": "placeholder-desktop-2660.webp",
+      "imageBytes": 133000,
+      "belowFold": []
+    }
+  },
+  "results": [
+    {
+      "name": "viewport 320x700: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 390x844: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 768x1024: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1330x748: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "viewport 1440x900: layout, geen overflow/overlap/afkapping, targets ≥48px, geen consolefouten",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 390x844: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 1440x900: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "200% tekst op 320x700: geen horizontale scroll, geen afgekapte waarde, geen overlap",
+      "ok": true
+    },
+    {
+      "name": "alle scenario’s: DOM-routes en tegels volgen exact het model (incl. offline/stale/nacht/P1/negatief)",
+      "ok": true
+    },
+    {
+      "name": "50 hertekeningen: geen DOM-rebuild, geen route-flikkering, deeltjes herstarten niet",
+      "ok": true
+    },
+    {
+      "name": "ongeldig/verouderd/offline: route direct uit en deeltjes staan onmiddellijk stil (alleen passieve fade)",
+      "ok": true
+    },
+    {
+      "name": "negatieve EV-meting, minteken bij teruglevering en scenario-overgangen in het DOM",
+      "ok": true
+    },
+    {
+      "name": "maskers 1440x900: deeltjes verdwijnen achter voorgrondobjecten, routelijnen gemaskeerd, UI-kaarten erboven",
+      "ok": true
+    },
+    {
+      "name": "maskers 390x844: deeltjes verdwijnen achter voorgrondobjecten, routelijnen gemaskeerd, UI-kaarten erboven",
+      "ok": true
+    },
+    {
+      "name": "placeholder-status zichtbaar: \"Tijdelijk beeld — niet visueel goedgekeurd\"; batterij linksonder (desktop)",
+      "ok": true
+    },
+    {
+      "name": "terugval: geen manifest, kapotte beeldlaag of kapot masker ⇒ interface blijft werken, geen JS-fouten",
+      "ok": true
+    },
+    {
+      "name": "manifestvalidatie in de browser: ongeldig/null ⇒ veilige terugval; v1 en lichtlagen laden; geen excepties",
+      "ok": true
+    },
+    {
+      "name": "beschermde gebieden en UI-zones op 320/390/768/1330/1440: geen kaart raakt een beschermd gebied; kaartmidden in eigen zone",
+      "ok": true
+    },
+    {
+      "name": "SVG-routelijnen visueel gemaskeerd 1440x900 (screenshotvergelijking met/zonder routes)",
+      "ok": true
+    },
+    {
+      "name": "SVG-routelijnen visueel gemaskeerd 390x844 (screenshotvergelijking met/zonder routes)",
+      "ok": true
+    },
+    {
+      "name": "toetsenbord: Tab → tegel, Enter opent detail, focus op Sluiten, Escape sluit en herstelt focus; klik buiten sluit",
+      "ok": true
+    },
+    {
+      "name": "prefers-reduced-motion: geen deeltjesanimatie, richting blijft zichtbaar via pijlen",
+      "ok": true
+    },
+    {
+      "name": "verborgen tab pauzeert animatie en schommeling; zichtbaar hervat",
+      "ok": true
+    },
+    {
+      "name": "twee gelijktijdige instanties: onafhankelijk; destroy() ruimt timers, rAF en listeners op",
+      "ok": true
+    },
+    {
+      "name": "performance: fps onder 4× CPU-throttling, geheugen na 200 updates, beeldgewicht",
+      "ok": true
+    }
+  ]
+}

@@ -13,6 +13,7 @@
   <div id="mount"></div>
 </main>
 <script src="scene-manifest.js"></script>
+<script src="manifest-validate.js"></script>
 <script src="model.js"></script>
 <script src="flows.js"></script>
 <script src="app.js"></script>
@@ -22,12 +23,20 @@
     var n = Math.max(1, Math.min(4, parseInt(q.get('instances') || '1', 10) || 1));
     var mount = document.getElementById('mount');
     // Testhaak: ?manifest=0 simuleert een ontbrekend scènemanifest (terugvalgedrag).
-    if (q.get('manifest') === '0') { try { delete window.EhPve04Manifest; } catch (e) { window.EhPve04Manifest = undefined; } }
+    // Testhaken (alleen voor de browsertests): ?manifest=0|null|invalid|v1|light
+    var mq = q.get('manifest');
+    if (mq === '0') { try { delete window.EhPve04Manifest; } catch (e) { window.EhPve04Manifest = undefined; } }
+    if (mq === 'null') window.EhPve04Manifest = null;
+    if (mq === 'invalid') { var bad = JSON.parse(JSON.stringify(window.EhPve04Manifest)); bad.compositions.desktop.base = []; bad.compositions.mobile.base[0].file = '../../etc/passwd.webp'; window.EhPve04Manifest = bad; }
+    if (mq === 'v1') { var v1 = JSON.parse(JSON.stringify(window.EhPve04Manifest)); v1.schema = 'energiehuis.scene-manifest/1'; delete v1.coordinateSystem; ['desktop', 'mobile'].forEach(function (k) { var c = v1.compositions[k]; delete c.uiZones; delete c.keyObjects; delete c.protectedAreas; delete c.lightLayers; delete c.outOfView; }); window.EhPve04Manifest = v1; }
+    if (mq === 'light') { var lm = JSON.parse(JSON.stringify(window.EhPve04Manifest)); ['desktop', 'mobile'].forEach(function (k) { var c = lm.compositions[k], b = c.base[0]; c.lightLayers = [Object.assign({}, b, { id: 'test-always', blend: 'screen', trigger: 'always' }), Object.assign({}, b, { id: 'test-future', blend: 'screen', trigger: 'practice-linked', futureField: true })]; }); window.EhPve04Manifest = lm; }
     window.__cockpits = [];
     for (var i = 0; i < n; i++) {
       window.__cockpits.push(EhPve04.createCockpit(mount, {
         scenario: q.get('scenario') || (i ? 'net-laden' : 'zon-export'),
-        ticker: q.get('ticker') !== '0'
+        ticker: q.get('ticker') !== '0',
+        maskMode: q.get('maskmode') || undefined,
+        svgMask: q.get('svgmask') === '0' ? false : undefined
       }));
     }
   })();
