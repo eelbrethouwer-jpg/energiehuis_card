@@ -115,6 +115,10 @@
       "ok": true
     },
     {
+      "name": "privélaag: geladen via ?scene=private; mobiel valt terug; ontbrekend/onveilig ⇒ placeholder; geen fouten",
+      "ok": true
+    },
+    {
       "name": "toetsenbord: Tab → tegel, Enter opent detail, focus op Sluiten, Escape sluit en herstelt focus; klik buiten sluit",
       "ok": true
     },

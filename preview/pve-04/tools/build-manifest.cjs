@@ -98,8 +98,8 @@ function dims(buf) {
   throw new Error('onbekend beeldformaat');
 }
 
-function entry(file, rights) {
-  const p = path.join(DIR, 'assets', file);
+function entry(file, rights, root = DIR) {
+  const p = path.join(root, 'assets', file);
   const buf = fs.readFileSync(p);
   const d = dims(buf);
   return { file: 'assets/' + file, type: d.type, w: d.w, h: d.h, alpha: d.alpha, bytes: buf.length, sha256: crypto.createHash('sha256').update(buf).digest('hex'), rights };
@@ -138,13 +138,55 @@ function build() {
     '})(typeof globalThis !== \'undefined\' ? globalThis : this);\n';
 }
 
-const js = build();
-if (process.argv.includes('--check')) {
-  const cur = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
-  if (cur !== js) { console.error('FAIL: scene-manifest.js wijkt af van de bestanden; draai build-manifest.cjs'); process.exit(1); }
-  console.log('PASS: scene-manifest.js komt exact overeen met assets, ankerpunten en rechten');
-} else {
-  fs.writeFileSync(OUT, js);
-  console.log('scene-manifest.js geschreven');
+/*
+ * PRIVÉ-modus:  node preview/pve-04/tools/build-manifest.cjs --private preview/pve-04/private/<map>
+ * Leest <map>/scene-source.json (zie cleanplate/scene-source.template.json) en <map>/assets/*, schrijft
+ * <map>/scene-manifest.private.js (global EhPve04PrivateManifest, visibility 'private'). De map MOET onder
+ * preview/pve-04/private/ liggen (in .gitignore): privébeeld komt nooit in de publieke repository.
+ * Voor Home Assistant: zet assetBase op '/local/energiehuis/pve04/' en kopieer de map naar /config/www/energiehuis/pve04/.
+ */
+function buildPrivate(dir) {
+  const PRIV = path.join(DIR, 'private');
+  const abs = path.resolve(dir);
+  if (!abs.startsWith(PRIV + path.sep)) throw new Error('privémap moet onder preview/pve-04/private/ liggen: ' + dir);
+  const src = JSON.parse(fs.readFileSync(path.join(abs, 'scene-source.json'), 'utf8'));
+  const compositions = {};
+  for (const [name, c] of Object.entries(src.compositions || {})) {
+    const keyObjects = c.keyObjects || {};
+    compositions[name] = {
+      minContainerWidth: c.minContainerWidth, natural: c.natural, budgetBytes: c.budgetBytes,
+      base: c.base.map(f => entry(f, src.rightsId, abs)),
+      masks: (c.masks || []).map(([id, f, bbox]) => ({ id, semantics: 'alfa = voorgrond-occlusie (deeltjes en routelijnen verdwijnen erachter; UI-kaarten niet)', ...entry(f, src.rightsId, abs), bbox: bbox || null })),
+      anchors: c.anchors, uiZones: c.uiZones, keyObjects,
+      protectedAreas: (c.protected || []).map(pa => { const k = keyObjects[pa.from]; const [l, t, rr, bb] = pa.inset; return { id: pa.id, from: pa.from, purpose: pa.purpose, x: r4(k.x + k.w * l), y: r4(k.y + k.h * t), w: r4(k.w * (1 - l - rr)), h: r4(k.h * (1 - t - bb)) }; }),
+      lightLayers: c.lightLayers || []
+    };
+  }
+  const manifest = { schema: 'energiehuis.scene-manifest/2', coordinateSystem: COORDINATES, sceneId: src.sceneId, visibility: 'private', assetBase: src.assetBase, status: src.status, statusLabel: src.statusLabel, compositions, rights: src.rights };
+  const js = '/* PRIVÉ — gegenereerd door tools/build-manifest.cjs --private. NIET in de publieke repository plaatsen. */\n' +
+    '(function (root) {\n  \'use strict\';\n  root.EhPve04PrivateManifest = ' + JSON.stringify(manifest, null, 2).replace(/\n/g, '\n  ') + ';\n' +
+    '  if (typeof module === \'object\' && module.exports) module.exports = root.EhPve04PrivateManifest;\n' +
+    '})(typeof globalThis !== \'undefined\' ? globalThis : this);\n';
+  const out = path.join(abs, 'scene-manifest.private.js');
+  fs.writeFileSync(out, js);
+  return out;
 }
-module.exports = { dims };
+
+if (require.main === module) {
+  const pi = process.argv.indexOf('--private');
+  if (pi > 0) {
+    const out = buildPrivate(process.argv[pi + 1]);
+    console.log('privémanifest geschreven: ' + path.relative(process.cwd(), out));
+  } else {
+    const js = build();
+    if (process.argv.includes('--check')) {
+      const cur = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
+      if (cur !== js) { console.error('FAIL: scene-manifest.js wijkt af van de bestanden; draai build-manifest.cjs'); process.exit(1); }
+      console.log('PASS: scene-manifest.js komt exact overeen met assets, ankerpunten en rechten');
+    } else {
+      fs.writeFileSync(OUT, js);
+      console.log('scene-manifest.js geschreven');
+    }
+  }
+}
+module.exports = { dims, build, buildPrivate };

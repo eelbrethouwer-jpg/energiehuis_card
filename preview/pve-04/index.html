@@ -31,14 +31,29 @@
     if (mq === 'v1') { var v1 = JSON.parse(JSON.stringify(window.EhPve04Manifest)); v1.schema = 'energiehuis.scene-manifest/1'; delete v1.coordinateSystem; ['desktop', 'mobile'].forEach(function (k) { var c = v1.compositions[k]; delete c.uiZones; delete c.keyObjects; delete c.protectedAreas; delete c.lightLayers; delete c.outOfView; }); window.EhPve04Manifest = v1; }
     if (mq === 'light') { var lm = JSON.parse(JSON.stringify(window.EhPve04Manifest)); ['desktop', 'mobile'].forEach(function (k) { var c = lm.compositions[k], b = c.base[0]; c.lightLayers = [Object.assign({}, b, { id: 'test-always', blend: 'screen', trigger: 'always' }), Object.assign({}, b, { id: 'test-future', blend: 'screen', trigger: 'practice-linked', futureField: true })]; }); window.EhPve04Manifest = lm; }
     window.__cockpits = [];
-    for (var i = 0; i < n; i++) {
-      window.__cockpits.push(EhPve04.createCockpit(mount, {
-        scenario: q.get('scenario') || (i ? 'net-laden' : 'zon-export'),
-        ticker: q.get('ticker') !== '0',
-        maskMode: q.get('maskmode') || undefined,
-        svgMask: q.get('svgmask') === '0' ? false : undefined
-      }));
+    function mountAll(extra) {
+      for (var i = 0; i < n; i++) {
+        window.__cockpits.push(EhPve04.createCockpit(mount, Object.assign({
+          scenario: q.get('scenario') || (i ? 'net-laden' : 'zon-export'),
+          ticker: q.get('ticker') !== '0',
+          maskMode: q.get('maskmode') || undefined,
+          svgMask: q.get('svgmask') === '0' ? false : undefined
+        }, extra || {})));
+      }
+      window.__mounted = true;
     }
+    // Privébeeldlaag (opt-in): ?scene=private laadt een privémanifest dat NIET in de repository staat
+    // (standaard private/scene-manifest.private.js; in Home Assistant bijv. /local/energiehuis/pve04/…).
+    // Ontbreekt of faalt het, dan valt de cockpit per compositie terug op het publieke placeholderbeeld.
+    if (q.get('scene') === 'private') {
+      var url = q.get('privateManifest') || 'private/scene-manifest.private.js';
+      var publicMf = window.EhPve04Manifest;
+      var done = function () { mountAll({ manifest: window.EhPve04PrivateManifest || null, fallbackManifest: publicMf, privateRequested: true }); };
+      if (!EhPve04ManifestValidate.safeManifestUrl(url)) { done(); return; }
+      var s = document.createElement('script');
+      s.src = url; s.onload = done; s.onerror = done;
+      document.body.appendChild(s);
+    } else mountAll();
   })();
 </script>
 </body>

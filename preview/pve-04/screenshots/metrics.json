@@ -34,10 +34,10 @@
     }
   },
   "performance": {
-    "fps1x": 58.6,
-    "fps4x": 58.5,
+    "fps1x": 59.4,
+    "fps4x": 59.2,
     "heapMB": 1.53,
-    "heapDeltaKB": 133
+    "heapDeltaKB": 124
   },
   "results": [
     {
@@ -118,6 +118,10 @@
     },
     {
       "name": "SVG-routelijnen visueel gemaskeerd 390x844 (screenshotvergelijking met/zonder routes)",
+      "ok": true
+    },
+    {
+      "name": "privélaag: geladen via ?scene=private; mobiel valt terug; ontbrekend/onveilig ⇒ placeholder; geen fouten",
       "ok": true
     },
     {

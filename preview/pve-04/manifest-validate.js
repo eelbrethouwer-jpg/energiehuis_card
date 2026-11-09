@@ -23,6 +23,17 @@
   const num = v => typeof v === 'number' && Number.isFinite(v);
   const posInt = v => Number.isInteger(v) && v > 0;
 
+  /** assetBase (optioneel): map waaronder assets/ staat. Alleen 'private/…/' (preview) of '/local/…/' (Home Assistant). */
+  function safeAssetBase(b) {
+    return typeof b === 'string' && b.length <= 120 && !b.includes('..') && !b.includes('//') &&
+      /^(private\/([A-Za-z0-9_-]+\/)*|\/local\/([A-Za-z0-9_-]+\/)+)$/.test(b);
+  }
+  /** URL van een privémanifest: alleen same-origin .js onder private/ of /local/. */
+  function safeManifestUrl(u) {
+    return typeof u === 'string' && u.length <= 160 && !u.includes('..') && !u.includes('//') &&
+      /^(private\/([A-Za-z0-9_-]+\/)*|\/local\/([A-Za-z0-9_-]+\/)+)[A-Za-z0-9_.-]+\.js$/.test(u);
+  }
+
   /** Alleen relatieve paden binnen assets/, zonder ..-segmenten, schema's, query's of rare tekens. */
   function safePath(p) {
     return typeof p === 'string' && p.length <= 200 && /^assets\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(p) && !p.includes('..');
@@ -105,13 +116,25 @@
       if (version >= 2 && (!isObj(mf.coordinateSystem) || mf.coordinateSystem.id !== 'normalized-image')) errs.push('coordinateSystem.id moet normalized-image zijn');
       const rightsIds = isObj(mf.rights) ? new Set(Object.keys(mf.rights)) : null;
       if (!rightsIds || rightsIds.size === 0) errs.push('rights: ontbreekt');
+      const visibility = mf.visibility === undefined ? 'public' : mf.visibility;
+      if (!['public', 'private'].includes(visibility)) errs.push('visibility moet public of private zijn');
+      if (mf.assetBase !== undefined && !safeAssetBase(mf.assetBase)) errs.push(`assetBase: onveilig (${String(mf.assetBase).slice(0, 60)})`);
+      if (visibility === 'private') {
+        // Privé-assets mogen nooit als publiek gelabeld zijn.
+        if (rightsIds) for (const [id, r] of Object.entries(mf.rights)) if (!isObj(r) || r.publicAllowed !== false) errs.push(`rights.${id}: privé-asset moet publicAllowed:false hebben`);
+      }
       if (!isObj(mf.compositions)) errs.push('compositions: ontbreekt');
-      else for (const name of COMPOSITIONS) validateComposition(name, mf.compositions[name], version, rightsIds, errs);
+      else {
+        // Een privémanifest mag één compositie leveren (de andere valt terug op het publieke manifest).
+        const names = visibility === 'private' ? COMPOSITIONS.filter(n => mf.compositions[n] !== undefined) : COMPOSITIONS;
+        if (names.length === 0) errs.push('compositions: geen enkele compositie');
+        for (const name of names) validateComposition(name, mf.compositions[name], version, rightsIds, errs);
+      }
       return { ok: errs.length === 0, version, errors: errs };
     } catch (e) {
       return { ok: false, version: null, errors: errs.concat('validatie afgebroken: ' + String(e && e.message || e).slice(0, 120)) };
     }
   }
 
-  return Object.freeze({ validateManifest, safePath, SCHEMAS, REQUIRED_ANCHORS, UI_KEYS });
+  return Object.freeze({ validateManifest, safePath, safeAssetBase, safeManifestUrl, SCHEMAS, REQUIRED_ANCHORS, UI_KEYS });
 });

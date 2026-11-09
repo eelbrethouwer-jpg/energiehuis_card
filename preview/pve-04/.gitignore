@@ -29,3 +29,6 @@
 raw/
 source-assets/
 licenses-private/
+
+# Privébeeldmateriaal (clean plate, private maskers, private manifest): NOOIT op GitHub
+private/

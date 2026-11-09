@@ -58,6 +58,20 @@ node preview/pve-04/tools/build-manifest.cjs
 
 Bij stap 1 vervangen de Blender-renders de bestanden. Daarna worden `tools/render-output.json` (ankerpunten), `tools/rights.json` en het `SCENE`-blok in `build-manifest.cjs` bijgewerkt en het manifest opnieuw gebouwd. De UI en de tests blijven gelijk.
 
+## Privébeeldlaag (stap 1A: clean plate van de goedgekeurde master)
+
+De fotorealistische basislaag wordt een **clean plate** van de goedgekeurde master: zonder kaarten, tekst, logo's, kenteken en stromen. Die laag is **privé** en komt nooit in deze publieke repository. De volledige workflow, analyse en criteria staan in [cleanplate/CLEANPLATE.md](cleanplate/CLEANPLATE.md).
+
+```sh
+python3 preview/pve-04/tools/cleanplate.py all                      # masker, draft, QA, overzicht → private/cleanplate/
+node preview/pve-04/tools/build-manifest.cjs --private preview/pve-04/private/<map>
+# open index.html?scene=private&privateManifest=private/<map>/scene-manifest.private.js
+```
+
+- `?scene=private` laadt een privémanifest (standaard `private/scene-manifest.private.js`; in Home Assistant `/local/energiehuis/pve04/…`). Alleen same-origin `.js`-paden onder `private/` of `/local/` worden geaccepteerd.
+- Per compositie geldt: privélaag aanwezig ⇒ "Privébeeldlaag (concept) — niet visueel goedgekeurd"; geen privélaag voor die weergave ⇒ terugval op de placeholder, met melding. Een ontbrekend, ongeldig of onveilig manifest ⇒ placeholder, zonder fouten.
+- `private/` staat in `.gitignore`. De tools weigeren output elders, en de validator eist `publicAllowed: false` voor privé-assets.
+
 ## Coördinaten, zones en beschermde gebieden (v2)
 
 - **Coördinaten:** alles in fracties (0..1) van de natuurlijke beeldmaat, met de oorsprong linksboven, x naar rechts en y naar beneden. Op het scherm via `object-fit: cover`, gecentreerd (`flows.coverTransform`).
@@ -86,8 +100,8 @@ node preview/pve-04/tests/browser.cjs --browser=webkit --screenshots  # WebKit (
 node preview/pve-04/tests/perf.cjs --write
 ```
 
-- **Node (70 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting.
-- **Browser (25 controles, Chromium én WebKit):** viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
+- **Node (79 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting; plus de clean-plate- en privacytests (overlay-map, geen getrackte privébestanden, weigering van output buiten `private/`, privémanifest, veilige URL's).
+- **Browser (26 controles, Chromium én WebKit):** o.a. het laden van de privélaag via een synthetische testlaag, met mobiele terugval en terugval bij een ontbrekend of onveilig manifest; viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
 
 ## Beperkingen
 

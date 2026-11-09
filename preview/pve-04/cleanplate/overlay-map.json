@@ -1,0 +1,385 @@
+{
+  "schema": "energiehuis.cleanplate-overlay-map/1",
+  "master": {
+    "file": "preview/pve-03/reference/approved-visual-20261109.webp",
+    "w": 1330,
+    "h": 748,
+    "sha256": "932d0e745f8e8a415f6aab4e87091366a32d5a68d7363b908f55445fcccc7ee6",
+    "note": "Verliesgevende WebP-kopie; het originele PNG (SHA-256 3c81b1f2…f708f0) heeft de voorkeur als bron."
+  },
+  "coordinateSystem": "normalized-image (0..1 van master w/h, oorsprong linksboven)",
+  "inhoud": "Uitsluitend posities en eigenschappen van ingebakken overlays; bevat geen beeldmateriaal.",
+  "overlays": [
+    {
+      "id": "header-logo",
+      "kind": "logo",
+      "shape": "rect",
+      "x": 0.0256,
+      "y": 0.008,
+      "w": 0.0617,
+      "h": 0.1043,
+      "background": "lucht/boomkruin",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": ""
+    },
+    {
+      "id": "header-title",
+      "kind": "text",
+      "shape": "rect",
+      "x": 0.0917,
+      "y": 0.0107,
+      "w": 0.2857,
+      "h": 0.0909,
+      "background": "lucht/boomkruin",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": "Twee regels tekst over lucht en bladrand"
+    },
+    {
+      "id": "datetime-pill",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.6887,
+      "y": 0.0134,
+      "w": 0.2992,
+      "h": 0.0775,
+      "background": "lucht/wolken",
+      "difficulty": "laag",
+      "method": "auto-inpaint",
+      "note": "Datum, tijd en temperatuur"
+    },
+    {
+      "id": "card-pv",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.1383,
+      "y": 0.1511,
+      "w": 0.1654,
+      "h": 0.1417,
+      "background": "lucht/bomen/dakrand",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": ""
+    },
+    {
+      "id": "card-practice",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.0759,
+      "y": 0.4278,
+      "w": 0.1406,
+      "h": 0.1123,
+      "background": "houten gevel/dakrand/wandlamp",
+      "difficulty": "hoog",
+      "method": "herschilderen",
+      "note": "Planken, dakrand en wandlamp reconstrueren"
+    },
+    {
+      "id": "card-house",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.4368,
+      "y": 0.4118,
+      "w": 0.1632,
+      "h": 0.1417,
+      "background": "gevel/ramen/interieur",
+      "difficulty": "hoog",
+      "method": "regenereren",
+      "note": "Verlichte benedenramen met interieur achter de kaart"
+    },
+    {
+      "id": "card-cupra",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.8068,
+      "y": 0.2861,
+      "w": 0.1632,
+      "h": 0.1497,
+      "background": "bomen/garagedak",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": ""
+    },
+    {
+      "id": "card-battery",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.0444,
+      "y": 0.738,
+      "w": 0.1729,
+      "h": 0.1444,
+      "background": "gazon/pad",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": ""
+    },
+    {
+      "id": "card-net",
+      "kind": "card",
+      "shape": "rect",
+      "x": 0.4331,
+      "y": 0.7366,
+      "w": 0.185,
+      "h": 0.1457,
+      "background": "natte bestrating/pad/planten",
+      "difficulty": "hoog",
+      "method": "herschilderen",
+      "note": "Visgraatpatroon en reflecties doorzetten"
+    },
+    {
+      "id": "flow-pv",
+      "kind": "flow",
+      "shape": "polyline",
+      "points": [
+        [
+          0.2992,
+          0.2166
+        ],
+        [
+          0.3308,
+          0.2179
+        ],
+        [
+          0.3534,
+          0.2273
+        ],
+        [
+          0.3684,
+          0.246
+        ],
+        [
+          0.3835,
+          0.2594
+        ],
+        [
+          0.406,
+          0.2567
+        ],
+        [
+          0.4323,
+          0.2513
+        ],
+        [
+          0.4511,
+          0.254
+        ],
+        [
+          0.4662,
+          0.2674
+        ],
+        [
+          0.4752,
+          0.2941
+        ],
+        [
+          0.4797,
+          0.3342
+        ],
+        [
+          0.4812,
+          0.3743
+        ],
+        [
+          0.482,
+          0.4225
+        ]
+      ],
+      "width": 0.0226,
+      "background": "lucht/dakpannen/zonnepanelen",
+      "difficulty": "hoog",
+      "method": "herschilderen",
+      "note": "Raster van de panelen en dakpannen herstellen"
+    },
+    {
+      "id": "flow-practice",
+      "kind": "flow",
+      "shape": "polyline",
+      "points": [
+        [
+          0.2143,
+          0.5187
+        ],
+        [
+          0.2331,
+          0.5294
+        ],
+        [
+          0.2556,
+          0.5294
+        ],
+        [
+          0.2782,
+          0.516
+        ],
+        [
+          0.297,
+          0.5134
+        ],
+        [
+          0.3083,
+          0.5241
+        ],
+        [
+          0.3233,
+          0.5401
+        ],
+        [
+          0.3383,
+          0.5455
+        ],
+        [
+          0.3571,
+          0.5374
+        ],
+        [
+          0.3759,
+          0.5241
+        ],
+        [
+          0.3985,
+          0.5134
+        ],
+        [
+          0.4211,
+          0.508
+        ],
+        [
+          0.4398,
+          0.5053
+        ]
+      ],
+      "width": 0.0105,
+      "background": "praktijkglas/gevel/tuin",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": "Gestippeld"
+    },
+    {
+      "id": "flow-net",
+      "kind": "flow",
+      "shape": "polyline",
+      "points": [
+        [
+          0.5188,
+          0.5508
+        ],
+        [
+          0.5105,
+          0.5882
+        ],
+        [
+          0.5203,
+          0.6283
+        ],
+        [
+          0.512,
+          0.6684
+        ],
+        [
+          0.5188,
+          0.7086
+        ],
+        [
+          0.5158,
+          0.7393
+        ]
+      ],
+      "width": 0.0211,
+      "background": "pad/deur/planten",
+      "difficulty": "middel",
+      "method": "patch-clone",
+      "note": ""
+    },
+    {
+      "id": "flow-car",
+      "kind": "flow",
+      "shape": "polyline",
+      "points": [
+        [
+          0.5985,
+          0.5053
+        ],
+        [
+          0.6316,
+          0.516
+        ],
+        [
+          0.6617,
+          0.5321
+        ],
+        [
+          0.6902,
+          0.5468
+        ],
+        [
+          0.7143,
+          0.5628
+        ],
+        [
+          0.7233,
+          0.5722
+        ]
+      ],
+      "width": 0.0211,
+      "background": "gevel/raam/planten/garagewand",
+      "difficulty": "hoog",
+      "method": "herschilderen",
+      "note": "Lichtgloed op gevel verwijderen"
+    },
+    {
+      "id": "flow-card-car",
+      "kind": "flow",
+      "shape": "polyline",
+      "points": [
+        [
+          0.8368,
+          0.4332
+        ],
+        [
+          0.8346,
+          0.4612
+        ],
+        [
+          0.8391,
+          0.4893
+        ],
+        [
+          0.8451,
+          0.516
+        ]
+      ],
+      "width": 0.0135,
+      "background": "donkere garagewand",
+      "difficulty": "laag",
+      "method": "auto-inpaint",
+      "note": ""
+    },
+    {
+      "id": "car-plate",
+      "kind": "plate",
+      "shape": "rect",
+      "x": 0.8489,
+      "y": 0.6377,
+      "w": 0.0474,
+      "h": 0.0281,
+      "background": "nummerbord",
+      "difficulty": "middel",
+      "method": "herschilderen",
+      "note": "Kenteken 'CUPRA BORN' → blanco plaat of carrosserie"
+    },
+    {
+      "id": "car-logo",
+      "kind": "logo",
+      "shape": "rect",
+      "x": 0.8436,
+      "y": 0.5882,
+      "w": 0.0195,
+      "h": 0.0294,
+      "background": "lak voorkant",
+      "difficulty": "middel",
+      "method": "herschilderen",
+      "note": "Merklogo op neus → lak"
+    }
+  ]
+}

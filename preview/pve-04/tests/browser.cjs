@@ -418,6 +418,40 @@ const MEASURE = () => {
     });
   }
 
+  // ---------------------------------------------------------------- stap 1A: privélaag (synthetisch, zonder privébeeld)
+  await check('privélaag: geladen via ?scene=private; mobiel valt terug; ontbrekend/onveilig ⇒ placeholder; geen fouten', async () => {
+    const BM = require('../tools/build-manifest.cjs');
+    const tdir = path.join(DIR, 'private', '__test__');
+    fs.rmSync(tdir, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tdir, 'assets'), { recursive: true });
+    for (const f of ['placeholder-desktop-1330.webp', 'placeholder-desktop-1330.jpg']) fs.copyFileSync(path.join(DIR, 'assets', f), path.join(tdir, 'assets', f.replace('placeholder', 'testplate')));
+    const tpl = JSON.parse(fs.readFileSync(path.join(DIR, 'cleanplate', 'scene-source.template.json'), 'utf8'));
+    tpl.assetBase = 'private/__test__/'; tpl.compositions.desktop.base = ['testplate-desktop-1330.webp', 'testplate-desktop-1330.jpg'];
+    fs.writeFileSync(path.join(tdir, 'scene-source.json'), JSON.stringify(tpl));
+    BM.buildPrivate(tdir);
+    const res = {};
+    try {
+      for (const [name, w, h, q] of [
+        ['desktop-privé', 1440, 900, '?ticker=0&scene=private&privateManifest=private/__test__/scene-manifest.private.js'],
+        ['mobiel-terugval', 390, 844, '?ticker=0&scene=private&privateManifest=private/__test__/scene-manifest.private.js'],
+        ['niet-gevonden', 1440, 900, '?ticker=0&scene=private&privateManifest=private/bestaat-niet.js'],
+        ['onveilige-url', 1440, 900, '?ticker=0&scene=private&privateManifest=https://evil.example/x.js']
+      ]) {
+        const { ctx, page, errors } = await open(browser, base, { width: w, height: h, query: q, waitImage: false });
+        await page.waitForFunction('window.__mounted === true'); await page.waitForTimeout(700);
+        res[name] = await page.evaluate(() => { const r = document.querySelector('.ehc'); return { src: r.dataset.sceneSource, scene: r.dataset.scene, note: document.querySelector('.ehc-scene-note').textContent, img: (document.querySelector('.ehc-scene img').currentSrc || '').replace(location.origin + '/', ''), pv: document.querySelector('.tile[data-key="pv"] .t-value').textContent, js: window.__errors }; });
+        res[name].console = errors.filter(e => !/Failed to load resource|404/.test(e));
+        await ctx.close();
+      }
+    } finally { fs.rmSync(tdir, { recursive: true, force: true }); }
+    for (const [k, r] of Object.entries(res)) { assert.equal(r.pv, '4,82 kW', k); assert.deepEqual(r.js, [], k); assert.deepEqual(r.console, [], k); assert.equal(r.scene, 'ok', k); }
+    assert.equal(res['desktop-privé'].src, 'primary-private'); assert.match(res['desktop-privé'].img, /^private\/__test__\/assets\/testplate-desktop-1330\.webp$/); assert.match(res['desktop-privé'].note, /Privébeeldlaag \(concept\)/);
+    assert.equal(res['mobiel-terugval'].src, 'fallback'); assert.match(res['mobiel-terugval'].img, /^assets\/placeholder-mobile/); assert.match(res['mobiel-terugval'].note, /Geen privébeeldlaag voor deze weergave/);
+    for (const k of ['niet-gevonden', 'onveilige-url']) { assert.equal(res[k].src, 'fallback', k); assert.match(res[k].note, /niet gevonden/, k); assert.match(res[k].img, /^assets\/placeholder-desktop/, k); }
+    assert.equal(fs.existsSync(tdir), false, 'testmap niet opgeruimd');
+    return Object.fromEntries(Object.entries(res).map(([k, r]) => [k, r.src]));
+  });
+
   // ---------------------------------------------------------------- toetsenbord
   await check('toetsenbord: Tab → tegel, Enter opent detail, focus op Sluiten, Escape sluit en herstelt focus; klik buiten sluit', async () => {
     const { ctx, page, errors } = await open(browser, base, { width: 1440, height: 900, query: '?ticker=0' });

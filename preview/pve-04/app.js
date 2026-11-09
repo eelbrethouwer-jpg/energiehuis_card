@@ -7,7 +7,7 @@
   'use strict';
   const M = root.EhPve04Model, F = root.EhPve04Flows;
   const MOBILE_MAX = 700; // containerbreedte in px (moet gelijk zijn aan manifest desktop.minContainerWidth)
-  const srcset = (c, type) => c.base.filter(b => b.type === type).sort((a, b) => a.w - b.w).map(b => b.file + ' ' + b.w + 'w').join(', ');
+  const srcset = (c, type, base = '') => c.base.filter(b => b.type === type).sort((a, b) => a.w - b.w).map(b => base + b.file + ' ' + b.w + 'w').join(', ');
   const smallest = (c, type) => c.base.filter(b => b.type === type).sort((a, b) => a.w - b.w)[0];
 
   const ICON = {
@@ -46,13 +46,22 @@
     const id = 'ehc' + (++seq);
     let scenario = M.SCENARIO_IDS.includes(options.scenario) ? options.scenario : 'zon-export';
     let tick = 0, model = null, layout = null, ticker = 0, geoRaf = 0, destroyed = false, openKey = null, opener = null, maskImg = null;
+    // Primair manifest (publiek placeholder, of het PRIVÉmanifest uit private/ of /local/ in Home Assistant)
+    // en een optioneel terugvalmanifest (altijd het publieke). Per compositie wordt het eerste geldige gebruikt.
     const MF_RAW = options.manifest !== undefined ? options.manifest : root.EhPve04Manifest;
+    const FB_RAW = options.fallbackManifest || null;
     // Valideren vóór de scène wordt opgebouwd; validateManifest gooit nooit. Zonder validator: veilig weigeren.
     const VAL = root.EhPve04ManifestValidate;
     const check = MF_RAW == null ? { ok: false, errors: ['manifest ontbreekt'], missing: true }
       : (VAL ? VAL.validateManifest(MF_RAW) : { ok: false, errors: ['validator ontbreekt'] });
-    const MF = check.ok ? MF_RAW : null;
-    const comp = name => (MF && MF.compositions && MF.compositions[name]) || null;
+    const fbCheck = FB_RAW && VAL ? VAL.validateManifest(FB_RAW) : null;
+    const MF = check.ok ? MF_RAW : null, FB = fbCheck && fbCheck.ok ? FB_RAW : null;
+    function pick(name) {
+      if (MF && MF.compositions && MF.compositions[name]) return { c: MF.compositions[name], base: MF.assetBase || '', mf: MF, src: 'primary' };
+      if (FB && FB.compositions && FB.compositions[name]) return { c: FB.compositions[name], base: FB.assetBase || '', mf: FB, src: 'fallback' };
+      return null;
+    }
+    const comp = name => { const p = pick(name); return p ? p.c : null; };
     const listeners = [];
     const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); listeners.push(() => t.removeEventListener(type, fn, o)); };
 
@@ -114,24 +123,32 @@
       if (state === 'missing') note('Scènelaag ontbreekt — alleen interface');
       else if (state === 'invalid') note('Scènemanifest ongeldig — alleen interface');
       else if (state === 'error') note('Beeldlaag kon niet laden — alleen interface');
-      else note(MF && MF.status !== 'approved' ? (MF.statusLabel || 'Tijdelijk beeld — niet visueel goedgekeurd') : '');
+      else {
+        const p = pick(layout);
+        if (!p) note('');
+        else if (p.src === 'fallback' && options.privateRequested) note(check.ok ? 'Geen privébeeldlaag voor deze weergave — tijdelijk beeld, niet visueel goedgekeurd' : check.missing ? 'Privébeeldlaag niet gevonden — tijdelijk beeld, niet visueel goedgekeurd' : 'Privémanifest ongeldig — tijdelijk beeld, niet visueel goedgekeurd');
+        else if (p.mf.visibility === 'private') note(p.mf.status === 'approved' ? '' : 'Privébeeldlaag (concept) — niet visueel goedgekeurd');
+        else note(p.mf.status !== 'approved' ? (p.mf.statusLabel || 'Tijdelijk beeld — niet visueel goedgekeurd') : '');
+      }
     }
     function applyLayout(next) {
       if (next === layout) return;
       layout = next; rootEl.dataset.layout = next;
       const c = comp(next);
       if (!c) { sceneState(check.ok || check.missing ? 'missing' : 'invalid'); flows.setMask(null); return; }
+      const B = pick(next).base;
+      rootEl.dataset.sceneSource = pick(next).src + (pick(next).mf.visibility === 'private' ? '-private' : '');
       // Optionele lichtlagen (v2): alleen trigger 'always' wordt nu getoond; andere triggers zijn voor later
       // gereserveerd en worden genegeerd, zodat nieuwe lagen bestaande assets nooit breken.
       lights.replaceChildren(...(c.lightLayers || []).filter(l => l.trigger === 'always').map(l => {
-        const li = el(doc, 'img', 'ehc-light', { src: l.file, alt: '', decoding: 'async', 'data-light': l.id });
+        const li = el(doc, 'img', 'ehc-light', { src: B + l.file, alt: '', decoding: 'async', 'data-light': l.id });
         li.style.mixBlendMode = l.blend || 'screen'; return li;
       }));
       sceneState('loading');
-      source.setAttribute('srcset', srcset(c, 'image/webp'));
-      img.setAttribute('srcset', srcset(c, 'image/jpeg'));
+      source.setAttribute('srcset', srcset(c, 'image/webp', B));
+      img.setAttribute('srcset', srcset(c, 'image/jpeg', B));
       const fb = smallest(c, 'image/jpeg') || smallest(c, 'image/webp');
-      img.setAttribute('src', fb.file);
+      img.setAttribute('src', B + fb.file);
       img.setAttribute('width', c.natural.w); img.setAttribute('height', c.natural.h);
       // Occlusiemasker: laden mislukt ⇒ geen masker (veilig: alleen visueel, nooit een datawijziging)
       flows.setMask(null); rootEl.dataset.mask = 'none';
@@ -140,7 +157,7 @@
         const mi = new win.Image(); maskImg = mi;
         mi.onload = () => { if (maskImg === mi && !destroyed) { flows.setMask(mi, mk); rootEl.dataset.mask = 'ok'; scheduleGeo(); } };
         mi.onerror = () => { if (maskImg === mi && !destroyed) { flows.setMask(null); rootEl.dataset.mask = 'error'; } };
-        mi.src = mk.file;
+        mi.src = B + mk.file;
       }
     }
     function geometry() {
@@ -249,7 +266,8 @@
       el: rootEl,
       get model() { return model; },
       get scenario() { return scenario; },
-      get manifest() { return MF; },
+      get manifest() { const p = pick(layout); return p ? p.mf : MF; },
+      get sceneSource() { return rootEl.dataset.sceneSource || null; },
       get manifestCheck() { return check; },
       setScenario(s) { if (M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       step() { tick++; compute(); },

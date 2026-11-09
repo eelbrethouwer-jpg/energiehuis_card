@@ -1,131 +1,75 @@
-# Overdracht aan ChatGPT — PVE-04 stap 0, correctieronde
+# Overdracht aan ChatGPT — PVE-04 stap 1A: clean plate van de goedgekeurde master
 
-**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. De scènelaag blijft **placeholder, niet visueel goedgekeurd**. Fotorealisme blijft een harde eis voor stap 1.
-Opgesteld door Claude Code, 9 november 2026. Reactie op de ChatGPT-review van `83d9cfc` (GO MET OPMERKINGEN).
+**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. De publieke scènelaag blijft **placeholder**. De privélaag is in dit stadium alleen een **concept (automatische draft)** en is **niet visueel goedgekeurd**.
+Opgesteld door Claude Code, 9 november 2026. Opdracht: optie A (master als primaire beeldbasis → clean plate → cockpit erbovenop).
 
-## 1. Branch, baseline, commits, diff
+## 1. Branchstatus
 
 | | |
 |---|---|
 | Branch | `preview/claude-premium-pve04` |
-| Verplichte uitgangs-HEAD | `83d9cfc9402275ba6dc680535eacd4c4f3653995` (gecontroleerd: remote = lokaal vóór aanvang) |
+| Uitgangs-HEAD (gecontroleerd) | `9357ac91b5b8e556297b7d42e1ef91ded5d8c093` (remote = lokaal vóór aanvang) |
 | `main` | `62fa09cbd6dd3c4d481c0669c9cbac4f8a39aae9` (ongewijzigd) |
-| Correcties | `c70b544` — manifest v2, validatie, performance, WebKit |
-| HEAD na deze overdracht | de commit die dit bestand bijwerkt (direct na `c70b544`) |
+| HEAD na deze ronde | de commit die dit bestand bijwerkt (zie het chatbericht voor de exacte SHA) |
 
-Diff `83d9cfc..c70b544`: 32 bestanden, +1509 / −55, **uitsluitend `preview/pve-04/`**. De beeldbestanden zijn opnieuw gegenereerd en byte voor byte gecontroleerd: alle 10 zijn **identiek** (SHA-256 ongewijzigd). Alleen `tools/render-output.json` kreeg objectkaders en maskerkaders.
+De diff blijft uitsluitend binnen `preview/pve-04/`. Er is **geen privébeeld gecommit**: `private/` staat in `.gitignore` en een test controleert dat.
 
-**Omgeving (geen repo-wijziging):**
-- Er is een persoonlijke cloudomgeving "energiehuis_card" aangemaakt, met akkoord van de eigenaar via de goedkeuringsprompt. Die staat de Playwright-downloadhosts `cdn.playwright.dev` en `playwright.download.prss.microsoft.com` toe.
-- Playwright WebKit 26.6 en de systeembibliotheken zijn in de container geïnstalleerd.
-- `package.json`, lockfiles en dependencies zijn niet gewijzigd.
+## 2. Analyse van de master (details: [cleanplate/CLEANPLATE.md](cleanplate/CLEANPLATE.md))
 
-## 2. Correcties
+- **Te verwijderen:** 16 overlays, vastgelegd in `cleanplate/overlay-map.json` (alleen coördinaten): 9 tekst-, kaart- en pilgebieden, 5 stroomlijnen met gloed, het kenteken en het merklogo. Het masker dekt met gloedmarge ~27 % van het beeld.
+- **Moeilijkste gebieden:**
+  - de gele stroom over het **paneelraster en de dakpannen**;
+  - de huiskaart over de **verlichte benedenramen**;
+  - de praktijkkaart over de **houten gevel en wandlamp**;
+  - de Net-kaart over **natte visgraat met reflecties**;
+  - de **gloed** van de groene en gele stroom op gevel en dak.
+- **Bron:** de GitHub-kopie is een verliesgevende WebP van 1330×748. Gebruik het originele PNG als bron. Voor DPR 2 is opschalen nodig (lokaal en gratis) of 1× accepteren.
+- **Desktop of mobiel:** desktop kan uit de master. Mobiel **niet**: een 9:16-uitsnede toont alleen de woning en verliest praktijk en auto. Er is dus een aparte mobiele master in dezelfde stijl nodig, of een samengestelde mobiele compositie. Tot die er is, valt mobiel automatisch terug op de placeholder.
 
-### P1-A — Manifest v2 (v1 blijft geldig)
-- **Coördinatenstelsel:** `coordinateSystem.id = "normalized-image"`: fracties 0..1 van de natuurlijke beeldmaat, oorsprong linksboven, x naar rechts, y naar beneden, omzetting via gecentreerde `object-fit: cover`.
-- **`uiZones`:** per compositie zes zones waarin het kaartmidden moet liggen. Ze overlappen niet (getest).
-- **`keyObjects`:** kaders voor woning, garage, auto, praktijk, panelen en wandlader, **geprojecteerd vanuit de 3D-scène**. Objecten volledig buiten beeld staan in `outOfView`; op mobiel is dat de wandlader.
-- **`protectedAreas`:** dit vervangt de starre 10 %-grens. De herkenbare kern van auto, praktijkpui, panelen en dak/topgevel is beschermd, met marges per object. **Geen enkele kaart raakt een beschermd gebied** op 320, 390, 768, 1330 en 1440 px, in Chromium én WebKit.
-- **`lightLayers`:** optioneel en uitbreidbaar. Extra velden zijn toegestaan; de runtime toont nu alleen trigger `always` en negeert onbekende triggers (getest met een testmanifest).
-- **Maskerkaders** (`masks[].bbox`): berekend in de generator uit de maskerpixels.
+## 3. Workflow (gratis en lokaal)
+- **`tools/cleanplate.py`:** maakt het overlaymasker, een automatische draft (OpenCV), een QA-rapport per overlay (`OK` / `CONTROLEREN` / `TE VLAK` / `RESTANT`) en een overzichtsblad. Alle beeldoutput gaat alleen naar `private/`; output elders wordt geweigerd.
+- **Retouche:** GIMP + Resynthesizer, waaronder Perspective Clone voor het paneelraster; IOPaint (LaMa, draait op de CPU); Krita AI Diffusion (lokaal, GPU) voor de moeilijke gebieden; Upscayl om op te schalen. Allemaal gratis en lokaal.
+- **Acceptatiecriteria en beslisregels:** opgenomen in `CLEANPLATE.md` §3, inclusief wanneer retouche volstaat en wanneer herschilderen of opnieuw genereren nodig is.
 
-### P1-B — Runtimevalidatie
-- **Validator:** `manifest-validate.js` → `validateManifest(mf)` geeft `{ok, version, errors}` en **gooit nooit**; getest met een getter die gooit, met `null`, een getal en een array.
-- **Wat er gecontroleerd wordt:**
-  - schema v1/v2, status en `statusLabel`, rechten;
-  - beide composities, en `natural` als positieve gehele getallen;
-  - `base` niet leeg en met WebP en JPEG;
-  - per beeld bestand, type, extensie, afmetingen, beeldverhouding, bytes, SHA-256 en rechten-ID;
-  - per masker PNG, `alpha:true`, `semantics` en `id`;
-  - **veilige paden** (alleen `assets/<naam>`; geen `..`, `/`, `//`, schema's of submappen);
-  - de verplichte ankers als eindige getallen;
-  - de v2-velden.
-- **Runtime:** `app.js` valideert vóór het opbouwen. Bij een ongeldig manifest verschijnt "Scènemanifest ongeldig — alleen interface", worden scène en routes verborgen en blijven waarden en kaarten werken. Er treden geen excepties op, in Chromium noch WebKit.
-- **Tests:** **25 negatieve tests** (er waren er minimaal 12 gevraagd). Daaronder: geen of lege `base`, geen JPEG, `natural` ontbrekend of 0, compositie ontbrekend, masker zonder `alpha` of `semantics` of als JPEG, `..`-pad, absolute URL, `javascript:`, pad buiten `assets/`, verkeerde extensie, ongeldige SHA-256, ontbrekend of NaN-anker, zone buiten beeld of ontbrekend, en een onbekende rechten-ID.
+## 4. Architectuur en privacy (geïmplementeerd)
 
-### P2-A — Performance
-- **Oorzaak:** gemeten, niet aangenomen. De grootste kostenpost was de SVG-routelaag met masker, die elk frame opnieuw werd gerasterd omdat het canvas erboven veranderde. Daarnaast kostte het per frame herschalen van het volledige masker.
-- **Oplossing:**
-  1. maskeringsmodus `bbox` (standaard): het masker wordt één keer per resize voorgeschaald naar canvaspixels, en per frame snijdt `destination-out` alleen het maskerkader weg (~21 % van de desktopscène);
-  2. `will-change: transform` geeft de SVG- en canvaslaag elk een eigen compositielaag.
-- **Correctheid ongewijzigd:** de pixeltest blijft 0, de visuele SVG-test blijft 0, en reduced motion en routeveiligheid zijn ongewijzigd.
-- **Meting** (`tests/perf.cjs --write` → `screenshots/perf.json`): Chromium headless, DPR 1, scenario praktijk-sim (4 routes), schommeling uit, 3 runs van 3 s per meting.
+| Onderdeel | Uitvoering |
+|---|---|
+| Privémanifest | `build-manifest.cjs --private <map>` → `<map>/scene-manifest.private.js` (`visibility: private`, `assetBase`). Alleen mappen onder `private/` zijn toegestaan. |
+| Laden | `?scene=private[&privateManifest=…]` laadt het privémanifest via een `<script>`-tag (same-origin). Alleen `.js` onder `private/` of `/local/` is toegestaan (`safeManifestUrl`). |
+| Per compositie | Privélaag als die er is; anders terugval op de publieke placeholder, met melding. Een ontbrekend, ongeldig of onveilig manifest ⇒ placeholder, zonder excepties. |
+| Validator | `visibility`; `assetBase` alleen `private/…/` of `/local/…/`; een privémanifest mag één compositie hebben; privérechten moeten `publicAllowed: false` dragen. |
+| Repository | Publiek zijn code, tools, tests, de overlay-map en het sjabloon (alleen getallen). Privé zijn master-PNG, clean plate, maskers, `scene-source.json` en het privémanifest (`private/` lokaal; `/config/www/energiehuis/pve04/` in Home Assistant). |
+| DEMO-veiligheid | Ongewijzigd: geen Home Assistant, geen opslag, geen bediening; het model en de routeregels zijn ongewijzigd. |
 
-| Variant (desktop 1440×900) | 1× fps | 4× fps | p95 4× | Δ t.o.v. PVE-03 (4×) |
-|---|---|---|---|---|
-| PVE-03, geen masker (nulmeting) | 60,0 | 60,0 | 16,8 ms | — |
-| PVE-04 `full` (methode vorige ronde) | 59,7 | **38,6** | 33,4 ms | −35,7 % |
-| **PVE-04 `bbox` (standaard)** | 59,7 | **59,7** | **16,8 ms** | **−0,5 %** → **DOEL** |
-| PVE-04 `css` (CSS mask-image) | 50,1 | 48,7 | 33,4 ms | −18,8 % |
-| PVE-04 `bbox` zonder SVG-masker (diagnose) | 60,0 | 60,0 | 16,7 ms | 0 % |
+**Proof-of-concept:** de master → overlaymasker → automatische draft → privémanifest → cockpit met live kaarten, waarden, routes en maskering op de master-compositie (desktop). Mobiel valt terug. De QA keurt de draft terecht af: 13/16 gebieden zijn "TE VLAK". **De draft is geen eindbeeld**; de screenshots zijn alleen privé gedeeld en niet gecommit.
 
-Mobiel 390×844: alle varianten 60 fps bij 1× en 4×. Een eerdere meetrun vóór de compositielaag-fix gaf voor `bbox` 49,3 fps en p95 33,4 ms (WAARSCHUWING); die run toont waar de winst zit. De perftest geeft **WAARSCHUWING** bij 45–49 fps, **DOEL NIET GEHAALD** onder 45 en een **harde fout** onder 30 fps.
+**Bestaande situatie:** de master-WebP staat al publiek op drie branches (`preview/pve-03/reference/…`). Volledig verwijderen vraagt het verwijderen van branches of het herschrijven van de geschiedenis. Dat is een besluit van de eigenaar en is niet uitgevoerd.
 
-### P2-B — WebKit
-- Dezelfde browsersuite draait in **Playwright-WebKit 26.6: 25/25**. Alleen de CDP-prestatiemeting is overgeslagen, omdat die alleen in Chromium bestaat.
-- Er is een **visuele SVG-maskercontrole** bijgekomen: een screenshot met en zonder routelaag, vergeleken op punten op de route.
-
-| Engine | Viewport | Routepunten onder masker zichtbaar | Vrije punten zichtbaar |
-|---|---|---|---|
-| Chromium | 1440 | 0/69 | 221/258 |
-| Chromium | 390 | 0/61 | 166/262 |
-| WebKit | 1440 | 0/70 | 258/258 |
-| WebKit | 390 | 0/61 | 262/262 |
-
-- De canvasmaskering laat in WebKit 0 deeltjespixels onder het masker zien. Terugval, validatie, toetsenbord, reduced motion en twee instanties slagen in WebKit. Via `file://` werken in beide engines scène, masker (`bbox`) en SVG-masker.
-- **Beperkingen:**
-  - Playwright-WebKit op Linux is niet gelijk aan Safari op iOS of macOS: andere GPU-paden, en `backdrop-filter` rendert in WebKit iets transparanter (zie `screenshots/compare-chromium-webkit.jpg`).
-  - **Een echte iPhone-test blijft vereist.**
-  - Voor de terugval is `?svgmask=0` beschikbaar; die zet alleen de lijnmaskering uit (visueel, geen datawijziging).
-
-## 3. Testresultaten (lokaal; Node v22.23.4, Chromium 153.0.8010.12, WebKit 26.6)
+## 5. Testresultaten (lokaal; Node v22.23.4, Chromium 153.0.8010.12, WebKit 26.6)
 
 | Controle | Resultaat |
 |---|---|
 | `node scripts/build.cjs --check` / `node --check energiehuis-card.js` | PASS / PASS |
 | Productie-Node UTC / Amsterdam | **359/359 / 359/359** |
-| Productie-Chromium `mobile-visual`, `regisseur-cockpit`, `stroomvergelijker` | 3× PASS (stroomvergelijker zonder live tarieven) |
-| **PVE-04 Node UTC / Amsterdam** | **70/70 / 70/70** (was 38) |
-| **PVE-04 browser Chromium** | **25/25** (was 21) |
-| **PVE-04 browser WebKit** | **25/25** (1 CDP-meting overgeslagen) |
-| `tests/perf.cjs` | exit 0; standaardvariant DOEL op desktop en mobiel |
+| Productie-Chromium `mobile-visual`, `regisseur-cockpit`, `stroomvergelijker` | 3× PASS (zonder live tarieven) |
+| **PVE-04 Node UTC / Amsterdam** | **79/79 / 79/79** (+9: privacy, overlay-map, weigering van output buiten `private/`, privémanifest, veilige URL's) |
+| **PVE-04 browser Chromium / WebKit** | **26/26 / 26/26** (+1: privélaag synthetisch, mobiele terugval, ontbrekend/onveilig manifest) |
+| `tests/perf.cjs` | desktop en mobiel bij 4×: standaardvariant 60 fps, p95 16,7 ms → DOEL |
 | `tools/build-manifest.cjs --check` | PASS |
 
-Screenshots in `screenshots/`:
-- Chromium en WebKit op 320, 390, 390 bij 200 % tekst, 768, 1330 en 1440 (`*-webkit.jpg` voor WebKit);
-- `compare-chromium-webkit.jpg`, `mask-overlay-desktop.jpg` en `mask-overlay-mobile.jpg`;
-- `metrics.json`, `metrics-webkit.json` en `perf.json`.
+## 6. Productie ongewijzigd
+`git diff --name-only 9357ac9..HEAD` bevat alleen `preview/pve-04/…`. De build-check is byte-identiek en de productietests en -suites zijn groen.
 
-## 4. Productie ongewijzigd
-- `git diff --name-only 83d9cfc..c70b544` bevat alleen `preview/pve-04/…`; `main` staat op `62fa09c`, en `preview/pve-03/` is ongewijzigd.
-- De build-check is byte-identiek en de productietests en -suites zijn groen.
+## 7. Advies voor de volgende stap (1B: echte privé clean plate maken en koppelen)
+1. Eigenaar: het originele master-PNG lokaal beschikbaar maken (niet op GitHub).
+2. Retouche volgens `CLEANPLATE.md` §3, gebied voor gebied, met QA na elke ronde. Begin met de "laag"- en "middel"-gebieden, daarna de vijf "hoog"-gebieden, met lokale generatieve vulling waar nodig.
+3. Occlusiemasker (auto, struiken, paaltjes) en ankerpunten/zones voor de master-compositie vastleggen in `scene-source.json`. Het sjabloon is ingevuld met eerste waarden die nog verfijnd moeten worden, bijvoorbeeld de laadklep aan de achterkant van de auto.
+4. Een besluit over mobiel: een aparte staande master (voorkeur), of een samengestelde compositie.
+5. Een vergelijkingsblad (master, clean plate desktop, clean plate mobiel, volledige cockpit) met scores van 1–5, en daarna het **visuele akkoord van de eigenaar** → `status: approved` in het privémanifest.
+6. Pas daarna, apart en met akkoord, de koppeling in de echte Home Assistant-kaart (productiefase; niet in deze scope).
 
-## 5. Stap 1 — ongewijzigd voorstel (NIET gestart; apart akkoord nodig)
-
-Het voorstel is Blender Cycles lokaal op de GPU van de eigenaar, met twee camera's (2660×1496 en 1080×1920). Per camera komen er:
-- de basisplaat;
-- een occlusiemasker (Cryptomatte of holdout);
-- **ankerpunten, `keyObjects` en maskerkaders**, met hetzelfde projectiescript als de placeholdergenerator; de vorm in `render-output.json` is nu vastgelegd;
-- optioneel `lightLayers`.
-
-Assets: CC0 (Poly Haven, ambientCG), eigen modellen van woning, garage en praktijk, en een gelicentieerd, niet-redactioneel EV-model of eigen foto's. Ruwe bestanden komen nooit op GitHub. Daarna werk ik `uiZones` en `protectedAreas` bij voor de nieuwe compositie, draai ik `build-manifest.cjs`, en blijven UI en tests gelijk.
-
-Nodig van de eigenaar:
-- welke GPU en welk besturingssysteem;
-- budget en akkoord voor het automodel, of eigen foto's;
-- wie modelleert;
-- akkoord om de CC0-assets te downloaden.
-
-Status `approved` komt pas na visueel akkoord van de eigenaar.
-
-## 6. Open punten en risico's
-- Er is geen test op een echte iPhone of in Safari op macOS.
-- Fps zijn headless-metingen; een meting op een echte telefoon ontbreekt.
-- De beschermde gebieden en zones zijn afgestemd op de placeholdercompositie en moeten bij stap 1 opnieuw worden vastgesteld; de tests dwingen dat af.
-- De `css`-maskeringsvariant is niet als standaard gekozen: die is trager in software-rendering en niet pixelverifieerbaar via canvas-uitlezing.
-
-## 7. Reviewvragen (read-only)
-1. Zijn de beschermde gebieden (kern van auto, praktijkpui, panelen, dak/topgevel) de juiste interpretatie van "beschermde visuele gebieden"?
-2. Is de semantiek van `lightLayers` (alleen `always` actief; andere triggers gereserveerd) voldoende als uitbreidingspunt?
-3. Zijn de prestatiedoelen en de meetopzet (3 runs, 1× en 4×, nulmeting PVE-03) akkoord als vaste regressiecontrole?
+## 8. Reviewvragen (read-only)
+1. Is de scheiding openbaar/privé (overlay-map en sjabloon publiek, beeld en maskers privé) zoals gewenst?
+2. Is de mobiele aanpak (aparte staande master als voorkeur, nu terugval op de placeholder) akkoord?
+3. Moet de reeds publieke master-WebP van de branches worden gehaald? Dat vraagt een besluit van de eigenaar over branchverwijdering of het herschrijven van de geschiedenis.

@@ -1,0 +1,192 @@
+{
+  "_uitleg": "SJABLOON (publiek, alleen getallen). Kopieer naar preview/pve-04/private/<map>/scene-source.json, zet de clean-plate-bestanden in <map>/assets/ en draai: node preview/pve-04/tools/build-manifest.cjs --private preview/pve-04/private/<map>. Coördinaten: normalized-image t.o.v. de master (1330x748).",
+  "sceneId": "pve04-private-cleanplate",
+  "status": "placeholder",
+  "statusLabel": "Privébeeldlaag (concept) — niet visueel goedgekeurd",
+  "assetBase": "private/<map>/",
+  "rightsId": "R-PRIVE-MASTER-CLEANPLATE",
+  "rights": {
+    "R-PRIVE-MASTER-CLEANPLATE": {
+      "title": "Clean plate van de goedgekeurde master-afbeelding (privé)",
+      "origin": "Afgeleid van image(20261109-092713).png (master, eigendom/gebruik van de eigenaar) door retouche",
+      "author": "Eigenaar (retouche) / Claude Code (tooling)",
+      "holder": "eelbrethouwer-jpg",
+      "license": "Uitsluitend privégebruik in de eigen Home Assistant",
+      "proof": "Privé bewaard bij de eigenaar (bron-PNG + retouchebestand)",
+      "publicAllowed": false,
+      "visualStatus": "concept — NIET visueel goedgekeurd"
+    }
+  },
+  "compositions": {
+    "desktop": {
+      "minContainerWidth": 700,
+      "natural": {
+        "w": 1330,
+        "h": 748
+      },
+      "budgetBytes": 1572864,
+      "base": [
+        "cleanplate-desktop-1330.webp",
+        "cleanplate-desktop-1330.jpg"
+      ],
+      "masks": [],
+      "anchors": {
+        "pv": {
+          "x": 0.4511,
+          "y": 0.2005
+        },
+        "house": {
+          "x": 0.5188,
+          "y": 0.5348
+        },
+        "cupraPort": {
+          "x": 0.906,
+          "y": 0.5949
+        },
+        "charger": {
+          "x": 0.9308,
+          "y": 0.5307
+        },
+        "practice": {
+          "x": 0.2256,
+          "y": 0.5615
+        }
+      },
+      "keyObjects": {
+        "house": {
+          "x": 0.2481,
+          "y": 0.0535,
+          "w": 0.4737,
+          "h": 0.615
+        },
+        "pv": {
+          "x": 0.3759,
+          "y": 0.0334,
+          "w": 0.2256,
+          "h": 0.254
+        },
+        "garage": {
+          "x": 0.6917,
+          "y": 0.3877,
+          "w": 0.3083,
+          "h": 0.2874
+        },
+        "car": {
+          "x": 0.7053,
+          "y": 0.508,
+          "w": 0.2241,
+          "h": 0.1845
+        },
+        "practice": {
+          "x": 0.0,
+          "y": 0.3583,
+          "w": 0.2902,
+          "h": 0.3369
+        },
+        "charger": {
+          "x": 0.9188,
+          "y": 0.5027,
+          "w": 0.0256,
+          "h": 0.0588
+        }
+      },
+      "protected": [
+        {
+          "id": "car",
+          "from": "car",
+          "inset": [
+            0.15,
+            0.15,
+            0.15,
+            0.15
+          ],
+          "purpose": "Groene auto: carrosserie en ruiten"
+        },
+        {
+          "id": "practice-front",
+          "from": "practice",
+          "inset": [
+            0.35,
+            0.4,
+            0.05,
+            0.1
+          ],
+          "purpose": "Praktijk: verlichte schuifpui"
+        },
+        {
+          "id": "pv",
+          "from": "pv",
+          "inset": [
+            0.15,
+            0.15,
+            0.15,
+            0.15
+          ],
+          "purpose": "Zonnepanelen"
+        },
+        {
+          "id": "house-upper",
+          "from": "house",
+          "inset": [
+            0.35,
+            0.1,
+            0.15,
+            0.5
+          ],
+          "purpose": "Woning: topgevel en grote ramen"
+        }
+      ],
+      "uiZones": [
+        {
+          "id": "pv",
+          "x": 0,
+          "y": 0,
+          "w": 0.35,
+          "h": 0.25,
+          "purpose": "Zonnepanelen-kaart linksboven, naast het dak"
+        },
+        {
+          "id": "practice",
+          "x": 0,
+          "y": 0.25,
+          "w": 0.35,
+          "h": 0.35,
+          "purpose": "Praktijkkaart links, boven het bijgebouw"
+        },
+        {
+          "id": "battery",
+          "x": 0,
+          "y": 0.7,
+          "w": 0.35,
+          "h": 0.3,
+          "purpose": "Virtuele batterij linksonder"
+        },
+        {
+          "id": "house",
+          "x": 0.35,
+          "y": 0.55,
+          "w": 0.3,
+          "h": 0.25,
+          "purpose": "Huiskaart midden op de gevel"
+        },
+        {
+          "id": "net",
+          "x": 0.35,
+          "y": 0.82,
+          "w": 0.3,
+          "h": 0.18,
+          "purpose": "Net midden onder de woning"
+        },
+        {
+          "id": "cupra",
+          "x": 0.65,
+          "y": 0.1,
+          "w": 0.35,
+          "h": 0.45,
+          "purpose": "Cupra-kaart boven de auto"
+        }
+      ],
+      "lightLayers": []
+    }
+  }
+}
