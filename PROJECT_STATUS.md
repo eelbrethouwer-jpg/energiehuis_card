@@ -1,5 +1,33 @@
 # PROJECT_STATUS — Energiehuis
 
+## Actuele status — 9 november 2026
+
+Gecontroleerd door Claude Code via git (`git ls-remote`, lokale checkout) en de GitHub REST-API (releases, check-runs). Werkwijze: zie [`AGENTS.md`](AGENTS.md).
+
+| Onderdeel | Status |
+|---|---|
+| Gecontroleerde `main`-baseline | `7308d3a72de5073f398f26041404d0e400785d0a` — merge van PR #50 (Visual Experience RC), 8 nov 2026 |
+| Versie in broncode | `EH_VERSION = '1.25.0'` (`src/legacy/00-foundation.js`), kaartnaam `Energiehuis v1.25.0` (`src/legacy/02-card-shell.js`) |
+| Versie in HACS-bundel | `energiehuis-card.js`: `1.25.0`; byte-identiek aan `src/` volgens `node scripts/build.cjs --check` |
+| Hoogste geverifieerde tag | `v1.25.0` → commit `1b8ac34` (merge PR #49). Er bestaat ook een afwijkende tag `v1,0,0,` (`0d32530`); niet aangepast |
+| Laatst geverifieerde GitHub-release | `v1.25.0` ("latest", geen draft/prerelease), gepubliceerd 7 nov 2026 22:54 UTC op commit `1b8ac34`. Of HACS-installaties zijn bijgewerkt, is niet uit GitHub af te leiden |
+| PR #50 Visual Experience | Gemerged in `main`; PR-HEAD `61fe095` heeft dezelfde bestandsinhoud als mergecommit `7308d3a`. De Visual Experience RC staat in `main`, maar de versie blijft **1.25.0**: v1.26.0 heeft nog geen versie-update, tag, release of HACS-publicatie |
+| Premium Live Cockpit-preview | Afzonderlijke branch `preview/chatgpt-premium-pve01` (HEAD `7f04771`, gebaseerd op `7308d3a`); wijzigingen uitsluitend onder `preview/pve-01/`. Niet in `main`, geen PR |
+
+**Statusbegrippen voor v1.26.0 Visual Experience RC (in `main`):**
+- **Gebouwd:** ja, in `main` op `7308d3a`.
+- **Automatisch getest:** lokaal op `7308d3a` (9 nov 2026, Node 22): `build.cjs --check` geslaagd, `node --check` geslaagd, `node --test tests/*.test.cjs` 359/359 geslaagd in UTC en Europe/Amsterdam. CI op PR-HEAD `61fe095` (event `pull_request`): v1.7-regressie (UTC en Europe/Amsterdam), v1.15-regressie, Stroomvergelijker-browsercontrole (Chromium) en Energiehuis controles allemaal geslaagd. CI op mergecommit `7308d3a` (event `push`): alleen `Energiehuis controles` (build-check en HACS-validatie), geslaagd; de volledige regressie- en browsersuite draait niet automatisch na merge.
+- **Praktisch getest:** nee, niet vastgelegd (HA/iPhone-acceptatie open).
+- **Gepubliceerd:** nee.
+
+**Eerstvolgende stappen:** praktijkacceptatie van de Visual Experience in Home Assistant/iPhone; daarna een aparte, expliciet goedgekeurde release-PR voor v1.26.0.
+
+---
+
+## Historische statusinformatie (niet actueel)
+
+> De onderstaande blokken zijn **historische momentopnamen** en beschrijven niet de huidige status. Gebruik voor de actuele status uitsluitend het blok hierboven en GitHub.
+
 > **29 oktober 2026 — v1.13.0-rc.2:** na merge van PR #19 gebouwd op main `3c0d653aa756e3457faa3527fd5c7e7588298fec`. Branch `feature/aanbiederstarieven`: aparte aanbiederslijst, bron-/controledatum en conceptbevestiging, prijscomponenten, dynamische teruglevercorrectie en maandkosten. 108 tests + lokale Chromium-test met fictieve tarieven groen. Live raw-GitHub-fetch + browsertoegang en schema met 42 aanbiedingen in GitHub CI geslaagd; HACS en regressies groen. [Draft-PR #20](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/20). Geen EnergyZero-marktprijsintegratie; eigen kale beursprijssensor vereist voor dynamische lijstcontracten. HA/iPhone-praktijkacceptatie open. Zie [RC2-notes](RELEASE_NOTES_v1.13.0_RC2.md). Geen release of installatie uitgevoerd.
 
 > **29 oktober 2026 — v1.13.0-rc.1:** afzonderlijke stroomvergelijker gebouwd op actuele main `3596cf4a047559d5cece01f1b71ba901799b13f0` (codeversie 1.12.1). Branch `feature/stroomvergelijker`, [draft-PR #19](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/19). Bestaande Vattenfall-grafieken behouden. 94 lokale tests en Chromium-browsercontrole op 320/390/768/1280 px geslaagd; praktijkacceptatie HA/iPhone open. Contracten lokaal, JSON-export/import; alleen indicatieve stroomkosten. Geen release/merge/installatie uitgevoerd. Zie [release notes](RELEASE_NOTES_v1.13.0_RC.md). Oudere statusregels hieronder zijn historische momentopnamen.
@@ -10,14 +38,14 @@
 
 > **Momentopname:** 24 oktober 2026. Bij een volgende chat opnieuw actuele GitHub main, releases, PR's en CI controleren. HACS-installatiestatus en iPhone-weergave zijn niet uit GitHub af te leiden.
 
-## Gecontroleerde productiestatus
+### Gecontroleerde productiestatus
 - **Repository:** [eelbrethouwer-jpg/energiehuis_card](https://github.com/eelbrethouwer-jpg/energiehuis_card), standaardbranch `main`.
 - **Laatste gepubliceerde release:** [V1.8.2 — batterijcapaciteitskeuze hersteld](https://github.com/eelbrethouwer-jpg/energiehuis_card/releases/tag/V1.8.2), 24 oktober 2026.
 - **Main-commit bij start v1.9:** `a5f0dcd1d815403140ae67a29cd1ea938d8933ab`.
 - **PR #11:** samengevoegd op 24 oktober 2026. Keuzeknoppen 5/10/15 kWh zitten in main.
 - **HACS daadwerkelijk bijgewerkt / gebruikersacceptatie van v1.8.2:** gebruiker meldt dat publicatie is gedaan; werking op iPhone / HA is niet onafhankelijk geverifieerd.
 
-## In ontwikkeling
+### In ontwikkeling
 - **v1.9.0-rc.1**, branch `feature/v1.9.0-mobile-app-experience`.
 - **Draft-PR:** [#12 – Mobile App Experience](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/12).
 - **Nieuwe code:** mobiele werkbalk, compacte/ruime bediening, responsieve dichtheid, conservatieve offlinewaarschuwing, zichtbaarheidsgestuurde vaste bottomnav met sticky fallback.
@@ -26,14 +54,14 @@
 - **CI / handmatige teststatus:** automatische GitHub-controles gestart; uiteindelijke uitkomst en mobiele praktijkwerking nog verifiëren.
 - **V1.9.0 NIET gereleased, nog niet geïnstalleerd in HACS.**
 
-## Architectuurbesluit
+### Architectuurbesluit
 1. Bestaande HACS/Lovelace-kaart blijft werken en ontvangt zijn `hass`-context van Home Assistant.
 2. Alleen frontendwijzigingen in v1.9 RC; geen nieuwe Home Assistant-entiteiten, Alfen/Cupra-commando's of wijziging aan load balancing.
 3. Zelfstandige PWA is **nog geen werkend product**. Pas bouwen na aparte test van HTTPS, same-origin routing, Home Assistant-authenticatie, scopes en beperkte caching.
 4. Geen tokens of meetgeschiedenis in browseropslag; alleen compacte/ruime UI-voorkeur.
 5. `mobile_fixed_navigation: false` kan vaste navigatie uitschakelen bij meerdere dashboardkaarten.
 
-## Acceptatiecriteria vóór release
+### Acceptatiecriteria vóór release
 - CI volledig groen; code op PR diff inspecteren.
 - Op iPhone Safari en HA Companion: overzicht, Cupra, slim laden, batterij, kosten, meer, grafiekinteractie, scrollen en compact/ruim.
 - Android Chrome, kleine telefoonbreedtes en safe-area.
@@ -42,8 +70,8 @@
 - 5/10/15 kWh-capaciteitselectie blijft bruikbaar.
 - Nogmaals controleren: echte sensordata versus simulaties, Zonneplan-contractstart 1 nov 2026, budgetdoel <€200/maand.
 
-## Eerstvolgende stap
+### Eerstvolgende stap
 PR #12 CI nakijken en eventuele regressies herstellen. Daarna praktijkacceptatie op mobiele apparaten. Pas bij groen resultaat en expliciete releasekeuze PR mergen en definitieve `v1.9.0` releasen.
 
-## Werkafspraak
+### Werkafspraak
 Eén chat per release/bugfix; nieuwe chat start met dit bestand en actuele GitHub-controle. Maak onderscheid tussen **gebouwd**, **automatisch getest**, **praktisch getest** en **gepubliceerd**.

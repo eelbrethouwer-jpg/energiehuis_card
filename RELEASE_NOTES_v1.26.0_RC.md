@@ -1,6 +1,6 @@
 # Energiehuis v1.26.0 — Visual Experience (releasekandidaat)
 
-**Status: PR / NIET MERGEN, TAGGEN OF PUBLICEREN.** De actieve `EH_VERSION` en HACS-kaartregistratie blijven bewust op v1.25.0 zolang dit uitsluitend een ontwerp-PR is.
+**Status (bijgewerkt 9 november 2026): PR #50 is gemerged in `main` (mergecommit `7308d3a`); NIET TAGGEN OF PUBLICEREN.** De Visual Experience RC staat in `main`, maar v1.26.0 heeft nog geen definitieve versie-update, tag, release of HACS-publicatie. De actieve `EH_VERSION` en HACS-kaartregistratie staan nog op v1.25.0.
 
 ## Doel
 Een rustige, levendige, mobile-first energie-app in plaats van zes afzonderlijke schermen met herhaalde kaarten. De herinrichting bouwt voort op de eerste EnergieRegisseur-cockpit van v1.25.0.
