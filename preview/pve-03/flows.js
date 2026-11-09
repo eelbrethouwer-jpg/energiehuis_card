@@ -165,14 +165,16 @@
       const still = !animating();
       for (const r of Object.values(R)) {
         const target = r.active ? 1 : 0;
-        r.alpha += (target - r.alpha) * Math.min(1, dt * 4); // passieve fade, geen claim
+        r.alpha += (target - r.alpha) * Math.min(1, dt * (r.active ? 4 : 6)); // passieve fade, geen claim
         if (!r.active && dt === 0) r.alpha = still ? 0 : r.alpha;
         if (still || !r.poly || r.alpha < 0.01) continue;
         const speed = (40 + 140 * r.intensity) / Math.max(120, r.poly.length); // fractie per seconde
         const img = sprite(STYLE[r.id].color), s = 10 + 10 * r.intensity;
         ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < r.phase.length; i++) {
-          r.phase[i] = (r.phase[i] + dt * speed) % 1;
+          // Alleen een actieve route beweegt. Bij ongeldig/verouderd/offline staan de deeltjes
+          // onmiddellijk stil en doven ze passief uit op hun plek (geen richtingsclaim).
+          if (r.active) r.phase[i] = (r.phase[i] + dt * speed) % 1;
           const q = at(r.poly, r.phase[i]);
           const fade = Math.min(1, r.phase[i] * 6, (1 - r.phase[i]) * 6);
           ctx.globalAlpha = r.alpha * fade * (STYLE[r.id].dashed ? 0.55 : 0.95);

@@ -24,6 +24,9 @@
     crossDiffW: 150,    // max. afwijking net + zon − Cupra t.o.v. huissensor
     houseNegW: -50,     // huissensor onder −50 W is ongeldig
     maxW: 9200,         // 1×40 A ≈ 9,2 kW: schaal voor intensiteit
+    evMaxW: 11500,      // laadmeting boven ~11,5 kW (3×16 A) is fysiek onwaarschijnlijk voor 1×40 A
+    // Tijdstempels tot 120 s in de toekomst worden geaccepteerd (klokverschil tussen bron en
+    // weergave). Meer dan 120 s in de toekomst ⇒ 'stale' ("Tijdstempel onbekend"): nooit actief.
     futureToleranceMs: 120000
   });
 
@@ -99,6 +102,12 @@
     if (a < 10000) return (a / 1000).toFixed(2).replace('.', ',') + ' kW';
     return (a / 1000).toFixed(1).replace('.', ',') + ' kW';
   }
+  /** Netvermogen met teken: teruglevering krijgt een minteken (−), afname geen teken. */
+  function formatNet(importW, direction) {
+    if (!Number.isFinite(importW)) return '—';
+    const s = formatPower(importW);
+    return direction === 'export' && s !== '0 W' ? '\u2212' + s : s;
+  }
   const formatPct = p => Number.isFinite(p) ? Math.round(p) + ' %' : '—';
 
   function gridDirection(importW, prevDir) {
@@ -142,7 +151,13 @@
       warnings.push({ code: 'house-negative', critical: true, text: 'Huissensor is negatief: P1-richting of huisformule controleren.' });
     }
     const pv = cur(r.pv) ? r.pv.value : null;
-    const ev = cur(r.ev) ? r.ev.value : null;
+    // Laadmeting: negatief (< −30 W) of onwaarschijnlijk hoog is ongeldig. Nooit als positief
+    // laadvermogen of als actieve laadsessie tonen; |P| < 30 W telt als 0 W.
+    let evInvalid = null;
+    if (cur(r.ev) && r.ev.value < -T.zeroW) evInvalid = 'Ongeldige laadmeting (negatief)';
+    else if (cur(r.ev) && r.ev.value > T.evMaxW) evInvalid = 'Ongeldige laadmeting (te hoog)';
+    if (evInvalid) warnings.push({ code: 'ev-invalid', critical: false, text: evInvalid + ': Cupra-route en balans uitgeschakeld.' });
+    const ev = cur(r.ev) && !evInvalid ? Math.max(0, r.ev.value) : null;
     let balance = 'onbekend';
     if (importW !== null && pv !== null && ev !== null && house !== null && !houseInvalid) {
       const calc = importW + pv - ev;
@@ -161,7 +176,7 @@
       'sun-home': { ok: pv !== null && pv >= T.routeMinW, w: pv, why: cur(r.pv) ? 'Onder 30 W' : r.pv.reason },
       'grid-home': { ok: direction === 'import', w: importW, why: cur(r.net) ? 'Geen netafname' : r.net.reason },
       'home-grid': { ok: direction === 'export', w: importW === null ? null : -importW, why: cur(r.net) ? 'Geen teruglevering' : r.net.reason },
-      'home-ev': { ok: ev !== null && ev >= T.routeMinW, w: ev, why: cur(r.ev) ? 'Cupra laadt niet' : r.ev.reason },
+      'home-ev': { ok: ev !== null && ev >= T.routeMinW, w: ev, why: evInvalid || (cur(r.ev) ? 'Cupra laadt niet' : r.ev.reason) },
       'home-practice': { ok: practiceSim && r.practice.value >= T.routeMinW, w: practiceSim ? r.practice.value : null, why: r.practice.state === 'unlinked' ? 'Nog niet gekoppeld' : 'Geen simulatie' }
     };
     const routes = {};
@@ -184,13 +199,15 @@
     tiles.pv = { title: 'Zonnepanelen', value: pv !== null && pv >= 0 ? formatPower(pv) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: SPECS.pv.entity };
     tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: 'Simulatie · geen fysieke opslag', tone: 'sim', entity: SPECS.battery.entity };
     tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (house !== null ? formatPower(house) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: SPECS.house.entity };
-    const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname' : direction === 'export' ? 'Teruglevering' : 'In balans';
-    tiles.net = { title: 'Net', value: importW === null ? '—' : formatPower(importW), sub: netSub, tone: tone(r.net), direction, entity: SPECS.net.entity, p1Sign };
+    const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
+    tiles.net = { title: 'Net', value: importW === null ? '—' : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: SPECS.net.entity, p1Sign };
     tiles.practice = practiceSim
       ? { title: 'Praktijkruimte', value: formatPower(r.practice.value), sub: 'SIMULATIE · niet gemeten', tone: 'sim', entity: '—' }
       : { title: 'Praktijkruimte', value: '—', sub: 'Nog niet gekoppeld', tone: 'muted', entity: '—' };
-    const cupraLabel = (input.cupra && input.cupra.label) || (ev !== null && ev >= T.routeMinW ? 'Laden' : 'Niet aan het laden');
-    tiles.cupra = { title: 'Cupra Born', value: ev !== null ? formatPower(ev) : '—', soc: val(r.soc, formatPct), sub: cur(r.ev) ? cupraLabel : r.ev.reason, tone: tone(r.ev), entity: SPECS.ev.entity };
+    const charging = routes['home-ev'].active;
+    const cu = input.cupra || {};
+    const cupraLabel = charging ? (cu.label || 'Laden') : (cu.idleLabel || 'Niet aan het laden');
+    tiles.cupra = { title: 'Cupra Born', value: evInvalid ? '—' : (ev !== null ? formatPower(ev) : '—'), soc: val(r.soc, formatPct), sub: evInvalid || (cur(r.ev) ? cupraLabel : r.ev.reason), tone: evInvalid ? 'bad' : tone(r.ev), charging, entity: SPECS.ev.entity };
 
     // ---- status en samenvatting
     let status;
@@ -235,8 +252,8 @@
   const SCENARIOS = Object.freeze([
     { id: 'zon-export', label: 'Zon & teruglevering', make: now => ({ states: { net: W(-1880, 2, now), pv: W(4820, 2, now), house: W(1460, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden op zonne-overschot' } }) },
     { id: 'net-laden', label: 'Netafname & laden', make: now => ({ states: { net: W(7600, 2, now), pv: W(120, 2, now), house: W(520, 3, now), ev: W(7200, 2, now), soc: PCT(38, 120, now), battery: PCT(15, 60, now) }, cupra: { label: 'Laden (goedkoop uurtarief)' } }) },
-    { id: 'zon-huis', label: 'Zon dekt huis', make: now => ({ states: { net: W(-300, 2, now), pv: W(2100, 2, now), house: W(1800, 3, now), ev: W(0, 2, now), soc: PCT(81, 120, now), battery: PCT(90, 60, now) }, cupra: { label: 'Verbonden, niet aan het laden' } }) },
-    { id: 'nacht', label: 'Nacht', make: now => ({ states: { net: W(420, 2, now), pv: W(0, 2, now), house: W(420, 3, now), ev: W(0, 2, now), soc: PCT(80, 300, now), battery: PCT(22, 60, now) }, cupra: { label: 'Niet verbonden' } }) },
+    { id: 'zon-huis', label: 'Zon dekt huis', make: now => ({ states: { net: W(-300, 2, now), pv: W(2100, 2, now), house: W(1800, 3, now), ev: W(0, 2, now), soc: PCT(81, 120, now), battery: PCT(90, 60, now) }, cupra: { idleLabel: 'Verbonden, niet aan het laden' } }) },
+    { id: 'nacht', label: 'Nacht', make: now => ({ states: { net: W(420, 2, now), pv: W(0, 2, now), house: W(420, 3, now), ev: W(0, 2, now), soc: PCT(80, 300, now), battery: PCT(22, 60, now) }, cupra: { idleLabel: 'Niet verbonden' } }) },
     { id: 'offline', label: 'Offline', make: now => ({ connected: false, states: { net: W(420, 2, now), pv: W(0, 2, now), house: W(420, 3, now), ev: W(0, 2, now), soc: PCT(80, 300, now), battery: PCT(22, 60, now) } }) },
     { id: 'verouderd', label: 'Verouderde P1', make: now => ({ states: { net: W(-1880, 900, now), pv: W(4820, 2, now), house: W(1460, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden' } }) },
     { id: 'onbekende-eenheid', label: 'Onbekende eenheid', make: now => ({ states: { net: W(-1880, 2, now), pv: W(4820, 2, now, 'Wh'), house: W(1460, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden' } }) },
@@ -244,7 +261,8 @@
     { id: 'p1-fout', label: 'P1 omgekeerd (niet gecorrigeerd)', make: now => ({ config: { p1Sign: 'import_positive' }, states: { net: W(1880, 2, now), pv: W(4820, 2, now), house: W(1460, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden' } }) },
     { id: 'huis-negatief', label: 'Negatieve huissensor', make: now => ({ states: { net: W(-1880, 2, now), pv: W(4820, 2, now), house: W(-350, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden' } }) },
     { id: 'praktijk-sim', label: 'Praktijk (simulatie)', make: now => ({ states: { net: W(-1230, 2, now), pv: W(4820, 2, now), house: W(2110, 3, now), ev: W(1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now), practice: { state: '650', attributes: { unit_of_measurement: 'W' }, last_updated: new Date(now - 2000).toISOString(), simulated: true } }, cupra: { label: 'Laden op zonne-overschot' } }) },
-    { id: 'grote-waarden', label: 'Grote waarden & lange labels', make: now => ({ states: { net: W(-9870, 2, now), pv: W(12345, 2, now), house: W(2475, 3, now), ev: W(0, 2, now), soc: PCT(100, 120, now), battery: PCT(100, 60, now) }, cupra: { label: 'Laden gepauzeerd door laadpaal — wacht op goedkoper tarief en voldoende zonne-overschot' } }) }
+    { id: 'grote-waarden', label: 'Grote waarden & lange labels', make: now => ({ states: { net: W(-9870, 2, now), pv: W(12345, 2, now), house: W(2475, 3, now), ev: W(0, 2, now), soc: PCT(100, 120, now), battery: PCT(100, 60, now) }, cupra: { idleLabel: 'Laden gepauzeerd door laadpaal — wacht op goedkoper tarief en voldoende zonne-overschot' } }) },
+    { id: 'ev-negatief', label: 'Negatieve laadmeting', make: now => ({ states: { net: W(-1880, 2, now), pv: W(4820, 2, now), house: W(1460, 3, now), ev: W(-1480, 2, now), soc: PCT(64, 120, now), battery: PCT(72, 60, now) }, cupra: { label: 'Laden' } }) }
   ]);
   const SCENARIO_IDS = Object.freeze(SCENARIOS.map(s => s.id));
 
@@ -273,5 +291,5 @@
     return { now, connected: j.connected !== false, config: j.config || {}, states: j.states, cupra: j.cupra || {} };
   }
 
-  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, formatPower, formatPct, gridDirection, computeModel, scenarioInput, ageLabel });
+  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, formatPower, formatNet, formatPct, gridDirection, computeModel, scenarioInput, ageLabel });
 });

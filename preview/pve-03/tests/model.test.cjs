@@ -35,7 +35,8 @@ test('zon & teruglevering: zon→huis, huis→net en huis→Cupra actief', () =>
   const m = run('zon-export');
   assert.deepEqual(active(m), ['home-ev', 'home-grid', 'sun-home']);
   assert.equal(m.grid.direction, 'export');
-  assert.equal(m.tiles.net.sub, 'Teruglevering');
+  assert.equal(m.tiles.net.value, '\u22121,88 kW');
+  assert.equal(m.tiles.net.sub, 'Teruglevering aan het net');
   assert.equal(m.tiles.pv.value, '4,82 kW');
 });
 
@@ -167,7 +168,95 @@ test('50 schommel-updates: balans blijft sluiten, routes blijven stabiel (geen f
 test('lange labels en grote waarden blijven tekst (geen afkapping in het model)', () => {
   const m = run('grote-waarden');
   assert.equal(m.tiles.pv.value, '12,3 kW');
-  assert.equal(m.tiles.net.value, '9,87 kW');
+  assert.equal(m.tiles.net.value, '\u22129,87 kW');
   assert.ok(m.tiles.cupra.sub.length > 60);
   assert.equal(m.tiles.cupra.soc, '100 %');
+});
+
+// ---------------------------------------------------------------- reviewcorrecties (ChatGPT, b0322af)
+const withEv = (state, label = 'Laden') => {
+  const input = M.scenarioInput('zon-export', NOW);
+  input.states.ev = { state: String(state), attributes: { unit_of_measurement: 'W' }, last_updated: new Date(NOW - 2000).toISOString() };
+  input.cupra = { label };
+  return M.computeModel(input);
+};
+
+test('negatieve EV-meting: nooit als positief vermogen of actieve laadsessie', () => {
+  for (const v of [-1480, -31, -7400]) {
+    const m = withEv(v);
+    assert.equal(m.routes['home-ev'].active, false, v);
+    assert.equal(m.routes['home-ev'].watts, null, v);
+    assert.equal(m.tiles.cupra.value, '—', v);
+    assert.equal(m.tiles.cupra.charging, false, v);
+    assert.match(m.tiles.cupra.sub, /Ongeldige laadmeting \(negatief\)/, v);
+    assert.doesNotMatch(m.tiles.cupra.sub, /^Laden/, v);
+    assert.equal(m.tiles.cupra.tone, 'bad');
+    assert.equal(m.balance, 'onbekend', 'ongeldige EV telt niet mee in de balans');
+    assert.doesNotMatch(m.summary, /Cupra laadt/);
+  }
+  const sc = run('ev-negatief');
+  assert.equal(sc.routes['home-ev'].active, false);
+  assert.ok(sc.warnings.some(w => w.code === 'ev-invalid'));
+});
+
+test('EV binnen de nulband (−29…29 W) is 0 W en niet laden; onwaarschijnlijk hoog is ongeldig', () => {
+  for (const v of [-29, -1, 0, 12]) {
+    const m = withEv(v);
+    assert.equal(m.tiles.cupra.value, '0 W', v);
+    assert.equal(m.routes['home-ev'].active, false, v);
+    assert.equal(m.tiles.cupra.sub, 'Niet aan het laden', 'fixture-label “Laden” mag niet zonder laadvermogen');
+  }
+  const hi = withEv(25000);
+  assert.equal(hi.routes['home-ev'].active, false);
+  assert.equal(hi.tiles.cupra.value, '—');
+  assert.match(hi.tiles.cupra.sub, /te hoog/);
+});
+
+test('ongeldige EV-waarden (unavailable, kWh, verouderd) geven geen laadsessie', () => {
+  const base = M.scenarioInput('zon-export', NOW);
+  for (const st of [
+    { state: 'unavailable', attributes: { unit_of_measurement: 'W' }, last_updated: new Date(NOW).toISOString() },
+    { state: '1480', attributes: { unit_of_measurement: 'kWh' }, last_updated: new Date(NOW).toISOString() },
+    { state: '1480', attributes: { unit_of_measurement: 'W' }, last_updated: new Date(NOW - 5 * 60000).toISOString() }
+  ]) {
+    const input = { ...base, states: { ...base.states, ev: st } };
+    const m = M.computeModel(input);
+    assert.equal(m.routes['home-ev'].active, false, st.state);
+    assert.equal(m.tiles.cupra.value, '—');
+    assert.equal(m.tiles.cupra.charging, false);
+  }
+});
+
+test('net: teruglevering met minteken (U+2212) én richtingstekst; afname zonder teken; balans 0 W', () => {
+  assert.equal(M.formatNet(-1880, 'export'), '−1,88 kW');
+  assert.equal(M.formatNet(7600, 'import'), '7,60 kW');
+  assert.equal(M.formatNet(20, 'balance'), '0 W');
+  assert.equal(M.formatNet(NaN, null), '—');
+  const e = run('zon-export'), i = run('net-laden'), c = run('p1-omgekeerd');
+  assert.ok(e.tiles.net.value.startsWith('−')); assert.match(e.tiles.net.sub, /Teruglevering/);
+  assert.ok(!i.tiles.net.value.startsWith('−')); assert.match(i.tiles.net.sub, /Afname/);
+  assert.equal(c.tiles.net.value, '−1,88 kW', 'gecorrigeerde P1 toont ook export met minteken');
+  // fout geconfigureerde P1: geen routes, ook al toont de tegel de (foute) richting
+  assert.equal(run('p1-fout').routes['home-grid'].active, false);
+});
+
+test('toekomstige brontijdstempels: tot 120 s geaccepteerd, daarboven verouderd en nooit actief', () => {
+  const spec = M.SPECS.pv, mk = s => ({ state: '4820', attributes: { unit_of_measurement: 'W' }, last_updated: new Date(NOW + s * 1000).toISOString() });
+  assert.equal(M.T.futureToleranceMs, 120000);
+  assert.equal(M.readEntity(mk(60), spec, NOW).state, 'live');
+  assert.equal(M.readEntity(mk(119), spec, NOW).state, 'live');
+  assert.equal(M.readEntity(mk(121), spec, NOW).state, 'stale');
+  const input = M.scenarioInput('zon-export', NOW); input.states.pv = mk(3600);
+  assert.equal(M.computeModel(input).routes['sun-home'].active, false);
+  assert.ok(!Object.keys(M).some(k => /verif/i.test(k)), 'geen live-verificatievlaggen');
+});
+
+test('scenario-overgangen: geen route blijft hangen bij wissel naar offline/stale/negatief', () => {
+  let prev = run('zon-export');
+  for (const id of ['offline', 'verouderd', 'ev-negatief', 'huis-negatief', 'p1-fout', 'nacht', 'zon-export']) {
+    const m = M.computeModel(M.scenarioInput(id, NOW), prev);
+    const expected = M.computeModel(M.scenarioInput(id, NOW));
+    assert.deepEqual(active(m), active(expected), id + ' na ' + (prev && Object.keys(prev.routes).join()));
+    prev = m;
+  }
 });
