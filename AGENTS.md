@@ -44,7 +44,7 @@ TZ=Europe/Amsterdam node --test tests/*.test.cjs
 
 ## 6. Merge, tag, release en publicatie
 - **Geen merge, tag, release of HACS-publicatie zonder expliciet akkoord** van de eigenaar (`eelbrethouwer-jpg`) voor die specifieke actie.
-- Let op: de workflows `publish-v1xx.yml` voor v1.15–v1.24.1 publiceren automatisch bij een push naar `main` die het bijbehorende `RELEASE_NOTES_v<versie>.md` wijzigt. Raak die release notes niet aan zonder releaseopdracht. `publish-v1250.yml` werkt alleen handmatig met bevestigingstekst.
+- De 14 historische `publish-v*.yml`-workflows voor v1.15.0–v1.24.1 zijn buiten werking gesteld: geen `push`-trigger, publicatiejob permanent geblokkeerd en alleen leesrechten. Schakel ze niet opnieuw in. Voor nieuwe releases is een afzonderlijk gereviewde, handmatige publicatieworkflow met expliciete bevestiging vereist. `publish-v1250.yml` blijft handmatig en is niet gewijzigd.
 - Versie-updates (`EH_VERSION` en de kaartnaam in `src/`) horen in een aparte release-PR.
 
 ## 7. Statusbegrippen

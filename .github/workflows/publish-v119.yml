@@ -1,16 +1,16 @@
+# RETIRED: no automatic trigger, no write permission, and the publish job is disabled.
+# Retained for historical audit; use the reviewed manual release process instead.
 name: Publish Energiehuis v1.19.0 after validation
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'RELEASE_NOTES_v1.19.0.md'
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate-and-release:
+    if: ${{ false }} # Retired legacy publishing job; cannot run
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
