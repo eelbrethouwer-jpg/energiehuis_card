@@ -1,102 +1,131 @@
-# Overdracht aan ChatGPT — PVE-04 stap 0 (beeldinfrastructuur)
+# Overdracht aan ChatGPT — PVE-04 stap 0, correctieronde
 
-**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. De scènelaag is een **placeholder** en is **niet visueel goedgekeurd**.
-Opgesteld door Claude Code, 9 november 2026.
+**Status: DEMO — niet productie.** Geen PR, merge, tag, release of HACS-publicatie. De scènelaag blijft **placeholder, niet visueel goedgekeurd**. Fotorealisme blijft een harde eis voor stap 1.
+Opgesteld door Claude Code, 9 november 2026. Reactie op de ChatGPT-review van `83d9cfc` (GO MET OPMERKINGEN).
 
 ## 1. Branch, baseline, commits, diff
 
 | | |
 |---|---|
-| Branch | `preview/claude-premium-pve04` (nieuw, vanaf `cae8edf`) |
-| Technische basis | PVE-03 `cae8edf7d087fb4d285430a00d3a9b88866145c7` |
+| Branch | `preview/claude-premium-pve04` |
+| Verplichte uitgangs-HEAD | `83d9cfc9402275ba6dc680535eacd4c4f3653995` (gecontroleerd: remote = lokaal vóór aanvang) |
 | `main` | `62fa09cbd6dd3c4d481c0669c9cbac4f8a39aae9` (ongewijzigd) |
-| Implementatie stap 0 | `180f1bd` |
-| HEAD na deze overdracht | de commit die dit bestand toevoegt (direct na `180f1bd`) |
+| Correcties | `c70b544` — manifest v2, validatie, performance, WebKit |
+| HEAD na deze overdracht | de commit die dit bestand bijwerkt (direct na `c70b544`) |
 
-Diff `cae8edf..180f1bd`: 37 bestanden, **+3293 / −0, uitsluitend nieuwe bestanden in `preview/pve-04/`**. `preview/pve-03/` en alle productiebestanden zijn ongewijzigd (`git diff --stat cae8edf -- . ':!preview/pve-04'` is leeg).
+Diff `83d9cfc..c70b544`: 32 bestanden, +1509 / −55, **uitsluitend `preview/pve-04/`**. De beeldbestanden zijn opnieuw gegenereerd en byte voor byte gecontroleerd: alle 10 zijn **identiek** (SHA-256 ongewijzigd). Alleen `tools/render-output.json` kreeg objectkaders en maskerkaders.
 
-## 2. Implementatie
+**Omgeving (geen repo-wijziging):**
+- Er is een persoonlijke cloudomgeving "energiehuis_card" aangemaakt, met akkoord van de eigenaar via de goedkeuringsprompt. Die staat de Playwright-downloadhosts `cdn.playwright.dev` en `playwright.download.prss.microsoft.com` toe.
+- Playwright WebKit 26.6 en de systeembibliotheken zijn in de container geïnstalleerd.
+- `package.json`, lockfiles en dependencies zijn niet gewijzigd.
 
-| Eis stap 0 | Uitvoering |
-|---|---|
-| Assetmanifest met SHA-256 en herkomst | `scene-manifest.js`, gegenereerd door `tools/build-manifest.cjs` uit de echte bestanden: type, afmetingen, alfa, bytes, SHA-256, rechten-ID, budget, ankerpunten, status. `--check` faalt bij elk gewijzigd byte (gecontroleerd met een tijdelijke manipulatie). |
-| Licentiebewijs per asset | `ASSET_RIGHTS.md` + `tools/rights.json`; verplichte velden; tests eisen een rechtenregel en de SHA-256 in `ASSET_RIGHTS.md` per asset. |
-| Geen betaalde ruwe modellen op GitHub | `preview/pve-04/.gitignore` blokkeert o.a. `.blend .fbx .obj .glb .gltf .usd* .exr .hdr .psd .zip`; een test faalt op elk zo'n bestand en op elk ongeregistreerd bestand in `assets/` (beide getest met een tijdelijk bestand). |
-| Desktop- en mobiele ankerpunten en maskers | Per compositie in het manifest; occlusiemaskers `mask-desktop-1330.png` en `mask-mobile-540.png` (alfa = voorgrond: auto + laadkabel, hortensia's, haag, potten, paaltjes), gegenereerd in dezelfde render als de placeholderlaag en dus pixelgenauw. |
-| Deeltjes achter objecten, niet achter UI | Canvas: `destination-out` met het masker; SVG-routelijnen: `<mask>` met geïnverteerd masker. Kaarten liggen in een hogere laag (z-index 2 > 1). |
-| Manifest lokaal zonder netwerk | Gewoon `<script>` met data; werkt via `http.server` én `file://`. Test: geen fetch/XHR/import/URL's, alleen relatieve paden. |
-| Fallbackgedrag | Geen manifest ⇒ "Scènelaag ontbreekt — alleen interface"; beeldlaag kapot ⇒ "Beeldlaag kon niet laden — alleen interface"; masker kapot ⇒ geen maskering (alleen visueel). Status `placeholder` ⇒ permanente melding "Tijdelijk beeld — niet visueel goedgekeurd". |
-| Assetbudgetten | Desktop ≤ 1,5 MB, mobiel ≤ 1 MB (grootste startlaag + maskers, ook voor de JPEG-terugval). Nu: desktop 133 000 + 41 420 B, mobiel 63 054 + 22 418 B. |
-| Ontwerpbesluiten | Virtuele batterij **linksonder** (desktop), Cupra-kaart bij de auto, routekleuren volgens het contract. |
-| Geen wijziging productie/meetveiligheid | `model.js` ongewijzigd t.o.v. PVE-03 (alleen globale naam `EhPve04Model`); geen HA, geen opslag, geen laadbediening. |
+## 2. Correcties
 
-## 3. Testresultaten (lokaal, Node v22.23.4, Chromium 153.0.8010.12)
+### P1-A — Manifest v2 (v1 blijft geldig)
+- **Coördinatenstelsel:** `coordinateSystem.id = "normalized-image"`: fracties 0..1 van de natuurlijke beeldmaat, oorsprong linksboven, x naar rechts, y naar beneden, omzetting via gecentreerde `object-fit: cover`.
+- **`uiZones`:** per compositie zes zones waarin het kaartmidden moet liggen. Ze overlappen niet (getest).
+- **`keyObjects`:** kaders voor woning, garage, auto, praktijk, panelen en wandlader, **geprojecteerd vanuit de 3D-scène**. Objecten volledig buiten beeld staan in `outOfView`; op mobiel is dat de wandlader.
+- **`protectedAreas`:** dit vervangt de starre 10 %-grens. De herkenbare kern van auto, praktijkpui, panelen en dak/topgevel is beschermd, met marges per object. **Geen enkele kaart raakt een beschermd gebied** op 320, 390, 768, 1330 en 1440 px, in Chromium én WebKit.
+- **`lightLayers`:** optioneel en uitbreidbaar. Extra velden zijn toegestaan; de runtime toont nu alleen trigger `always` en negeert onbekende triggers (getest met een testmanifest).
+- **Maskerkaders** (`masks[].bbox`): berekend in de generator uit de maskerpixels.
+
+### P1-B — Runtimevalidatie
+- **Validator:** `manifest-validate.js` → `validateManifest(mf)` geeft `{ok, version, errors}` en **gooit nooit**; getest met een getter die gooit, met `null`, een getal en een array.
+- **Wat er gecontroleerd wordt:**
+  - schema v1/v2, status en `statusLabel`, rechten;
+  - beide composities, en `natural` als positieve gehele getallen;
+  - `base` niet leeg en met WebP en JPEG;
+  - per beeld bestand, type, extensie, afmetingen, beeldverhouding, bytes, SHA-256 en rechten-ID;
+  - per masker PNG, `alpha:true`, `semantics` en `id`;
+  - **veilige paden** (alleen `assets/<naam>`; geen `..`, `/`, `//`, schema's of submappen);
+  - de verplichte ankers als eindige getallen;
+  - de v2-velden.
+- **Runtime:** `app.js` valideert vóór het opbouwen. Bij een ongeldig manifest verschijnt "Scènemanifest ongeldig — alleen interface", worden scène en routes verborgen en blijven waarden en kaarten werken. Er treden geen excepties op, in Chromium noch WebKit.
+- **Tests:** **25 negatieve tests** (er waren er minimaal 12 gevraagd). Daaronder: geen of lege `base`, geen JPEG, `natural` ontbrekend of 0, compositie ontbrekend, masker zonder `alpha` of `semantics` of als JPEG, `..`-pad, absolute URL, `javascript:`, pad buiten `assets/`, verkeerde extensie, ongeldige SHA-256, ontbrekend of NaN-anker, zone buiten beeld of ontbrekend, en een onbekende rechten-ID.
+
+### P2-A — Performance
+- **Oorzaak:** gemeten, niet aangenomen. De grootste kostenpost was de SVG-routelaag met masker, die elk frame opnieuw werd gerasterd omdat het canvas erboven veranderde. Daarnaast kostte het per frame herschalen van het volledige masker.
+- **Oplossing:**
+  1. maskeringsmodus `bbox` (standaard): het masker wordt één keer per resize voorgeschaald naar canvaspixels, en per frame snijdt `destination-out` alleen het maskerkader weg (~21 % van de desktopscène);
+  2. `will-change: transform` geeft de SVG- en canvaslaag elk een eigen compositielaag.
+- **Correctheid ongewijzigd:** de pixeltest blijft 0, de visuele SVG-test blijft 0, en reduced motion en routeveiligheid zijn ongewijzigd.
+- **Meting** (`tests/perf.cjs --write` → `screenshots/perf.json`): Chromium headless, DPR 1, scenario praktijk-sim (4 routes), schommeling uit, 3 runs van 3 s per meting.
+
+| Variant (desktop 1440×900) | 1× fps | 4× fps | p95 4× | Δ t.o.v. PVE-03 (4×) |
+|---|---|---|---|---|
+| PVE-03, geen masker (nulmeting) | 60,0 | 60,0 | 16,8 ms | — |
+| PVE-04 `full` (methode vorige ronde) | 59,7 | **38,6** | 33,4 ms | −35,7 % |
+| **PVE-04 `bbox` (standaard)** | 59,7 | **59,7** | **16,8 ms** | **−0,5 %** → **DOEL** |
+| PVE-04 `css` (CSS mask-image) | 50,1 | 48,7 | 33,4 ms | −18,8 % |
+| PVE-04 `bbox` zonder SVG-masker (diagnose) | 60,0 | 60,0 | 16,7 ms | 0 % |
+
+Mobiel 390×844: alle varianten 60 fps bij 1× en 4×. Een eerdere meetrun vóór de compositielaag-fix gaf voor `bbox` 49,3 fps en p95 33,4 ms (WAARSCHUWING); die run toont waar de winst zit. De perftest geeft **WAARSCHUWING** bij 45–49 fps, **DOEL NIET GEHAALD** onder 45 en een **harde fout** onder 30 fps.
+
+### P2-B — WebKit
+- Dezelfde browsersuite draait in **Playwright-WebKit 26.6: 25/25**. Alleen de CDP-prestatiemeting is overgeslagen, omdat die alleen in Chromium bestaat.
+- Er is een **visuele SVG-maskercontrole** bijgekomen: een screenshot met en zonder routelaag, vergeleken op punten op de route.
+
+| Engine | Viewport | Routepunten onder masker zichtbaar | Vrije punten zichtbaar |
+|---|---|---|---|
+| Chromium | 1440 | 0/69 | 221/258 |
+| Chromium | 390 | 0/61 | 166/262 |
+| WebKit | 1440 | 0/70 | 258/258 |
+| WebKit | 390 | 0/61 | 262/262 |
+
+- De canvasmaskering laat in WebKit 0 deeltjespixels onder het masker zien. Terugval, validatie, toetsenbord, reduced motion en twee instanties slagen in WebKit. Via `file://` werken in beide engines scène, masker (`bbox`) en SVG-masker.
+- **Beperkingen:**
+  - Playwright-WebKit op Linux is niet gelijk aan Safari op iOS of macOS: andere GPU-paden, en `backdrop-filter` rendert in WebKit iets transparanter (zie `screenshots/compare-chromium-webkit.jpg`).
+  - **Een echte iPhone-test blijft vereist.**
+  - Voor de terugval is `?svgmask=0` beschikbaar; die zet alleen de lijnmaskering uit (visueel, geen datawijziging).
+
+## 3. Testresultaten (lokaal; Node v22.23.4, Chromium 153.0.8010.12, WebKit 26.6)
 
 | Controle | Resultaat |
 |---|---|
-| `node scripts/build.cjs --check` | PASS (bundel byte-identiek, SHA-256 `9f4fce00…6388`) |
-| `node --check energiehuis-card.js` | PASS |
-| Productie-Node UTC / Europe/Amsterdam | **359/359** / **359/359** |
-| Productie-Chromium: `mobile-visual`, `regisseur-cockpit`, `stroomvergelijker` | 3× PASS (stroomvergelijker zonder live tarieven) |
-| PVE-03 Node UTC / Amsterdam (ter controle, ongewijzigd) | 30/30 / 30/30 |
-| **PVE-04 Node UTC / Amsterdam** | **38/38 / 38/38** |
-| **PVE-04 browser** (`tests/browser.cjs --screenshots`) | **21/21 PASS** |
+| `node scripts/build.cjs --check` / `node --check energiehuis-card.js` | PASS / PASS |
+| Productie-Node UTC / Amsterdam | **359/359 / 359/359** |
+| Productie-Chromium `mobile-visual`, `regisseur-cockpit`, `stroomvergelijker` | 3× PASS (stroomvergelijker zonder live tarieven) |
+| **PVE-04 Node UTC / Amsterdam** | **70/70 / 70/70** (was 38) |
+| **PVE-04 browser Chromium** | **25/25** (was 21) |
+| **PVE-04 browser WebKit** | **25/25** (1 CDP-meting overgeslagen) |
+| `tests/perf.cjs` | exit 0; standaardvariant DOEL op desktop en mobiel |
 | `tools/build-manifest.cjs --check` | PASS |
 
-Maskertest (pixelmeting over 24 frames):
+Screenshots in `screenshots/`:
+- Chromium en WebKit op 320, 390, 390 bij 200 % tekst, 768, 1330 en 1440 (`*-webkit.jpg` voor WebKit);
+- `compare-chromium-webkit.jpg`, `mask-overlay-desktop.jpg` en `mask-overlay-mobile.jpg`;
+- `metrics.json`, `metrics-webkit.json` en `perf.json`.
 
-| Compositie | Deeltjespixels onder masker | Zichtbaar buiten masker | EV-route door masker |
-|---|---|---|---|
-| Desktop 1440 | **0** | 60 734 | 23 meetpunten |
-| Mobiel 390 | **0** | 63 562 | 29 meetpunten |
+## 4. Productie ongewijzigd
+- `git diff --name-only 83d9cfc..c70b544` bevat alleen `preview/pve-04/…`; `main` staat op `62fa09c`, en `preview/pve-03/` is ongewijzigd.
+- De build-check is byte-identiek en de productietests en -suites zijn groen.
 
-Verder bevestigd: het SVG-masker ligt exact op de canvasrechthoek, en `elementFromPoint` geeft voor elke kaart de kaart zelf terug.
-Performance: ~55 fps (1×), ~39 fps onder 4× CPU-throttling (PVE-03 zonder masker: ~58). Heap 1,47 MB.
+## 5. Stap 1 — ongewijzigd voorstel (NIET gestart; apart akkoord nodig)
 
-Screenshots (DPR 2): `pve04-320x700`, `pve04-390x844`, `pve04-390x844-tekst200`, `pve04-768x1024`, `pve04-1330x748`, `pve04-1440x900`, plus `mask-overlay-desktop` en `mask-overlay-mobile`.
+Het voorstel is Blender Cycles lokaal op de GPU van de eigenaar, met twee camera's (2660×1496 en 1080×1920). Per camera komen er:
+- de basisplaat;
+- een occlusiemasker (Cryptomatte of holdout);
+- **ankerpunten, `keyObjects` en maskerkaders**, met hetzelfde projectiescript als de placeholdergenerator; de vorm in `render-output.json` is nu vastgelegd;
+- optioneel `lightLayers`.
 
-## 4. Bewijs dat productie ongewijzigd is
+Assets: CC0 (Poly Haven, ambientCG), eigen modellen van woning, garage en praktijk, en een gelicentieerd, niet-redactioneel EV-model of eigen foto's. Ruwe bestanden komen nooit op GitHub. Daarna werk ik `uiZones` en `protectedAreas` bij voor de nieuwe compositie, draai ik `build-manifest.cjs`, en blijven UI en tests gelijk.
 
-- `git diff --stat cae8edf..HEAD -- . ':!preview/pve-04'`: leeg; `cae8edf` heeft t.o.v. `main` alleen `preview/pve-03/`-wijzigingen.
-- Build-check byte-identiek; productietests 359/359 in beide tijdzones; 3 productie-Chromium-suites groen.
+Nodig van de eigenaar:
+- welke GPU en welk besturingssysteem;
+- budget en akkoord voor het automodel, of eigen foto's;
+- wie modelleert;
+- akkoord om de CC0-assets te downloaden.
 
-## 5. Voorstel stap 1 — fotorealistische scène (NIET gestart; vraagt apart akkoord)
+Status `approved` komt pas na visueel akkoord van de eigenaar.
 
-**Pipeline:** Blender (LTS) met Cycles, lokaal op de GPU van de eigenaar. De voorkeur gaat naar NVIDIA RTX met OptiX en ruisonderdrukking; AMD HIP, Apple Metal of Intel oneAPI kunnen ook. Eén `.blend`-scène met twee camera's: desktop 2660×1496 en mobiel 1080×1920. Per camera worden gerenderd:
-1. de basisplaat (tekstvrij, met Filmic/AgX-kleurbeheer);
-2. een occlusiemasker via een Cryptomatte- of holdout-pass van de voorgrondobjecten;
-3. de ankerpunten, met een klein Python-script dat de 3D-punten (panelen, voordeur, laadklep, praktijkdeur, wandlader) via de camera projecteert naar `render-output.json`;
-4. optioneel lichtlagen (praktijk aan/uit, laadpaal-led).
-
-Daarna draait `build-manifest.cjs`; de UI en de tests blijven gelijk.
-
-**Benodigde assets en voorgestelde herkomst:**
-
-| Onderdeel | Bron (voorkeur) | Licentie | Aandachtspunt |
-|---|---|---|---|
-| Lucht/belichting zonsondergang | Poly Haven HDRI | CC0 | — |
-| Materialen gevel, dak, hout, klinkers, gras | Poly Haven / ambientCG | CC0 | — |
-| Bomen, struiken, hortensia's | Poly Haven-scans (CC0) of commerciële bibliotheek | CC0 / per product | licentietekst vastleggen |
-| Woning, garage, praktijk | Eigen modellering naar foto's en maten van de eigenaar | eigen werk | maatvoering van de eigenaar |
-| Groene EV (Born-lookalike) | Gekocht model met niet-redactionele licentie die aanpassen toestaat, **of** eigen lookalike | per product | geen "Editorial Use"; logo en kenteken verwijderen; niets kopen zonder akkoord |
-| Aanvullend (pipeline B) | Eigen avondfoto's (beplanting, auto) | eigen rechten | kenteken en huisnummer retoucheren |
-
-**Rechten:** per asset een regel in `rights.json` en `ASSET_RIGHTS.md` met ordernummer en datum. Licentiedocumenten blijven privé bij de eigenaar. Ruwe bestanden blijven buiten GitHub (afgedwongen door `.gitignore` en een test); alleen de tekstvrije renders worden gecommit.
-
-**Acceptatie:** één vergelijkingsblad met (1) de referentie, (2) de desktoprender, (3) de mobiele render en (4) de volledige cockpit. Elk scoort 1–5 op fotorealisme, architectuur, auto, licht, beplanting, materialen, compositie, leesbaarheid van de UI en mobiele kwaliteit. De status `approved` komt pas na visueel akkoord van de eigenaar.
-
-**Beslissingen nodig voor stap 1:** de GPU en het besturingssysteem van de eigenaar en het akkoord op een lokale Blender-installatie; budget en akkoord voor het automodel (of eigen foto's); wie modelleert (eigenaar, Claude via scripts lokaal, of een externe 3D-artiest); en akkoord op het downloaden van CC0-assets.
-
-## 6. Risico's en open punten
-
-- De placeholderlaag blijft CGI. Het fotorealisme is pas na stap 1 te beoordelen.
-- Het maskeren kost ~20 fps onder zware CPU-throttling. Optimalisatie is mogelijk (een vooraf geschaald masker en `willReadFrequently` alleen in de tests) als het op echte telefoons merkbaar is.
-- Safari/WebKit en echte apparaten zijn niet getest; `<mask>` met `<image>` in SVG werkt in Chromium, maar is op iOS niet geverifieerd.
-- De globale namen zijn hernoemd naar `EhPve04*`. PVE-03 is volledig intact en los te gebruiken.
+## 6. Open punten en risico's
+- Er is geen test op een echte iPhone of in Safari op macOS.
+- Fps zijn headless-metingen; een meting op een echte telefoon ontbreekt.
+- De beschermde gebieden en zones zijn afgestemd op de placeholdercompositie en moeten bij stap 1 opnieuw worden vastgesteld; de tests dwingen dat af.
+- De `css`-maskeringsvariant is niet als standaard gekozen: die is trager in software-rendering en niet pixelverifieerbaar via canvas-uitlezing.
 
 ## 7. Reviewvragen (read-only)
-
-1. Dekt het manifestschema (`energiehuis.scene-manifest/1`) alles wat stap 1 nodig heeft (maskers, lichtlagen, vrije kaartzones)?
-2. Zijn de verplichte rechtenvelden en de `.gitignore`-blokkade voldoende voor betaalde modellen?
-3. Is het terugvalgedrag (scène verbergen bij ontbrekende of kapotte laag) zoals gewenst, of moet de interface dan een vaste vervangende illustratie tonen?
-4. Is de stap-1-route (lokale Blender/Cycles, CC0 plus één gelicentieerd automodel) akkoord?
+1. Zijn de beschermde gebieden (kern van auto, praktijkpui, panelen, dak/topgevel) de juiste interpretatie van "beschermde visuele gebieden"?
+2. Is de semantiek van `lightLayers` (alleen `always` actief; andere triggers gereserveerd) voldoende als uitbreidingspunt?
+3. Zijn de prestatiedoelen en de meetopzet (3 runs, 1× en 4×, nulmeting PVE-03) akkoord als vaste regressiecontrole?
