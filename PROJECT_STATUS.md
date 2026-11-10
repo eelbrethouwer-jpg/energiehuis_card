@@ -1,26 +1,23 @@
 # PROJECT_STATUS — Energiehuis
 
-## Actuele status — 9 november 2026
+## Actuele status — 10 november 2026
 
-Gecontroleerd door Claude Code via git (`git ls-remote`, lokale checkout) en de GitHub REST-API (releases, check-runs). Werkwijze: zie [`AGENTS.md`](AGENTS.md).
+Gecontroleerd tegen GitHub door ChatGPT. Verifieer actuele HEAD, CI en releases opnieuw vóór de publicatie.
 
 | Onderdeel | Status |
 |---|---|
-| Gecontroleerde `main`-baseline | `7308d3a72de5073f398f26041404d0e400785d0a` — merge van PR #50 (Visual Experience RC), 8 nov 2026 |
-| Versie in broncode | `EH_VERSION = '1.25.0'` (`src/legacy/00-foundation.js`), kaartnaam `Energiehuis v1.25.0` (`src/legacy/02-card-shell.js`) |
-| Versie in HACS-bundel | `energiehuis-card.js`: `1.25.0`; byte-identiek aan `src/` volgens `node scripts/build.cjs --check` |
-| Hoogste geverifieerde tag | `v1.25.0` → commit `1b8ac34` (merge PR #49). Er bestaat ook een afwijkende tag `v1,0,0,` (`0d32530`); niet aangepast |
-| Laatst geverifieerde GitHub-release | `v1.25.0` ("latest", geen draft/prerelease), gepubliceerd 7 nov 2026 22:54 UTC op commit `1b8ac34`. Of HACS-installaties zijn bijgewerkt, is niet uit GitHub af te leiden |
-| PR #50 Visual Experience | Gemerged in `main`; PR-HEAD `61fe095` heeft dezelfde bestandsinhoud als mergecommit `7308d3a`. De Visual Experience RC staat in `main`, maar de versie blijft **1.25.0**: v1.26.0 heeft nog geen versie-update, tag, release of HACS-publicatie |
-| Premium Live Cockpit-preview | Afzonderlijke branch `preview/chatgpt-premium-pve01` (HEAD `7f04771`, gebaseerd op `7308d3a`); wijzigingen uitsluitend onder `preview/pve-01/`. Niet in `main`, geen PR |
+| Integratie in `main` | PR #54 Live Cockpit gemerged op `c69613ae80b306693326039c37aa03276dd0ad21` |
+| Gebouwde functionaliteit | Premium PVE-04/HA-01 Live Cockpit in bestaande `<energiehuis-card>`; standaard UIT (`live_cockpit: true` activeert). Beeld afzonderlijk via HA Media Source |
+| Releasetraject | Aparte branch `release/energiehuis-v1.27.0-live-cockpit`; release-PR en CI moeten nog worden gecontroleerd |
+| Momenteel gepubliceerde release | `v1.25.0`, gepubliceerd 7 november 2026. Een v1.27.0-release is nog NIET gepubliceerd |
+| Versie vóór release-PR | `main` op mergecommit #54 gebruikt nog `EH_VERSION = 1.25.0`. De afzonderlijke release-PR beoogt `v1.27.0` in broncode, kaartnaam en HACS-bundel |
+| Automatische tests | PR #54 en mergecommit #54: Node UTC/Amsterdam, Chromium en WebKit Live Cockpit, bestaande regressies en validate groen. Voor de release-HEAD opnieuw testen |
+| Praktische HA/iPhone-validatie | NIET uitgevoerd. Echte sensoren, media-authenticatie en Companion-app blijven open |
+| Veiligheid | Nieuwe cockpit alleen-lezen; geen nieuwe Alfen-servicecalls, opslagmigraties of wijzigingen aan laadregeling |
 
-**Statusbegrippen voor v1.26.0 Visual Experience RC (in `main`):**
-- **Gebouwd:** ja, in `main` op `7308d3a`.
-- **Automatisch getest:** lokaal op `7308d3a` (9 nov 2026, Node 22): `build.cjs --check` geslaagd, `node --check` geslaagd, `node --test tests/*.test.cjs` 359/359 geslaagd in UTC en Europe/Amsterdam. CI op PR-HEAD `61fe095` (event `pull_request`): v1.7-regressie (UTC en Europe/Amsterdam), v1.15-regressie, Stroomvergelijker-browsercontrole (Chromium) en Energiehuis controles allemaal geslaagd. CI op mergecommit `7308d3a` (event `push`): alleen `Energiehuis controles` (build-check en HACS-validatie), geslaagd; de volledige regressie- en browsersuite draait niet automatisch na merge.
-- **Praktisch getest:** nee, niet vastgelegd (HA/iPhone-acceptatie open).
-- **Gepubliceerd:** nee.
+**Status volgens AGENTS.md §7:** integratie gebouwd: **ja** (main); automatisch getest: **ja** (feature + merge); praktisch getest: **nee**; gepubliceerd: **nee** (v1.27.0).
 
-**Eerstvolgende stappen:** praktijkacceptatie van de Visual Experience in Home Assistant/iPhone; daarna een aparte, expliciet goedgekeurde release-PR voor v1.26.0.
+**Volgende stap:** aparte v1.27.0-release-PR met handmatige publish-workflow, na volledige groene CI en eigenaarstoestemming mergen. Publicatie alleen na afzonderlijke gevalideerde `workflow_dispatch`, nooit op push/merge. Na HACS-update activeren met `live_cockpit: true` en een `live_cockpit_image` uit de afgeschermde HA-mediamap; standaard blijft de huidige Home intact.
 
 ---
 

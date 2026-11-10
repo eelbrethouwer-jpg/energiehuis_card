@@ -11,13 +11,13 @@ const shell=read('src/legacy/02-card-shell.js');
 const bundle=read('energiehuis-card.js');
 const notes=read('RELEASE_NOTES_v1.25.0.md');
 
-test('v1.25.0 release prep: source, bundled footer and card catalogue agree',()=>{
- assert.match(foundation,/const EH_VERSION = '1\.25\.0';/);
- assert.match(shell,/name:'Energiehuis v1\.25\.0'/);
- assert.match(bundle,/const EH_VERSION = '1\.25\.0';/);
- assert.match(bundle,/name:'Energiehuis v1\.25\.0'/);
+test('v1.25.0 historical publish workflow remains pinned to its published release',()=>{
+ assert.ok(workflow.includes("const EH_VERSION = '1.25.0';"));
+ assert.ok(workflow.includes("name:'Energiehuis v1.25.0'"));
+ assert.match(notes,/Energiehuis v1\.25\.0/);
  assert.match(bundle,/function eh40Cockpit\(/);
 });
+
 test('v1.25.0 release prep: no automatic tag or release after merge',()=>{
  assert.match(workflow,/^on:\s*\n\s+workflow_dispatch:/m);
  assert.doesNotMatch(workflow,/^\s{2}(?:push|pull_request|schedule|release):/m);

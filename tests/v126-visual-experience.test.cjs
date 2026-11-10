@@ -36,5 +36,5 @@ test('v1.26 RC: no new HA writes, storage or charging logic',()=>{
  assert.match(note,/NIET TAGGEN OF PUBLICEREN/);
  assert.match(note,/nog geen definitieve versie-update, tag, release of HACS-publicatie/);
  assert.match(note,/geen nieuwe Home Assistant-servicecalls/i);
- assert.match(bundle,/const EH_VERSION = '1\.25\.0'/);
+ assert.match(bundle,/const EH_VERSION = '1\.27\.0'/);
 });
