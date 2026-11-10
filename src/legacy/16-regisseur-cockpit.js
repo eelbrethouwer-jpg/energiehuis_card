@@ -108,7 +108,8 @@ function eh40Css(){
  const P=EnergiehuisCard.prototype,previous=P._render;
  P._render=function(){
   previous.call(this);
-  if(this._view!=='overview'||!this.config||!this._hass)return;
+  // v1.27: de Live Cockpit (16-live-cockpit.js, config live_cockpit: true) vervangt deze cockpit op Home.
+  if(this._view!=='overview'||!this.config||!this._hass||this._ehLiveShown)return;
   const root=this.shadowRoot,metrics=root?.querySelector?.('.body .metrics');
   if(!metrics)return;
   const style=root.querySelector('style');

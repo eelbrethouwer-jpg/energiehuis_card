@@ -1,5 +1,23 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: Live Cockpit als Home (standaard uit)
+
+De goedgekeurde fotorealistische Live Cockpit kan binnen dezelfde Energiehuis-kaart het Home-startscherm worden. Zolang de geïntegreerde versie niet praktisch is getest, staat hij **standaard uit**; de bestaande EnergieRegisseur-cockpit blijft dan ongewijzigd.
+
+```yaml
+type: custom:energiehuis-card
+live_cockpit: true                     # aan: Live Cockpit vervangt de EnergieRegisseur op Home
+live_cockpit_image: media-source://media_source/local/energiehuis/approved-visual-20261109.webp
+# optioneel en VOORLOPIG (bij te stellen na meting in Home Assistant):
+# live_cockpit_p1_sign: import_positive          # of export_positive
+# live_cockpit_route_ttl_s: { net: 60, zonnepanelen: 90, huis: 60, laden: 90 }
+# live_cockpit_balance_max_skew_s: 10
+```
+
+- Alleen-lezen: geen servicecalls, geen bediening van Alfen of andere apparatuur. Alle andere schermen en de navigatie blijven gelijk.
+- Het masterbeeld komt uitsluitend via de afgeschermde Media Source (`media_source/resolve_media`, tijdelijk getekende `/media/…`-URL). Zet het bestand in de HA-mediamap, **niet** in `/config/www` (`/local/` is publiek). Zonder of bij een mislukt beeld: duidelijke terugval naar alleen de interface.
+- Terugdraaien: `live_cockpit: false` of de regel verwijderen. Details, testresultaten en het releaseplan: [LIVE_COCKPIT_HOME.md](LIVE_COCKPIT_HOME.md).
+
 ## In ontwikkeling: Energiehuis v1.12.0 – drie afzonderlijke batterijen (RC)
 
 Nieuwe capaciteitsvergelijking [concept-PR #17](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/17): afzonderlijke 5/10/15-kWh SOC, optioneel per capaciteit instelbare laad-/ontlaadvermogens, bruikbare opslag en theoretische niet opgeslagen zonne-energie door volle batterij of laadlimiet. **Geen Home Assistant-YAML nodig**, geen laadbesturing. Zie [release notes](RELEASE_NOTES_v1.12.0_RC.md) en [testinstructies](BATTERY_PROFILES_V112.md). Niet gepubliceerd in HACS.

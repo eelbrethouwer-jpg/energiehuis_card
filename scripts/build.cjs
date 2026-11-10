@@ -28,6 +28,8 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'13-contracts.js'},
   {kind:'legacy',name:'14-detail-state.js'},
   {kind:'legacy',name:'15-homewizard-history.js'},
+  // v1.27: Live Cockpit vóór de EnergieRegisseur, zodat die zijn cockpit overslaat als de Live Cockpit actief is.
+  {kind:'legacy',name:'16-live-cockpit.js'},
   {kind:'legacy',name:'16-regisseur-cockpit.js'}
 ]);
 if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
