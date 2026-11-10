@@ -368,6 +368,8 @@ class EnergiehuisCard extends HTMLElement {
   }
   this._eh26MenuOpen=false;
   this._eh26RestoreFocus=null;
+  // v1.27 Live Cockpit: timers, animatie, observers en een lopende beeldaanvraag stoppen.
+  if(typeof this._ehLiveSuspend==='function')this._ehLiveSuspend();
   if(this._refreshTimer){clearInterval(this._refreshTimer);this._refreshTimer=null;}
   if(this._eh19Observer){this._eh19Observer.disconnect();this._eh19Observer=null;}
   if(this._eh19NetworkListener){
