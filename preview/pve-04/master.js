@@ -79,7 +79,7 @@
     const S = options.scene !== undefined ? options.scene : root.EhPve04MasterScene;
     const id = 'ehm' + (++seq);
     let scenario = M.SCENARIO_IDS.includes(options.scenario) ? options.scenario : 'zon-export';
-    let tick = 0, model = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null, suspended = false, liveInput = null, imgRetry = 0, imgJob = 0;
+    let tick = 0, model = null, offlineSince = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null, suspended = false, liveInput = null, imgRetry = 0, imgJob = 0;
     // DEMO (standaard): fictieve scenario's. LIVE: invoer uitsluitend via setInput() (HA-adapter); geen DEMO-labels,
     // geen scenario's, geen schommeling, geen fictieve waarden.
     const LIVE = options.mode === 'live';
@@ -103,7 +103,7 @@
     const particles = el(doc, 'canvas', 'ehm-particles', { 'aria-hidden': 'true' });
     const covers = el(doc, 'div', 'ehm-covers', { 'aria-hidden': 'true' });
     const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
-    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo');
+    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
     covers.appendChild(pill);
     const PL = {};   // lege glasvlakken (alleen in de lijstweergave zichtbaar; de lijst eronder toont de waarden)
     for (const k of KEYS) { const p = el(doc, 'div', 'ehm-cover ehm-plate', { 'data-key': k }); p.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; covers.appendChild(p); PL[k] = p; }
@@ -273,6 +273,7 @@
       setText(summary, (LIVE ? '' : 'DEMO · ') + m.summary);
       const w = m.warnings.map(x => x.text).join(' ');
       warn.hidden = !w; setText(warn, w);
+      setData(warn, 'tone', m.critical ? 'bad' : 'warn');   // RC1-B: niet-kritieke melding (bijv. niet synchroon) oranje, niet rood
       // Netrichting (pijl, kaartkleur, lichtpunten) alleen tonen bij een ACTIEVE netroute: zo kloppen tekst, kleur en
       // richting altijd. Bij een tegenstrijdige meetketen staat de route stil en is de richting niet bevestigd.
       const netActive = !!(m.routes['grid-home'].active || m.routes['home-grid'].active);
@@ -281,7 +282,7 @@
         setText(N.title, d.title);
         const [num, unit] = splitValue(d.value); setText(N.num, num); setText(N.unit, unit);
         let sub = d.sub, dir = d.direction || 'none';
-        if (k === 'net' && !netActive && NET_DIR[d.direction]) { dir = 'none'; sub = 'Richting niet bevestigd' + (m.critical ? ' (meetketen tegenstrijdig)' : ''); }
+        if (k === 'net' && !netActive && NET_DIR[d.direction]) { dir = 'none'; sub = 'Richting niet bevestigd' + (m.critical ? ' (meetketen tegenstrijdig)' : m.hold ? ' (meetketen niet synchroon)' : ''); }
         setText(N.sub, sub);
         let extra = k === 'cupra' ? 'Accu ' + d.soc : k === 'battery' ? 'Simulatie' : (d.tone === 'sim' ? 'Simulatie' : '');
         if (k === 'net') { const nd = netActive ? NET_DIR[d.direction] : null; extra = nd ? nd.arrow + ' ' + nd.text : ''; }
@@ -292,9 +293,18 @@
         const al = `${d.title}: ${d.value}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. Details openen.`;
         if (N.b.getAttribute('aria-label') !== al) N.b.setAttribute('aria-label', al);
       }
-      const now = new Date(m.now);
-      setText(pillTime, String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'));
-      if (LIVE) { setText(pillLabel, m.connected ? 'LIVE' : 'OFFLINE'); setData(pill, 'state', m.connected ? 'live' : 'offline'); }
+      const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+      if (LIVE) {
+        // RC1-C: één ondubbelzinnige verbindingsstatus in kop én pil. Offline = rood, nooit een groene LIVE-markering;
+        // verbonden maar niet alles actueel = oranje; alleen verbonden én alles actueel = groen.
+        if (!m.connected) { if (offlineSince === null) offlineSince = m.now; } else offlineSince = null;
+        const state = !m.connected ? 'offline' : m.status.tone === 'ok' ? 'live' : 'degraded';
+        setText(badge, !m.connected ? 'OFFLINE · geen verbinding met Home Assistant' : 'LIVE · alleen-lezen');
+        setData(badge, 'state', state); setData(pill, 'state', state); setData(rootEl, 'link', state);
+        setText(pillLabel, m.connected ? 'LIVE' : 'OFFLINE');
+        setText(pillText, m.connected ? 'alleen-lezen' : 'geen verbinding');
+        setText(pillTime, m.connected ? hhmm(m.now) : 'sinds ' + hhmm(offlineSince));
+      } else setText(pillTime, hhmm(m.now));
       for (const [sid, b] of Object.entries(SB)) if (b.getAttribute('aria-pressed') !== String(sid === scenario)) b.setAttribute('aria-pressed', String(sid === scenario));
       setData(rootEl, 'activeScenario', scenario);
       applyRoutes();
@@ -321,7 +331,7 @@
       }
       if (key === 'battery') rows.push(['Let op', 'Virtuele batterij: rekensimulatie, geen fysieke opslag en geen stroomroute.']);
       if (key === 'practice') rows.push(['Let op', d.tone === 'sim' ? 'Gesimuleerde waarde, niet gemeten en niet opgeteld bij het huis.' : 'Geen submeter gekoppeld: er wordt geen vermogen getoond.']);
-      if (key === 'house') rows.push(['Balans (rekenkundig)', model.balance === 'sluit' ? 'Sluit — dit bewijst niet dat de meetketen is geverifieerd' : model.balance]);
+      if (key === 'house') rows.push(['Balans (rekenkundig)', model.balanceInfo || model.balance]);
       for (const rid of ROUTES_FOR[key]) { const r = model.routes[rid]; rows.push([ROUTE[rid].label, r.active ? 'Actief · ' + M.formatPower(r.watts) : 'Inactief · ' + r.reason]); }
       if (ROUTES_FOR[key].length) rows.push(['Lichtlijn in beeld', 'Decoratief — geen actuele stroomindicator']);
       const frag = doc.createDocumentFragment();
@@ -393,6 +403,9 @@
       setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
       setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
+      /** LIVE: na een mislukte beeldlaag opnieuw proberen (bijv. na herstel van de verbinding). Begrensd: alleen in
+       *  de foutstand en met één extra poging bij een laadfout. Een geladen beeld blijft staan (geen nieuwe aanvraag). */
+      retryImage() { if (!LIVE || destroyed || !sceneOk || !options.resolveImage || rootEl.dataset.scene !== 'error') return false; imgRetry = 0; loadImage(); return true; },
       /** Ontkoppeld (bijv. kaart uit de DOM): alle timers, rAF, observers en documentlisteners stoppen; DOM blijft. */
       suspend() {
         if (suspended || destroyed) return; suspended = true;

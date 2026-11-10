@@ -3,7 +3,7 @@
   "version": "153.0.8010.12",
   "results": [
     {
-      "name": "alle 15 gesimuleerde HA-scenario’s: LIVE zonder DEMO/fictief/scenario’s; lichtpunten = actieve routes; netrichting consistent; geen fouten",
+      "name": "alle 17 gesimuleerde HA-scenario’s: LIVE zonder DEMO/fictief/scenario’s; lichtpunten = actieve routes; netrichting consistent; geen fouten",
       "ok": true
     },
     {
@@ -11,7 +11,7 @@
       "ok": true
     },
     {
-      "name": "veroudering zonder nieuwe HA-update: P1 passeert de TTL ⇒ netroute en lichtpunten stoppen via één timer",
+      "name": "veroudering zonder nieuwe HA-update: P1 passeert de route-TTL (60 s) ⇒ netroute en lichtpunten stoppen via één timer",
       "ok": true
     },
     {
@@ -47,7 +47,31 @@
       "ok": true
     },
     {
-      "name": "screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht",
+      "name": "RC1-A: actieve PV/Alfen 2/5/10/20/35 min niet bevestigd met recente P1 ⇒ geen zon-/laadlichtpunten, waarden \"niet live\", netroute blijft",
+      "ok": true
+    },
+    {
+      "name": "RC1-A: PV passeert de route-TTL (90 s) zonder nieuwe HA-update ⇒ zonlichtpunten stoppen, waarde blijft als \"niet live\"",
+      "ok": true
+    },
+    {
+      "name": "RC1-B: updatevolgorde P1 → huis → PV met verschillende leeftijden ⇒ nooit onterecht \"Controle nodig\"; synchroon tegenstrijdig ⇒ wel",
+      "ok": true
+    },
+    {
+      "name": "RC1-C: verbinding weg ⇒ kop en pil rood OFFLINE (geen groene LIVE), \"sinds HH:MM\", geen waarden/lichtpunten; herstel ⇒ groen LIVE",
+      "ok": true
+    },
+    {
+      "name": "RC1-D: mislukte, hangende, lege of onveilige resolve (/local/, extern) ⇒ veilige terugval, geen aanvraag buiten /media; data blijft werken",
+      "ok": true
+    },
+    {
+      "name": "RC1-D: handtekening verloopt NA het laden ⇒ beeld blijft staan zonder nieuwe aanvraag; mislukt beeld ⇒ herstel na herverbinding",
+      "ok": true
+    },
+    {
+      "name": "screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon",
       "ok": true
     }
   ]

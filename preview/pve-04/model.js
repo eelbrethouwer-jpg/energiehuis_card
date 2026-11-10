@@ -28,7 +28,13 @@
     evMaxW: 11500,      // laadmeting boven ~11,5 kW (3×16 A) is fysiek onwaarschijnlijk voor 1×40 A
     // Tijdstempels tot 120 s in de toekomst worden geaccepteerd (klokverschil tussen bron en
     // weergave). Meer dan 120 s in de toekomst ⇒ 'stale' ("Tijdstempel onbekend"): nooit actief.
-    futureToleranceMs: 120000
+    futureToleranceMs: 120000,
+    // RC1-B: balanscontrole alleen als de vier bron-tijdstempels (P1, PV, Alfen, huis) binnen deze spreiding liggen
+    // (LIVE: instelbaar via de HA-adapter, balance_max_skew_s) ...
+    balanceMaxSkewMs: 10000,
+    // ... en de huissensor niet méér dan deze marge ouder is dan de nieuwste invoermeting (de huiswaarde wordt
+    // afgeleid van de andere meters; is zij ouder, dan heeft zij de laatste invoerwijziging mogelijk nog niet verwerkt).
+    houseLagTolMs: 2000
   });
 
   const UNAVAILABLE = new Set(['', 'unknown', 'unavailable', 'none', 'null', 'nan']);
@@ -45,6 +51,7 @@
   });
 
   const ROUTES = Object.freeze(['sun-home', 'grid-home', 'home-grid', 'home-ev', 'home-practice']);
+  const LABEL = Object.freeze({ net: 'P1', pv: 'zon', ev: 'laadpaal', house: 'huis' });
 
   function parseNumber(raw) {
     if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
@@ -63,6 +70,15 @@
     if (m < 60) return m + ' min';
     const h = Math.floor(m / 60);
     return h < 24 ? h + ' uur' : Math.floor(h / 24) + ' d';
+  }
+
+  function asyncWhy(late, skewTxt) {
+    return late.length ? 'niet live bevestigd: ' + late.map(k => LABEL[k]).join(', ') + ' (spreiding ' + skewTxt + ')' : 'meettijden lopen ' + skewTxt + ' uiteen';
+  }
+  /** "40 s geleden", "5 min geleden" (voor vertraagde metingen). */
+  function agoLabel(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return 'tijd onbekend';
+    return ms < 60000 ? Math.round(ms / 1000) + ' s geleden' : ageLabel(ms) + ' geleden';
   }
 
   /** Leest één HA-achtig state-object. Geeft altijd een bevroren Reading terug. */
@@ -92,11 +108,15 @@
     if (ageMs > spec.ttlS * 1000) {
       // Stabiele bronnen (bijv. PV 's nachts op 0 W, Cupra-SOC): laatste stand tonen, nooit als actueel of als route.
       const keep = spec.stable && (spec.kind !== 'power' || Math.abs(v) < T.zeroW);
-      return done('stale', { ageMs, stampSource: stamp.source, retained: keep ? v : null, reason: keep ? 'Laatste stand · ' + ageLabel(ageMs) + ' · niet recent bevestigd' : 'Verouderd · ' + ageLabel(ageMs) });
+      return done('stale', { ageMs, stampMs: t, stampSource: stamp.source, retained: keep ? v : null, reason: keep ? 'Laatste stand · ' + ageLabel(ageMs) + ' · niet recent bevestigd' : 'Verouderd · ' + ageLabel(ageMs) });
     }
+    // RC1-A: tussen route-TTL en toon-TTL mag de waarde zichtbaar blijven ("vertraagd"), maar ze is NIET actueel genoeg
+    // voor een actieve route, bewegende lichtpunten, een netrichting of de balanscontrole.
+    const routeTtlS = Number.isFinite(spec.routeTtlS) ? Math.min(spec.routeTtlS, spec.ttlS) : spec.ttlS;
+    if (ageMs > routeTtlS * 1000) return done('recent', { shown: v, ageMs, stampMs: t, stampSource: stamp.source, reason: 'Niet live · bevestigd ' + agoLabel(ageMs) });
     const simulated = !!st.simulated;
-    if (spec.kind === 'power' && Math.abs(v) < T.zeroW) return done('live-zero', { value: v, ageMs, simulated, stampSource: stamp.source, reason: 'Actueel' });
-    return done('live', { value: v, ageMs, simulated, stampSource: stamp.source, reason: 'Actueel' });
+    if (spec.kind === 'power' && Math.abs(v) < T.zeroW) return done('live-zero', { value: v, ageMs, stampMs: t, simulated, stampSource: stamp.source, reason: 'Actueel' });
+    return done('live', { value: v, ageMs, stampMs: t, simulated, stampSource: stamp.source, reason: 'Actueel' });
   }
 
   /** Meest recente geldige bron-tijdstempel van een HA-state (geen eigen tijd). */
@@ -110,6 +130,8 @@
   }
 
   const cur = r => !!r && (r.state === 'live' || r.state === 'live-zero');
+  /** Waarde die getoond mag worden: actueel, vertraagd (RC1-A) of een stabiele laatste stand. Nooit voor routes. */
+  const shownOf = r => !r ? null : cur(r) ? r.value : r.state === 'recent' ? r.shown : r.retained != null ? r.retained : null;
 
   /** Vermogen als NL-tekst, altijd zonder minteken (richting staat in het label). */
   function formatPower(w) {
@@ -157,7 +179,7 @@
     for (const k of Object.keys(SPECS)) specs[k] = Object.freeze({ ...SPECS[k], ...((input.specs && input.specs[k]) || {}), key: k, kind: SPECS[k].kind });
     const r = {};
     for (const k of Object.keys(specs)) r[k] = readEntity(states[k], specs[k], now);
-    if (!connected) for (const k of Object.keys(r)) if (r[k].state !== 'unlinked') r[k] = Object.freeze({ ...r[k], state: 'offline', value: null, reason: 'Offline' });
+    if (!connected) for (const k of Object.keys(r)) if (r[k].state !== 'unlinked') r[k] = Object.freeze({ ...r[k], state: 'offline', value: null, shown: null, retained: null, reason: 'Offline' });
 
     const net = cur(r.net) ? r.net.value : null;
     const importW = net === null ? null : (p1Sign === 'export_positive' ? -net : net);
@@ -180,17 +202,44 @@
     else if (cur(r.ev) && r.ev.value > T.evMaxW) evInvalid = 'Ongeldige laadmeting (te hoog)';
     if (evInvalid) warnings.push({ code: 'ev-invalid', critical: false, text: evInvalid + ': Cupra-route en balans uitgeschakeld.' });
     const ev = cur(r.ev) && !evInvalid ? Math.max(0, r.ev.value) : null;
-    let balance = 'onbekend';
-    if (importW !== null && pv !== null && ev !== null && house !== null && !houseInvalid) {
-      const calc = importW + pv - ev;
-      if (Math.abs(calc - house) > T.crossDiffW) {
+    // ---- balans (RC1-B): alleen een VOLDOENDE SYNCHROON gemeten keten mag als tegenstrijdig (kritiek) gelden.
+    let balance = 'onbekend', balanceInfo = 'Niet alle vier meetwaarden zijn actueel: balans niet te controleren', hold = null;
+    const chainKeys = ['net', 'pv', 'ev', 'house'];
+    // Invoer: actuele waarden, en ook vertraagde/laatst bekende (RC1-A) — die kunnen een tegenstrijdigheid wel
+    // ZICHTBAAR maken (routes pauzeren), maar nooit een kritieke melding of een "sluit" opleveren.
+    const netB = importW !== null ? importW : r.net.state === 'recent' ? (p1Sign === 'export_positive' ? -r.net.shown : r.net.shown) : null;
+    const pvB = shownOf(r.pv), evRaw = shownOf(r.ev), houseB = shownOf(r.house);
+    const evB = evRaw === null || evRaw < -T.zeroW || evRaw > T.evMaxW ? null : Math.max(0, evRaw);
+    if (netB !== null && pvB !== null && evB !== null && houseB !== null && !houseInvalid && houseB >= T.houseNegW && !evInvalid) {
+      const allLive = chainKeys.every(k => cur(r[k]));
+      const calc = netB + pvB - evB, diff = Math.abs(calc - houseB);
+      const stamps = chainKeys.map(k => r[k].stampMs);
+      const skewMs = Math.max(...stamps) - Math.min(...stamps);
+      const newestInput = Math.max(r.net.stampMs, r.pv.stampMs, r.ev.stampMs);
+      const houseLagMs = Math.max(0, newestInput - r.house.stampMs);
+      const maxSkewMs = Number.isFinite(input.balanceMaxSkewS) ? input.balanceMaxSkewS * 1000 : T.balanceMaxSkewMs;
+      const late = chainKeys.filter(k => !cur(r[k]));
+      const sync = allLive && skewMs <= maxSkewMs && houseLagMs <= T.houseLagTolMs;
+      const skewTxt = skewMs < 60000 ? (skewMs / 1000).toFixed(skewMs < 10000 ? 1 : 0).replace('.', ',') + ' s' : ageLabel(skewMs);
+      if (diff <= T.crossDiffW) {
+        balance = sync ? 'sluit' : 'niet vergelijkbaar';
+        balanceInfo = sync ? 'Sluit (spreiding meettijden ' + skewTxt + ') — dit bewijst niet dat de meetketen is geverifieerd' : 'Rekenkundig binnen 150 W, maar ' + asyncWhy(late, skewTxt) + ': niet als bevestiging te gebruiken';
+      } else if (sync) {
         balance = 'wijkt af';
+        balanceInfo = 'Wijkt ' + formatPower(diff) + ' af bij synchrone meting (spreiding ' + skewTxt + ')';
         warnings.push({ code: 'crosscheck', critical: true, text: 'Net + zon − Cupra wijkt meer dan 150 W af van de huissensor.' });
-      } else balance = 'sluit';
+      } else {
+        // Niet synchroon én afwijkend: niet aantoonbaar tegenstrijdig, maar ook niet te vertrouwen. Geen kritieke
+        // melding; wel alle routes pauzeren, want welke meting achterloopt is niet te bepalen.
+        balance = 'niet vergelijkbaar';
+        hold = 'Gepauzeerd: meetketen niet synchroon';
+        balanceInfo = 'Wijkt ' + formatPower(diff) + ' af, maar ' + asyncWhy(late, skewTxt) + (houseLagMs > T.houseLagTolMs ? ' (huissensor loopt ' + agoLabel(houseLagMs).replace(' geleden', '') + ' achter op de invoer)' : '') + ': niet vergelijkbaar';
+        warnings.push({ code: 'chain-async', critical: false, text: 'Meettijden lopen uiteen en de waarden sluiten niet: stroomroutes gepauzeerd tot een synchrone meting.' });
+      }
     }
     if (pv !== null && pv < -T.routeMinW) warnings.push({ code: 'pv-negative', critical: false, text: 'Negatieve zonne-opwek genegeerd.' });
     const critical = warnings.some(w => w.critical);
-    const blocked = !connected ? 'Offline' : critical ? 'Gestopt: meetketen tegenstrijdig' : null;
+    const blocked = !connected ? 'Offline' : critical ? 'Gestopt: meetketen tegenstrijdig' : hold;
 
     // ---- routes (geen grace: ongeldig = direct inactief)
     const practiceSim = cur(r.practice) && r.practice.simulated && r.practice.value >= 0;
@@ -215,47 +264,53 @@
     }
 
     // ---- tegels
-    const val = (rd, fmt) => cur(rd) ? fmt(rd.value) : rd.retained != null ? fmt(rd.retained) : '—';
+    const val = (rd, fmt) => { const v = shownOf(rd); return v === null ? '—' : fmt(v); };
     const tone = rd => rd.state === 'live' || rd.state === 'live-zero' ? 'ok' : rd.state === 'unlinked' ? 'muted' : 'warn';
+    const pvShown = shownOf(r.pv), evShown = shownOf(r.ev), houseShown = shownOf(r.house);
     const tiles = {};
-    tiles.pv = { title: 'Zonnepanelen', value: pv !== null && pv >= 0 ? formatPower(pv) : r.pv.retained != null ? formatPower(r.pv.retained) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: specs.pv.entity };
+    tiles.pv = { title: 'Zonnepanelen', value: pvShown !== null && pvShown >= 0 ? formatPower(pvShown) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: specs.pv.entity };
     tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: cur(r.battery) || r.battery.state === 'unlinked' ? 'Geen fysieke opslag' : 'Geen fysieke opslag · ' + r.battery.reason, tone: 'sim', entity: specs.battery.entity };
-    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (house !== null ? formatPower(house) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: specs.house.entity };
+    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (houseShown !== null && houseShown >= T.houseNegW ? formatPower(houseShown) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: specs.house.entity };
     const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
-    tiles.net = { title: 'Net', value: importW === null ? '—' : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: specs.net.entity, p1Sign };
+    // Vertraagde P1 (RC1-A): alleen de grootte tonen, zonder teken of richting (de richting is niet actueel bevestigd).
+    const netShown = importW === null && r.net.state === 'recent' ? formatPower(r.net.shown) : null;
+    tiles.net = { title: 'Net', value: importW === null ? (netShown || '—') : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: specs.net.entity, p1Sign };
     tiles.practice = practiceSim
       ? { title: 'Praktijkruimte', value: formatPower(r.practice.value), sub: 'SIMULATIE · niet gemeten', tone: 'sim', entity: '—' }
       : { title: 'Praktijkruimte', value: '—', sub: 'Nog niet gekoppeld', tone: 'muted', entity: '—' };
     const charging = routes['home-ev'].active;
     const cu = input.cupra || {};
     const cupraLabel = charging ? (cu.label || 'Laden') : (cu.idleLabel || 'Niet aan het laden');
-    tiles.cupra = { title: 'Cupra Born', value: evInvalid ? '—' : (ev !== null ? formatPower(ev) : r.ev.retained != null ? formatPower(r.ev.retained) : '—'), soc: val(r.soc, formatPct), socReason: cur(r.soc) ? 'Actueel' : r.soc.reason, sub: evInvalid || (cur(r.ev) ? cupraLabel : r.ev.reason), tone: evInvalid ? 'bad' : tone(r.ev), charging, entity: specs.ev.entity, socEntity: specs.soc.entity };
+    tiles.cupra = { title: 'Cupra Born', value: evInvalid ? '—' : (ev !== null ? formatPower(ev) : evShown !== null && evShown >= -T.zeroW && evShown <= T.evMaxW ? formatPower(Math.max(0, evShown)) : '—'), soc: val(r.soc, formatPct), socReason: cur(r.soc) ? 'Actueel' : r.soc.reason, sub: evInvalid || (cur(r.ev) ? cupraLabel : r.ev.reason), tone: evInvalid ? 'bad' : tone(r.ev), charging, entity: specs.ev.entity, socEntity: specs.soc.entity };
 
     // ---- status en samenvatting
     let status;
     if (!connected) status = { text: 'Offline', tone: 'bad' };
     else if (critical) status = { text: 'Controle nodig', tone: 'bad' };
+    else if (hold) status = { text: 'Meetketen niet synchroon', tone: 'warn' };
     else {
       const keys = ['net', 'pv', 'house', 'ev', 'soc'];
-      const n = keys.filter(k => cur(r[k])).length;
-      status = { text: n + '/' + keys.length + (live ? ' meetwaarden actueel' : ' fictieve meetwaarden actueel'), tone: n === keys.length ? 'ok' : 'warn' };
+      const n = keys.filter(k => cur(r[k])).length, late = keys.filter(k => r[k].state === 'recent').length;
+      status = { text: n + '/' + keys.length + (live ? ' meetwaarden actueel' : ' fictieve meetwaarden actueel') + (late ? ' · ' + late + ' vertraagd' : ''), tone: n === keys.length ? 'ok' : 'warn' };
     }
-    const summary = summarize({ connected, critical, routes, direction, importW, live });
+    const late = ['pv', 'ev', 'net'].filter(k => r[k].state === 'recent').map(k => LABEL[k]);
+    const summary = summarize({ connected, critical, hold, routes, direction, importW, live, late });
 
     return Object.freeze({
       demo: !live, live, now, connected, p1Sign,
       readings: Object.freeze(r),
       grid: Object.freeze({ direction, importW }),
-      balance, warnings: Object.freeze(warnings), critical,
+      balance, balanceInfo, hold, warnings: Object.freeze(warnings), critical,
       routes: Object.freeze(routes),
       tiles: Object.freeze(Object.fromEntries(Object.entries(tiles).map(([k, v]) => [k, Object.freeze(v)]))),
       status: Object.freeze(status), summary
     });
   }
 
-  function summarize({ connected, critical, routes, direction, importW, live }) {
-    if (!connected) return 'Geen verbinding. Er worden geen stroomrichtingen getoond.';
+  function summarize({ connected, critical, hold, routes, direction, importW, live, late = [] }) {
+    if (!connected) return 'Geen verbinding met Home Assistant. Er worden geen meetwaarden of stroomrichtingen getoond.';
     if (critical) return (live ? 'De meetketen' : 'De fictieve meetketen') + ' is tegenstrijdig. Stroomroutes staan stil.';
+    if (hold) return 'De meettijden lopen uiteen en de waarden sluiten niet. Stroomroutes zijn gepauzeerd tot een synchrone meting.';
     const p = [];
     if (routes['sun-home'].active) p.push('de zon levert ' + formatPower(routes['sun-home'].watts));
     if (direction === 'export') p.push(formatPower(importW) + ' gaat terug naar het net');
@@ -263,7 +318,8 @@
     else if (direction === 'balance') p.push('het net is in balans');
     if (routes['home-ev'].active) p.push('de Cupra laadt met ' + formatPower(routes['home-ev'].watts));
     const s = p.length ? p.join(', ') : 'geen actuele vermogensmeting';
-    return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+    const tail = late.length ? ' Niet live bevestigd (' + late.join(', ') + '): daar wordt geen stroom getoond.' : '';
+    return s.charAt(0).toUpperCase() + s.slice(1) + '.' + tail;
   }
 
   // ---------------------------------------------------------------- DEMO-fixtures
@@ -314,5 +370,5 @@
     return { now, connected: j.connected !== false, config: j.config || {}, states: j.states, cupra: j.cupra || {} };
   }
 
-  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, freshness, formatPower, formatNet, formatPct, gridDirection, computeModel, scenarioInput, ageLabel });
+  return Object.freeze({ T, SPECS, ROUTES, SCENARIOS, SCENARIO_IDS, parseNumber, readEntity, freshness, formatPower, formatNet, formatPct, gridDirection, computeModel, scenarioInput, ageLabel, agoLabel });
 });

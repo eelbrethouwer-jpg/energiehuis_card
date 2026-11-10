@@ -38,7 +38,7 @@
         states[k] = st ? st : { missing: true };
       }
       return {
-        now, live: true,
+        now, live: true, balanceMaxSkewS: norm.balanceMaxSkewS,
         connected: !!hass && hass.connected !== false,
         config: { p1Sign: norm.p1Sign },
         specs, states,
@@ -46,14 +46,17 @@
       };
     }
 
-    /** Wanneer moet opnieuw worden beoordeeld zonder nieuwe HA-update? (eerstvolgende TTL-grens, max. 60 s) */
+    /** Wanneer moet opnieuw worden beoordeeld zonder nieuwe HA-update? (eerstvolgende route- of toon-TTL-grens, max. 60 s) */
     function nextCheckMs(hass, now) {
       let next = now + RECHECK_MAX_MS;
       for (const [k, id] of watched) {
         const st = hass && hass.states ? hass.states[id] : undefined; if (!st) continue;
         const f = M.freshness(st); if (!Number.isFinite(f.t)) continue;
-        const exp = f.t + specs[k].ttlS * 1000 + 1;
-        if (exp > now && exp < next) next = exp;
+        // beide grenzen: route-TTL (lichtpunten stoppen) en toon-TTL (waarde verdwijnt of wordt "laatste stand")
+        for (const ttl of [specs[k].routeTtlS, specs[k].ttlS]) {
+          const exp = f.t + ttl * 1000 + 1;
+          if (exp > now && exp < next) next = exp;
+        }
       }
       return Math.max(250, next - now);
     }
@@ -62,7 +65,7 @@
     function describe(hass) {
       return KEYS.map(k => {
         const id = norm.entities[k], st = id && hass && hass.states ? hass.states[id] : undefined, f = st ? M.freshness(st) : { source: null };
-        return { key: k, entity: id, present: !!st, stampSource: f.source, ttlS: specs[k].ttlS, contract: C.SOURCES[k].ha };
+        return { key: k, entity: id, present: !!st, stampSource: f.source, ttlS: specs[k].ttlS, routeTtlS: specs[k].routeTtlS, contract: C.SOURCES[k].ha };
       });
     }
 

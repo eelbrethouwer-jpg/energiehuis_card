@@ -153,6 +153,7 @@ body {
 .ehc-summary { margin: .9rem .25rem .25rem; font-size: 1rem; color: var(--text); }
 .ehc-warn { margin: .5rem .25rem; padding: .6rem .8rem; border-radius: .8rem; background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.45); color: #ffd1d1; font-size: .9rem; }
 .ehc-warn[hidden] { display: none; }
+.ehc-warn[data-tone="warn"] { background: rgba(255,181,71,.10); border-color: rgba(255,181,71,.5); color: #ffe2b0; }
 .ehc-controls { margin-top: 1rem; padding: 1rem; border-radius: var(--radius); background: var(--bg-2); border: 1px solid var(--line); }
 .ehc-controls-title { margin: 0 0 .6rem; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .ehc-scenarios { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -374,3 +375,8 @@ body {
 .ehc-demo.ehc-live { color: #04220f; background: #5fe7a0; box-shadow: 0 0 0 1px rgba(95,231,160,.4), 0 6px 20px rgba(95,231,160,.16); }
 .ehm-pill .p-demo.p-live { background: #5fe7a0; color: #04220f; }
 .ehm-pill[data-state="offline"] .p-demo.p-live { background: var(--bad); color: #2a0606; }
+/* RC1-C: verbindingsstatus ondubbelzinnig. Offline: rood (kop + pil), verbonden maar niet alles actueel: oranje. */
+.ehc-demo.ehc-live[data-state="offline"] { color: #2a0606; background: var(--bad); box-shadow: 0 0 0 1px rgba(255,107,107,.45), 0 6px 20px rgba(255,107,107,.18); }
+.ehc-demo.ehc-live[data-state="degraded"] { color: #1b1200; background: var(--warn); box-shadow: 0 0 0 1px rgba(255,181,71,.4), 0 6px 20px rgba(255,181,71,.18); }
+.ehm-pill[data-state="degraded"] .p-demo.p-live { background: var(--warn); color: #1b1200; }
+.ehm-pill[data-state="offline"] .p-text { color: var(--bad); }

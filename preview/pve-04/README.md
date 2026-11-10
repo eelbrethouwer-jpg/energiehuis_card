@@ -47,14 +47,14 @@ Zonder master of scènedata blijft alleen de lijst over.
 
 | Bestand | Rol |
 |---|---|
-| `ha/contract.js` | Datacontract: standaard-entiteiten en sleutels exact uit de productiekaart; TTL, stabiliteit, teken, configuratievalidatie |
-| `ha/adapter.js` | Leest `hass.states`/`hass.connected` (frontendcontract), geeft state-objecten ongewijzigd door aan `model.js`, detecteert wijzigingen op referentie, plant hercontrole op de TTL-grens |
-| `ha/live-card.js` | `<energiehuis-live-cockpit-preview>` (shadow DOM; niet geregistreerd als dashboardkaart): LIVE-modus van `master.js`, één rAF per frame, één timer, `suspend`/`resume` bij ontkoppelen, beeld via `media_source/resolve_media` |
-| `ha/sim.js`, `ha/index.html`, `tools/serve-ha-preview.cjs` | Uitsluitend testomgeving: 15 gesimuleerde HA-scenario's en een gesimuleerde getekende `/media`-route |
+| `ha/contract.js` | Datacontract: standaard-entiteiten en sleutels exact uit de productiekaart; toon-TTL (productie) en strengere route-TTL per bron (`route_ttl_s`), balansspreiding (`balance_max_skew_s`), stabiliteit, teken, configuratievalidatie |
+| `ha/adapter.js` | Leest `hass.states`/`hass.connected` (frontendcontract), geeft state-objecten ongewijzigd door aan `model.js`, detecteert wijzigingen op referentie, plant hercontrole op de eerstvolgende route- of toon-TTL-grens |
+| `ha/live-card.js` | `<energiehuis-live-cockpit-preview>` (shadow DOM; niet geregistreerd als dashboardkaart): LIVE-modus van `master.js`, één rAF per frame, één timer, `suspend`/`resume` bij ontkoppelen, beeld via `media_source/resolve_media` (time-out 15 s, veilige terugval, herstel na herverbinding) |
+| `ha/sim.js`, `ha/index.html`, `tools/serve-ha-preview.cjs` | Uitsluitend testomgeving: 17 gesimuleerde HA-scenario's (o.a. deels vertraagd, niet synchroon) en testhaken voor mislukte/onveilige beeld-resolves en een gesimuleerde getekende `/media`-route |
 
 ```sh
 node preview/pve-04/tools/serve-ha-preview.cjs        # http://127.0.0.1:8123/pve-04/ha/
-node --test preview/pve-04/tests/ha-adapter.test.cjs
+node --test preview/pve-04/tests/ha-adapter.test.cjs preview/pve-04/tests/ha-freshness-sync.test.cjs
 node preview/pve-04/tests/ha-live.cjs [--browser=webkit] [--screenshots]
 ```
 
@@ -158,6 +158,7 @@ node preview/pve-04/tests/master.cjs --browser=webkit --screenshots   # master-c
 ```
 
 - **Master (31 controles, Chromium én WebKit):** 8 viewports × 2 scenario's (320–1920 px, incl. grote waarden en lange labels) met dekking ≥ ingebakken kaart + 5 px, ondoorzichtig basisvlak, tikvlakken ≥ 48 px zonder overlap, geen afkapping, geen dubbele set en een compact eerste scherm; 200 % tekst ⇒ lijst; **doorschijntoets** (kaartinhoud verborgen, witte glyfpixels = 0); netrichting kaart/kleur/pijl/tekst/lichtpunten = model voor alle 14 scenario's; master onaangetast en lichtpuntlaag leeg bij 0 W/offline; lichtpunten bewegen alleen bij actief; DEMO/simulatie/praktijk/minteken/legenda; 50 hertekeningen; terugval (geen scène, beeld-404, `file://`); toetsenbord + inklapbare scenario's; reduced motion; twee instanties + destroy; performance (Chromium: ≥ 50 fps bij 4×, hoofdthread ≤ 150 ms); screenshots.
+- **HA-01 RC1:** Node `ha-adapter.test.cjs` (11) en `ha-freshness-sync.test.cjs` (17: dataversheid, asynchrone meetketen, geen fixtures in LIVE); browser `ha-live.cjs` (18 controles incl. screenshots).
 - **Node (84 tests):** model en veiligheid, routes, manifest (actualiteit, hashes, afmetingen, budgetten, rechten, ruwe bestanden, ankerpunten, geen netwerk), plus manifest v2 en de validator: v1-compatibiliteit, lichtlagen, **25 negatieve gevallen**, padveiligheid, geometrie van zones en beschermde gebieden, en de responsieve omzetting; plus de clean-plate- en privacytests (overlay-map, geen getrackte privébestanden, weigering van output buiten `private/`, privémanifest, veilige URL's).
 - **Browser-regressie placeholder/privélaag (26 controles, Chromium én WebKit, `?scene=placeholder`):** o.a. het laden van de privélaag via een synthetische testlaag, met mobiele terugval en terugval bij een ontbrekend of onveilig manifest; viewports, 200 % tekst, scenario's, 50 hertekeningen, stilstaande deeltjes, EV/minteken/overgangen, maskers (pixelmeting), placeholder, terugval, validatie in de browser, beschermde gebieden en zones op 5 breedtes, **visuele SVG-maskercontrole** (screenshotvergelijking), toetsenbord, reduced motion, verborgen tab, twee instanties en performance (alleen Chromium/CDP).
 

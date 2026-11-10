@@ -102,7 +102,13 @@ test('langdurig constant: stabiele bronnen tonen "laatste stand", nooit actueel 
 test('tegenstrijdige meetketen en omgekeerde P1: gecorrigeerd ⇒ teruglevering, niet gecorrigeerd ⇒ gestopt', () => {
   const t = run('tegenstrijdig').m; assert.equal(t.critical, true); assert.equal(t.status.text, 'Controle nodig');
   const r = run('p1-omgekeerd').m; assert.equal(r.p1Sign, 'export_positive'); assert.equal(r.grid.direction, 'export'); assert.deepEqual(active(r), ['home-grid', 'sun-home']);
-  const f = run('p1-omgekeerd-fout').m; assert.equal(f.critical, true); assert.deepEqual(active(f), []);
+  // Alfen-meting is 15 min oud (niet synchroon): niet aantoonbaar tegenstrijdig ⇒ geen kritieke melding, wél alles stil (RC1-B)
+  const f = run('p1-omgekeerd-fout').m; assert.equal(f.critical, false); assert.equal(f.hold, 'Gepauzeerd: meetketen niet synchroon'); assert.deepEqual(active(f), []);
+  assert.equal(f.status.text, 'Meetketen niet synchroon');
+  // dezelfde omgekeerde P1 met een synchroon gemeten keten ⇒ wél kritiek (bestaande fail-safe behouden)
+  const h = SIM.createHass('p1-omgekeerd-fout', NOW), ev = SIM.st(SIM.ID.ev, 0, 'W', NOW);
+  const fs2 = M.computeModel(A.createAdapter({}).input({ ...h, states: { ...h.states, [SIM.ID.ev]: ev } }, NOW));
+  assert.equal(fs2.critical, true); assert.equal(fs2.status.text, 'Controle nodig'); assert.deepEqual(active(fs2), []);
 });
 
 test('praktijk standaard niet gekoppeld; virtuele batterij altijd simulatie zonder route; LIVE-tekst zonder DEMO', () => {

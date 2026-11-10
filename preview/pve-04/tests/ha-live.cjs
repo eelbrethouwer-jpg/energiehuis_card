@@ -56,7 +56,11 @@ const STATE = () => {
     particles: c.particleInfo().filter(p => p.active).map(p => p.route).sort(), parts: c.particleInfo(),
     net: { value: net.querySelector('.t-value').textContent, dir: net.dataset.direction, extra: net.querySelector('.t-extra').hidden ? '' : net.querySelector('.t-extra').textContent, sub: net.querySelector('.t-sub').textContent },
     pv: { value: t('pv').querySelector('.t-value').textContent, sub: t('pv').querySelector('.t-sub').textContent, tone: t('pv').dataset.tone },
-    updates: card.debug.updates, imgSrc: sr.querySelector('.ehm-scene').getAttribute('src') || ''
+    updates: card.debug.updates, imgSrc: sr.querySelector('.ehm-scene').getAttribute('src') || '',
+    badge: { text: sr.querySelector('.ehc-demo').textContent, state: sr.querySelector('.ehc-demo').dataset.state, bg: getComputedStyle(sr.querySelector('.ehc-demo')).backgroundColor },
+    pill: { text: sr.querySelector('.ehm-pill').textContent, state: sr.querySelector('.ehm-pill').dataset.state, bg: getComputedStyle(sr.querySelector('.ehm-pill .p-demo')).backgroundColor },
+    warnTone: sr.querySelector('.ehc-warn').hidden ? null : sr.querySelector('.ehc-warn').dataset.tone,
+    cupra: { value: t('cupra').querySelector('.t-value').textContent, sub: t('cupra').querySelector('.t-sub').textContent }
   };
 };
 
@@ -71,7 +75,7 @@ const STATE = () => {
   const metrics = { engine: ENGINE, version: browser.version() };
 
   // ---------------------------------------------------------------- alle gesimuleerde scenario's
-  await check('alle 15 gesimuleerde HA-scenario’s: LIVE zonder DEMO/fictief/scenario’s; lichtpunten = actieve routes; netrichting consistent; geen fouten', async () => {
+  await check('alle ' + Object.keys(SIM.SCENARIOS).length + ' gesimuleerde HA-scenario’s: LIVE zonder DEMO/fictief/scenario’s; lichtpunten = actieve routes; netrichting consistent; geen fouten', async () => {
     const { ctx, page, errors } = await open(browser, base);
     const out = {};
     for (const id of Object.keys(SIM.SCENARIOS)) {
@@ -91,10 +95,19 @@ const STATE = () => {
       if (exp && !(s.net.dir === 'export' && s.net.extra === '↓ naar net' && s.net.value.startsWith('−'))) problems.push(id + ': teruglevering inconsistent');
       if (!imp && !exp && (s.net.extra || ['import', 'export'].includes(s.net.dir))) problems.push(id + ': richting zonder netroute');
     }
-    const want = { afname: ['grid-home', 'home-ev', 'sun-home'], teruglevering: ['home-grid', 'sun-home'], zonneladen: ['home-ev', 'home-grid', 'sun-home'], 'nul-watt': [], offline: [], unavailable: [], tegenstrijdig: [], 'p1-omgekeerd': ['home-grid', 'sun-home'], 'p1-omgekeerd-fout': [], verouderd: ['sun-home'], 'constant-nacht': ['grid-home'] };
+    const want = { afname: ['grid-home', 'home-ev', 'sun-home'], teruglevering: ['home-grid', 'sun-home'], zonneladen: ['home-ev', 'home-grid', 'sun-home'], 'nul-watt': [], offline: [], unavailable: [], tegenstrijdig: [], 'p1-omgekeerd': ['home-grid', 'sun-home'], 'p1-omgekeerd-fout': [], verouderd: ['sun-home'], 'constant-nacht': ['grid-home'], 'deels-vertraagd': ['home-grid'], 'niet-synchroon': [] };
     for (const [id, r] of Object.entries(want)) if (JSON.stringify(out[id].routes) !== JSON.stringify(r)) problems.push(id + ': routes ' + JSON.stringify(out[id].routes));
     if (out.offline.status !== 'Offline' || !/OFFLINE/.test(out.offline.text)) problems.push('offline-status/pil');
     if (/OFFLINE/.test(out.zonneladen.text)) problems.push('zonneladen: OFFLINE-pil');
+    // RC1-C: offline nergens groen; kop en pil zeggen hetzelfde
+    if (out.offline.badge.state !== 'offline' || out.offline.pill.state !== 'offline' || !/^OFFLINE/.test(out.offline.badge.text) || /LIVE/.test(out.offline.badge.text + out.offline.pill.text)) problems.push('offline: kop/pil ' + JSON.stringify([out.offline.badge, out.offline.pill]));
+    if (out.zonneladen.badge.state !== 'live' || out.zonneladen.pill.state !== 'live') problems.push('zonneladen: niet groen LIVE');
+    for (const id of ['deels-vertraagd', 'niet-synchroon', 'tegenstrijdig', 'verouderd']) if (out[id].badge.state !== 'degraded') problems.push(id + ': kop niet oranje');
+    if (!/Niet live · bevestigd 10 min geleden/.test(out['deels-vertraagd'].pv.sub) || out['deels-vertraagd'].pv.value !== '4,82 kW') problems.push('deels-vertraagd: pv ' + JSON.stringify(out['deels-vertraagd'].pv));
+    if (!/Niet live/.test(out['deels-vertraagd'].cupra.sub)) problems.push('deels-vertraagd: cupra');
+    if (out['niet-synchroon'].status !== 'Meetketen niet synchroon' || /Controle nodig/.test(out['niet-synchroon'].text)) problems.push('niet-synchroon: status');
+    if (out.tegenstrijdig.status !== 'Controle nodig') problems.push('tegenstrijdig: status');
+    if (out['niet-synchroon'].warnTone !== 'warn' || out.tegenstrijdig.warnTone !== 'bad') problems.push('meldingstoon ' + JSON.stringify([out['niet-synchroon'].warnTone, out.tegenstrijdig.warnTone]));
     if (!/Laatste stand/.test(out['constant-nacht'].pv.sub) || out['constant-nacht'].pv.tone !== 'warn') problems.push('constant-nacht: laatste stand');
     if (!/Onbekende eenheid/.test(out['eenheid-fout'].net.sub)) problems.push('eenheid-fout');
     assert.deepEqual(problems, []);
@@ -128,11 +141,11 @@ const STATE = () => {
   });
 
   // ---------------------------------------------------------------- veroudering zonder nieuwe update stopt de lichtpunten
-  await check('veroudering zonder nieuwe HA-update: P1 passeert de TTL ⇒ netroute en lichtpunten stoppen via één timer', async () => {
+  await check('veroudering zonder nieuwe HA-update: P1 passeert de route-TTL (60 s) ⇒ netroute en lichtpunten stoppen via één timer', async () => {
     const { ctx, page, errors } = await open(browser, base, { query: '?scenario=teruglevering' });
     const r = await page.evaluate(async () => {
       const card = window.__ha.card, c = card.debug.cockpit, h = window.__ha.hass, id = 'sensor.p1_meter_vermogen';
-      const t = new Date(Date.now() - 298500).toISOString();
+      const t = new Date(Date.now() - 58500).toISOString();
       window.__ha.push({ ...h, states: { ...h.states, [id]: { ...h.states[id], state: '-1880', last_updated: t, last_changed: t } } });
       await new Promise(res => setTimeout(res, 200));
       const before = c.particleInfo().find(p => p.id === 'flow-net').active;
@@ -141,7 +154,7 @@ const STATE = () => {
       return { before, after, sub: card.shadowRoot.querySelector('.tile[data-key="net"] .t-sub').textContent, timers: window.__live.timeouts.size };
     });
     await ctx.close();
-    assert.equal(r.before, true); assert.equal(r.after, false); assert.match(r.sub, /Verouderd/);
+    assert.equal(r.before, true); assert.equal(r.after, false); assert.match(r.sub, /Niet live · bevestigd 1 min geleden/);
     assert.ok(r.timers <= 2, 'timers ' + r.timers);
     assert.deepEqual(errors, []);
     return r;
@@ -253,11 +266,158 @@ const STATE = () => {
     return r;
   });
 
+
+  // ---------------------------------------------------------------- RC1-A: versheid voor actieve routes (browser)
+  await check('RC1-A: actieve PV/Alfen 2/5/10/20/35 min niet bevestigd met recente P1 ⇒ geen zon-/laadlichtpunten, waarden "niet live", netroute blijft', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=zonneladen' });
+    const out = {};
+    for (const min of [2, 5, 10, 20, 35]) {
+      out[min] = await page.evaluate(async ([min, S]) => {
+        const h = window.__ha.hass, now = Date.now(), iso = s => new Date(now - s * 1000).toISOString();
+        const mk = (id, v, ageS) => ({ entity_id: id, state: String(v), attributes: { unit_of_measurement: 'W' }, last_changed: iso(ageS), last_updated: iso(ageS), context: { id: 'sim' } });
+        window.__ha.push({ ...h, states: { ...h.states, [S.net]: mk(S.net, -380, 2), [S.house]: mk(S.house, 1460, 2), [S.pv]: mk(S.pv, 4820, min * 60 - (min === 35 ? 2 : 0)), [S.ev]: mk(S.ev, 2980, min * 60 - (min === 35 ? 2 : 0)) } });
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const sr = window.__ha.card.shadowRoot, c = window.__ha.card.debug.cockpit;
+        return { particles: c.particleInfo().filter(p => p.active).map(p => p.route).sort(), pv: sr.querySelector('.tile[data-key="pv"] .t-sub').textContent, pvv: sr.querySelector('.tile[data-key="pv"] .t-value').textContent, cu: sr.querySelector('.tile[data-key="cupra"] .t-sub').textContent, status: sr.querySelector('.ehc-status').textContent, warn: sr.querySelector('.ehc-warn').hidden };
+      }, [min, SIM.ID]);
+    }
+    await ctx.close();
+    for (const [min, o] of Object.entries(out)) {
+      assert.deepEqual(o.particles, ['home-grid'], min + ' min');
+      assert.match(o.pvv, /^4,82\s?kW$/, min + ' min: ' + o.pvv); assert.match(o.pv, new RegExp('Niet live · bevestigd ' + (min === '35' ? 34 : min) + ' min'));   // 35 min − 2 s (zie boven) assert.match(o.cu, /Niet live/);
+      assert.match(o.status, /3\/5 meetwaarden actueel · 2 vertraagd/); assert.equal(o.warn, true);
+    }
+    assert.deepEqual(errors, []);
+    return Object.fromEntries(Object.entries(out).map(([k, o]) => [k + ' min', o.particles.join(',') + ' · ' + o.status]));
+  });
+  await check('RC1-A: PV passeert de route-TTL (90 s) zonder nieuwe HA-update ⇒ zonlichtpunten stoppen, waarde blijft als "niet live"', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=zonneladen' });
+    const r = await page.evaluate(async S => {
+      const h = window.__ha.hass, c = window.__ha.card.debug.cockpit, t = new Date(Date.now() - 88500).toISOString();
+      window.__ha.push({ ...h, states: { ...h.states, [S.pv]: { ...h.states[S.pv], last_updated: t, last_changed: t } } });
+      await new Promise(res => setTimeout(res, 200));
+      const on = id => c.particleInfo().filter(p => p.active && p.route === id).length > 0;
+      const before = on('sun-home');
+      await new Promise(res => setTimeout(res, 2200));
+      return { before, after: on('sun-home'), grid: on('home-grid'), sub: window.__ha.card.shadowRoot.querySelector('.tile[data-key="pv"] .t-sub').textContent };
+    }, SIM.ID);
+    await ctx.close();
+    assert.equal(r.before, true); assert.equal(r.after, false); assert.equal(r.grid, true); assert.match(r.sub, /Niet live/);
+    assert.deepEqual(errors, []);
+    return r;
+  });
+
+  // ---------------------------------------------------------------- RC1-B: asynchrone meetketen (browser)
+  await check('RC1-B: updatevolgorde P1 → huis → PV met verschillende leeftijden ⇒ nooit onterecht "Controle nodig"; synchroon tegenstrijdig ⇒ wel', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=zonneladen' });
+    const steps = await page.evaluate(async S => {
+      const sr = window.__ha.card.shadowRoot, c = window.__ha.card.debug.cockpit;
+      const mk = (id, v, ageS, now) => ({ entity_id: id, state: String(v), attributes: { unit_of_measurement: 'W' }, last_changed: new Date(now - ageS * 1000).toISOString(), last_updated: new Date(now - ageS * 1000).toISOString(), context: { id: 'sim' } });
+      const snap = name => ({ name, status: sr.querySelector('.ehc-status').textContent, particles: c.particleInfo().filter(p => p.active).map(p => p.route).sort(), badge: sr.querySelector('.ehc-demo').dataset.state, net: sr.querySelector('.tile[data-key="net"] .t-sub').textContent });
+      const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const out = [];
+      const put = async (patch, name) => { const h = window.__ha.hass, now = Date.now(), st = { ...h.states }; for (const [k, v, a] of patch) st[S[k]] = mk(S[k], v, a, now); window.__ha.push({ ...h, states: st }); await frame(); out.push(snap(name)); };
+      await put([['net', -380, 1], ['pv', 4820, 1], ['house', 1460, 1], ['ev', 2980, 1]], '1 synchroon, sluit');
+      await put([['net', 1620, 0.5], ['house', 1460, 6]], '2 P1 sprong, huis 6 s ouder');
+      await put([['house', 3460, 0.2]], '3 huis volgt');
+      await put([['pv', 2800, 0.1], ['net', 1620, 25], ['house', 3460, 25]], '4 PV daalt, P1/huis 25 s oud');
+      await put([['net', 3640, 0.3], ['house', 3460, 0.2]], '5 P1/huis volgen, sluit');
+      await put([['house', 6000, 0.1], ['net', 3640, 0.2], ['pv', 2800, 0.2], ['ev', 2980, 0.2]], '6 synchroon tegenstrijdig');
+      return out;
+    }, SIM.ID);
+    await ctx.close();
+    const by = Object.fromEntries(steps.map(s => [s.name.slice(0, 1), s]));
+    assert.match(by[1].status, /5\/5/); assert.deepEqual(by[1].particles, ['home-ev', 'home-grid', 'sun-home']);
+    for (const k of ['2', '4']) { assert.equal(by[k].status, 'Meetketen niet synchroon', k); assert.deepEqual(by[k].particles, [], k); assert.equal(by[k].badge, 'degraded'); assert.match(by[k].net, /niet bevestigd|Afname|Teruglevering/); }
+    for (const k of ['3', '5']) { assert.match(by[k].status, /5\/5/, k); assert.deepEqual(by[k].particles, ['grid-home', 'home-ev', 'sun-home'], k); }
+    assert.equal(by[6].status, 'Controle nodig'); assert.deepEqual(by[6].particles, []);
+    assert.ok(!steps.slice(0, 5).some(s => s.status === 'Controle nodig'));
+    assert.deepEqual(errors, []);
+    return steps.map(s => s.name + ' ⇒ ' + s.status + ' · ' + (s.particles.join(',') || '-'));
+  });
+
+  // ---------------------------------------------------------------- RC1-C: offline ondubbelzinnig
+  await check('RC1-C: verbinding weg ⇒ kop en pil rood OFFLINE (geen groene LIVE), "sinds HH:MM", geen waarden/lichtpunten; herstel ⇒ groen LIVE', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=zonneladen' });
+    const r = await page.evaluate(async () => {
+      const sr = window.__ha.card.shadowRoot, c = window.__ha.card.debug.cockpit;
+      const frame = () => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const s = () => { const b = sr.querySelector('.ehc-demo'), p = sr.querySelector('.ehm-pill'); return { badge: b.textContent, bstate: b.dataset.state, bbg: getComputedStyle(b).backgroundColor, pill: p.textContent, pstate: p.dataset.state, pbg: getComputedStyle(p.querySelector('.p-demo')).backgroundColor, status: sr.querySelector('.ehc-status').textContent, particles: c.particleInfo().filter(x => x.active).length, net: sr.querySelector('.tile[data-key="net"] .t-value').textContent }; };
+      const a = s();
+      const h = window.__ha.hass; window.__ha.push({ ...h, connected: false }); await frame();
+      const b = s();
+      window.__ha.push({ ...h, connected: true }); await frame();
+      return { live: a, offline: b, back: s() };
+    });
+    await ctx.close();
+    const green = 'rgb(95, 231, 160)';
+    assert.equal(r.live.bstate, 'live'); assert.equal(r.live.bbg, green);
+    assert.equal(r.offline.bstate, 'offline'); assert.equal(r.offline.pstate, 'offline');
+    assert.match(r.offline.badge, /^OFFLINE · geen verbinding/); assert.doesNotMatch(r.offline.badge + r.offline.pill, /LIVE/);
+    assert.notEqual(r.offline.bbg, green); assert.notEqual(r.offline.pbg, green); assert.equal(r.offline.bbg, r.offline.pbg);
+    assert.match(r.offline.pill, /OFFLINEgeen verbindingsinds \d\d:\d\d/);
+    assert.equal(r.offline.status, 'Offline'); assert.equal(r.offline.particles, 0); assert.equal(r.offline.net, '—');
+    assert.equal(r.back.bstate, 'live'); assert.equal(r.back.bbg, green); assert.ok(r.back.particles > 0);
+    assert.deepEqual(errors, []);
+    return { offline: r.offline.badge + ' | ' + r.offline.pill, bg: r.offline.bbg };
+  });
+
+  // ---------------------------------------------------------------- RC1-D: beveiligde master, terugval
+  await check('RC1-D: mislukte, hangende, lege of onveilige resolve (/local/, extern) ⇒ veilige terugval, geen aanvraag buiten /media; data blijft werken', async () => {
+    const res = {};
+    for (const mode of ['fail', 'hang', 'empty', 'local', 'external']) {
+      log.length = 0;
+      const { ctx, page, errors } = await open(browser, base, { query: '?scenario=teruglevering&resolve=' + mode + '&resolveTimeout=400', waitScene: false });
+      await page.waitForFunction(() => window.__ha.card.shadowRoot.querySelector('.ehc').dataset.scene === 'error', null, { timeout: 5000 });
+      const s = await page.evaluate(STATE);
+      res[mode] = { scene: s.scene, layout: s.layout, note: s.note, img: s.imgSrc, resolves: await page.evaluate(() => window.__ha.resolves), local: log.filter(l => l.path.startsWith('/local/')).length, media: log.filter(l => l.path.startsWith('/media/')).length, routes: s.routes, errors };
+      await ctx.close();
+    }
+    for (const [mode, v] of Object.entries(res)) {
+      assert.equal(v.scene, 'error', mode); assert.equal(v.img, '', mode + ': geen beeldbron gezet'); assert.equal(v.local, 0); assert.equal(v.media, 0);
+      assert.deepEqual(v.routes, ['home-grid', 'sun-home'], mode + ': data werkt');
+      assert.deepEqual(v.errors, [], mode);
+      assert.ok(v.resolves <= 2, mode + ' resolves ' + v.resolves);
+    }
+    assert.match(res.hang.note, /kon niet worden opgehaald/);
+    return Object.fromEntries(Object.entries(res).map(([k, v]) => [k, v.note + ' · resolves ' + v.resolves]));
+  });
+  await check('RC1-D: handtekening verloopt NA het laden ⇒ beeld blijft staan zonder nieuwe aanvraag; mislukt beeld ⇒ herstel na herverbinding', async () => {
+    log.length = 0;
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=teruglevering&signTtl=1' });
+    await page.waitForTimeout(1500);                                        // handtekening nu verlopen
+    const kept = await page.evaluate(async () => {
+      const card = window.__ha.card, parent = card.parentNode, h = window.__ha.hass;
+      card.remove(); await new Promise(r => setTimeout(r, 100)); parent.appendChild(card);
+      window.__ha.push({ ...h, connected: false }); await new Promise(r => setTimeout(r, 100)); window.__ha.push({ ...h, connected: true });
+      await new Promise(r => setTimeout(r, 400));
+      return { scene: card.shadowRoot.querySelector('.ehc').dataset.scene, resolves: window.__ha.resolves };
+    });
+    const mediaAfter = log.filter(l => l.path.startsWith('/media/')).length;
+    await ctx.close();
+    const { ctx: c2, page: p2, errors: e2 } = await open(browser, base, { query: '?scenario=teruglevering&resolve=fail' });
+    const rec = await p2.evaluate(async () => {
+      const card = window.__ha.card, h = window.__ha.hass, sc = () => card.shadowRoot.querySelector('.ehc').dataset.scene;
+      const a = sc(); window.__ha.resolveMode = 'ok';
+      window.__ha.push({ ...h }); await new Promise(r => setTimeout(r, 300));
+      const noReconnect = sc();                                             // zonder herverbinding: geen nieuwe poging
+      window.__ha.push({ ...h, connected: false }); await new Promise(r => setTimeout(r, 100));
+      window.__ha.push({ ...h, connected: true }); await new Promise(r => setTimeout(r, 1200));
+      return { before: a, noReconnect, after: sc(), resolves: window.__ha.resolves, src: card.shadowRoot.querySelector('.ehm-scene').getAttribute('src') };
+    });
+    await c2.close();
+    assert.equal(kept.scene, 'ok'); assert.equal(kept.resolves, 1); assert.equal(mediaAfter, 1);
+    assert.equal(rec.before, 'error'); assert.equal(rec.noReconnect, 'error'); assert.equal(rec.after, 'ok'); assert.equal(rec.resolves, 2);
+    assert.match(rec.src, /^http:\/\/127\.0\.0\.1:\d+\/media\/local\/energiehuis\/.+\?authSig=/);
+    assert.deepEqual(errors.filter(e => !/40[13]|Failed to load resource/.test(e)), []); assert.deepEqual(e2, []);
+    return { kept, recovered: rec };
+  });
+
   // ---------------------------------------------------------------- screenshots
   if (WANT_SHOTS) {
-    await check('screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht', async () => {
+    await check('screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon', async () => {
       const files = [];
-      for (const [vp, w, h] of [['desktop', 1440, 900], ['mobiel', 390, 844]]) for (const sc of ['zonneladen', 'afname', 'nul-watt', 'offline', 'constant-nacht']) {
+      for (const [vp, w, h] of [['desktop', 1440, 900], ['mobiel', 390, 844]]) for (const sc of ['zonneladen', 'afname', 'nul-watt', 'offline', 'constant-nacht', 'deels-vertraagd', 'niet-synchroon']) {
         const { ctx, page } = await open(browser, base, { width: w, height: h, query: '?scenario=' + sc, dpr: vp === 'mobiel' ? 2 : 1 });
         await page.waitForTimeout(600);
         const f = `ha-live-${vp}-${sc}${IS_CHROMIUM ? '' : '-' + ENGINE}.jpg`;

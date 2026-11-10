@@ -39,6 +39,13 @@
     function callWS(msg) {
       // Simulatie van media_source/resolve_media (alleen-lezen WS-opdracht): de testserver tekent het pad tijdelijk.
       if (!msg || msg.type !== 'media_source/resolve_media') return Promise.reject(new Error('niet ondersteund in de simulatie'));
+      // Testhaken (RC1-D): ?resolve=fail|hang|local|external|empty of window.__ha.resolveMode tijdens de test.
+      var mode = window.__ha.resolveMode;
+      if (mode === 'fail') { window.__ha.resolves++; return Promise.reject(new Error('media_source: niet gevonden')); }
+      if (mode === 'hang') { window.__ha.resolves++; return new Promise(function () {}); }
+      if (mode === 'local') { window.__ha.resolves++; return Promise.resolve({ url: '/local/energiehuis/approved-visual-20261109.webp', mime_type: 'image/webp' }); }
+      if (mode === 'external') { window.__ha.resolves++; return Promise.resolve({ url: 'https://cdn.example.invalid/media/local/energiehuis/x.webp?authSig=a.b', mime_type: 'image/webp' }); }
+      if (mode === 'empty') { window.__ha.resolves++; return Promise.resolve({}); }
       var m = /^media-source:\/\/media_source\/local\/(.+)$/.exec(msg.media_content_id || '');
       if (!m) return Promise.reject(new Error('onbekende bron'));
       window.__ha.resolves++;
@@ -46,6 +53,7 @@
     }
     var extra = { callWS: callWS, hassUrl: function (p) { return new URL(p, location.origin).toString(); } };
     var card = document.createElement('energiehuis-live-cockpit-preview');
+    if (q.get('resolveTimeout')) card._resolveTimeoutMs = +q.get('resolveTimeout');
     function config(sc) {
       var c = Object.assign({}, (EhHaSim.SCENARIOS[sc] && EhHaSim.SCENARIOS[sc].config) || {});
       if (q.get('img') !== '0') c.image = 'media-source://media_source/local/energiehuis/' + (q.get('imgFile') || 'approved-visual-20261109.webp');
@@ -59,7 +67,7 @@
       [].forEach.call(document.querySelectorAll('#sc button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.sc === sc)); });
     }
     window.__ha = {
-      card: card, resolves: 0,
+      card: card, resolves: 0, resolveMode: q.get('resolve') || 'ok',
       set: set,
       get hass() { return hass; },
       push: function (h) { hass = h; card.hass = h; },

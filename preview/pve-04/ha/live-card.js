@@ -9,10 +9,16 @@
  *   hass.callWS({type:'media_source/resolve_media'}) — alleen-lezen WS-opdracht (geen servicecall) voor een
  *                         geauthenticeerde, tijdelijk getekende beeld-URL. Geen tokens, geen REST, geen opslag.
  * Geen bediening, geen servicecalls, geen schrijfacties.
+ *
+ * Beeld (RC1-D): de werkelijke URL-vorm, de authenticatie (authSig-handtekening en de geldigheidsduur ervan) en het
+ * gedrag in de iPhone-app/Safari zijn ONBEVESTIGD totdat een afzonderlijk goedgekeurde test in een echte Home
+ * Assistant is uitgevoerd. Daarom: alleen een same-origin /media/-pad, geen /local/, geen vaste publieke route, geen
+ * eigen tokens; een time-out op het oplossen en bij elke fout een veilige terugval (alleen interface).
  */
 (function (root) {
   'use strict';
   const C = root.EhHaContract, A = root.EhHaAdapter, X = root.EhPve04Master;
+  const RESOLVE_TIMEOUT_MS = 15000;
   const SCRIPT_BASE = (() => { try { const s = document.currentScript && document.currentScript.src; return s ? s.replace(/ha\/live-card\.js(\?.*)?$/, '') : ''; } catch (e) { return ''; } })();
 
   /** Alleen een same-origin pad onder /media/ (eventueel met ?authSig=…) wordt als beeld-URL geaccepteerd. */
@@ -30,6 +36,7 @@
       super();
       this._hass = null; this._config = null; this._adapter = null; this._cockpit = null;
       this._raf = 0; this._timer = 0; this._dirty = false; this._updates = 0; this._hassWaiters = [];
+      this._resolveTimeoutMs = RESOLVE_TIMEOUT_MS; this._wasConnected = null;
       this.attachShadow({ mode: 'open' });
     }
     setConfig(config) {
@@ -68,7 +75,14 @@
       });
     }
     _teardown() { if (this._cockpit) this._cockpit.destroy(); this._cockpit = null; }
-    async _resolveImage(id) {
+    _resolveImage(id) {
+      // Begrensd in tijd: een hangende WS-opdracht of een nooit verschijnend hass-object mag de kaart niet in
+      // "laden" laten hangen. Na de time-out: veilige terugval (alleen interface).
+      let to = 0;
+      const timeout = new Promise((_, rej) => { to = setTimeout(() => rej(new Error('time-out')), this._resolveTimeoutMs); });
+      return Promise.race([this._resolveImageNow(id), timeout]).finally(() => clearTimeout(to));
+    }
+    async _resolveImageNow(id) {
       // wacht op het eerste hass-object (de kaart kan eerder aan de DOM hangen dan hass beschikbaar is)
       const h = this._hass || await new Promise(res => this._hassWaiters.push(res));
       if (!h || typeof h.callWS !== 'function') return null;
@@ -85,6 +99,10 @@
       if (!this._cockpit || !this.isConnected) return;
       const h = this._hass, now = Date.now();
       const changed = this._adapter.changed(h);
+      // Verbinding hersteld na verlies ⇒ een mislukte beeldlaag één keer opnieuw oplossen (nieuwe handtekening).
+      const conn = !!h && h.connected !== false;
+      if (conn && this._wasConnected === false) this._cockpit.retryImage();
+      this._wasConnected = conn;
       if (changed || force || this._dirty) {
         if (changed || force) { this._cockpit.setInput(this._adapter.input(h, now)); this._updates++; }
         this._dirty = false;
@@ -98,5 +116,5 @@
   }
 
   if (!customElements.get('energiehuis-live-cockpit-preview')) customElements.define('energiehuis-live-cockpit-preview', EnergiehuisLiveCockpitPreview);
-  root.EhHaLiveCard = Object.freeze({ EnergiehuisLiveCockpitPreview, safeResolvedUrl });
+  root.EhHaLiveCard = Object.freeze({ EnergiehuisLiveCockpitPreview, safeResolvedUrl, RESOLVE_TIMEOUT_MS });
 })(typeof globalThis !== 'undefined' ? globalThis : this);
