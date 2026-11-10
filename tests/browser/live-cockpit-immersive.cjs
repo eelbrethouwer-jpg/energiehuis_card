@@ -1,0 +1,376 @@
+'use strict';
+// v1.28-voorstel (PR #56) browseracceptatie: immersive Live Cockpit Home + klikbare energieroutes, GESIMULEERDE HA-data.
+//   node tests/browser/live-cockpit-immersive.cjs [--browser=webkit] [--screenshots=<map>]   (EH_LIVE_MASTER=<pad> optioneel)
+// Geen echte Home Assistant. De getekende Media Source-route wordt nagebootst: /media/… alleen met geldige authSig.
+const {chromium,webkit}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
+const browserType=process.argv.includes('--browser=webkit') ? webkit : chromium;
+const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+
+const source=fs.readFileSync(path.join(__dirname,'..','..','energiehuis-card.js'),'utf8');
+const SHOTS=(process.argv.find(a=>a.startsWith('--screenshots='))||'').split('=')[1]||'';
+
+// Testbeeld 1330×748 (PNG, effen kleurverloop) tenzij een lokale master is opgegeven (alleen voor lokale screenshots).
+function png(w,h){
+ const crcT=new Int32Array(256).map((_,n)=>{let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;return c;});
+ const crc=b=>{let c=-1;for(const x of b)c=crcT[(c^x)&255]^(c>>>8);return (c^-1)>>>0;};
+ const chunk=(t,d)=>{const l=Buffer.alloc(4);l.writeUInt32BE(d.length);const td=Buffer.concat([Buffer.from(t),d]);const c=Buffer.alloc(4);c.writeUInt32BE(crc(td));return Buffer.concat([l,td,c]);};
+ const raw=Buffer.alloc((w*3+1)*h);
+ for(let y=0;y<h;y++){raw[y*(w*3+1)]=0;for(let x=0;x<w;x++){const o=y*(w*3+1)+1+x*3;raw[o]=20+Math.round(40*y/h);raw[o+1]=30+Math.round(50*x/w);raw[o+2]=60;}}
+ const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(w,0);ihdr.writeUInt32BE(h,4);ihdr[8]=8;ihdr[9]=2;
+ return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',zlib.deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);
+}
+const MASTER=process.env.EH_LIVE_MASTER?{body:fs.readFileSync(process.env.EH_LIVE_MASTER),type:'image/webp'}:{body:png(1330,748),type:'image/png'};
+const SECRET=crypto.randomBytes(16);
+const sign=(p,ttl)=>{const pl=Buffer.from(JSON.stringify({p,exp:Date.now()+ttl*1000})).toString('base64url');return pl+'.'+crypto.createHmac('sha256',SECRET).update(pl).digest('base64url');};
+const verify=(p,sig)=>{if(!sig||!sig.includes('.'))return 401;const [pl,mac]=sig.split('.');if(crypto.createHmac('sha256',SECRET).update(pl).digest('base64url')!==mac)return 403;const o=JSON.parse(Buffer.from(pl,'base64url').toString());return o.p!==p||Date.now()>o.exp?403:0;};
+const log=[];
+const html='<!doctype html><html lang="nl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#071522;font-family:Arial}energiehuis-card{display:block;max-width:1300px;margin:auto}</style><energiehuis-card></energiehuis-card><script src="/card.js"></script>';
+const server=http.createServer((q,r)=>{
+ const u=new URL(q.url,'http://x');log.push(u.pathname+u.search);
+ if(u.pathname==='/card.js'){r.setHeader('Content-Type','text/javascript');return r.end(source);}
+ if(u.pathname==='/__sign'){const p=u.searchParams.get('path');r.setHeader('Content-Type','application/json');return r.end(JSON.stringify({url:p+'?authSig='+sign(p,+(u.searchParams.get('ttl')||30)),mime_type:MASTER.type}));}
+ if(u.pathname.startsWith('/media/')){const why=u.pathname==='/media/local/energiehuis/master.webp'?verify(u.pathname,u.searchParams.get('authSig')):404;if(why){r.statusCode=why;return r.end();}r.setHeader('Content-Type',MASTER.type);return r.end(MASTER.body);}
+ if(u.pathname!=='/'){r.statusCode=404;return r.end();}
+ r.setHeader('Content-Type','text/html');r.end(html);
+});
+
+// In de pagina: kaart met gesimuleerde HA-states; hass.callWS ondersteunt alleen resolve_media (rest: lege antwoorden).
+const SETUP=([config,mode])=>{
+ const card=document.querySelector('energiehuis-card');
+ card._loadHistory=async()=>{};window.__metricLoads=[];card._loadMetricData=async function(){window.__metricLoads.push(this._detail);};card._loadCostCompare=async()=>{};card._loadCupraInsights=async()=>{};
+ window.__resolves=0;window.__resolveMode=mode||'ok';window.__calls=[];
+ const now=Date.now(),iso=s=>new Date(now-s*1000).toISOString();
+ const st=(id,v,unit,age=2)=>({entity_id:id,state:String(v),attributes:unit?{unit_of_measurement:unit}:{},last_updated:iso(age),last_changed:iso(age),last_reported:iso(age)});
+ card.setConfig(config);
+ const c=card.config;
+ const states={};
+ for(const [k,v,u,age] of [['net',-380,'W'],['zonnepanelen',4820,'W'],['huis',1460,'W'],['laden',2980,'W'],['cupra',58,'%',300],['batterij',72,'%',300],['prijs',.17,'€/kWh'],['stroom',13,'A']])states[c[k]]=st(c[k],v,u,age);
+ window.__st=st;
+ window.__hass={connected:true,states,callWS:async msg=>{
+   window.__calls.push(msg.type);
+   if(msg.type==='media_source/resolve_media'){
+    window.__resolves++;
+    if(window.__resolveMode==='fail')throw new Error('niet gevonden');
+    if(window.__resolveMode==='local')return {url:'/local/energiehuis/master.webp'};
+    if(window.__resolveMode==='hang')return new Promise(()=>{});
+    const m=/^media-source:\/\/media_source\/local\/(.+)$/.exec(msg.media_content_id);
+    return (await fetch('/__sign?path='+encodeURIComponent('/media/local/'+m[1]))).json();
+   }
+   return {};
+  },callApi:async()=>[],callService:()=>{throw Error('Ongewenste servicecall')},hassUrl:p=>new URL(p,location.origin).toString()};
+ card.hass=window.__hass;
+ window.__push=(patch,extra={})=>{const s={...window.__hass.states};for(const [k,v,u] of patch)s[c[k]]=st(c[k],v,u||'W',0);window.__hass={...window.__hass,...extra,states:s};card.hass=window.__hass;};
+};
+const LIVE={live_cockpit:true,live_cockpit_image:'media-source://media_source/local/energiehuis/master.webp',mobile_fixed_navigation:false};
+const frames=(page,n=2)=>page.evaluate(n=>new Promise(r=>{let i=0;const f=()=>++i>=n?r():requestAnimationFrame(f);requestAnimationFrame(f);}),n);
+const STATE=()=>{
+ const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,host=root.querySelector('.eh-live-home');
+ const sr=host&&host.shadowRoot,ehc=sr&&sr.querySelector('.ehc');
+ const tile=k=>sr&&sr.querySelector('.ehm-tiles .tile[data-key="'+k+'"]');
+ return {
+  view:card._view,live:!!host,eh40:!!root.querySelector('.eh40-cockpit'),configError:root.querySelector('.eh-live-config-error')?.textContent||null,
+  legacy:!!root.querySelector('.eh26-legacy'),legacyOpen:root.querySelector('.eh26-legacy')?.open??null,nav:[...root.querySelectorAll('.eh26-navitem')].map(b=>b.textContent.trim()),
+  scene:ehc?.dataset.scene,layout:ehc?.dataset.layout,note:sr?.querySelector('.ehc-scene-note')?.textContent,badge:sr?.querySelector('.ehc-demo')?.textContent,badgeState:sr?.querySelector('.ehc-demo')?.dataset.state,
+  status:sr?.querySelector('.ehc-status')?.textContent,net:tile('net')?.querySelector('.t-value')?.textContent,netSub:tile('net')?.querySelector('.t-sub')?.textContent,
+  text:ehc?.textContent||'',img:sr?.querySelector('.ehm-scene')?.getAttribute('src')||'',
+  particles:card._ehLive?.ctl?.cockpit.particleInfo().filter(p=>p.active).map(p=>p.route).sort()||[],
+  debug:card._ehLive?.ctl?{...card._ehLive.ctl.debug,cockpitSuspended:card._ehLive.ctl.cockpit.suspended}:null,
+  overflow:document.documentElement.scrollWidth>innerWidth+1,
+  hostRect:host?(r=>({l:Math.round(r.left),r:Math.round(r.right),w:Math.round(r.width)}))(host.getBoundingClientRect()):null
+ };
+};
+
+const results=[];let failed=0;
+async function check(name,fn){
+ try{const info=await fn();results.push(name);console.log('PASS',name,info?JSON.stringify(info).slice(0,280):'');}
+ catch(e){failed++;console.log('FAIL',name,'-',process.env.EH_VERBOSE?e.stack:e.message.split('\n')[0]);}
+}
+
+const IMM={...LIVE,live_cockpit_immersive:true};
+const SHOT_SET=process.argv.includes('--screenshots-all');
+
+// Meting van de immersive Home in de pagina (kaart-shadow + Live Cockpit-shadow).
+const HOME=()=>{
+ const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,shell=root.querySelector('.shell'),host=root.querySelector('.eh-live-home');
+ const sr=host&&host.shadowRoot,ehc=sr&&sr.querySelector('.ehc'),stage=sr&&sr.querySelector('.ehm-stage');
+ const vis=el=>!!el&&el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden';
+ const st=stage?stage.getBoundingClientRect():null,nav=root.querySelector('.shell > .nav').getBoundingClientRect();
+ const S=card._ehLive?.ctl?EhLiveCockpit.scope.EhPve04MasterScene:null;
+ const tiles=sr?[...sr.querySelectorAll('.ehm-tiles .tile')].map(b=>{
+  const r=b.getBoundingClientRect(),layout=ehc.dataset.layout,cx=r.left+r.width/2,cy=r.top+r.height/2;
+  const pts=layout==='list'?[[cx,cy]]:[[cx,cy],[cx-21,cy],[cx+21,cy],[cx,cy-21],[cx,cy+21]];
+  const navTop=root.querySelector('.shell > .nav').getBoundingClientRect().top;
+  const hit=pts.every(([x,y])=>{if(x<0||y<0||x>innerWidth||y>=Math.min(innerHeight,navTop))return true;   // onder de ondernavigatie: na scrollen bereikbaar
+   const e=sr.elementFromPoint(x,y);return !!e&&e.closest('.tile')===b;});
+  let covers=true;
+  if(layout!=='list'&&S){const c=S.covers[b.dataset.key].baked;covers=r.left<=st.left+c.x*st.width+.5&&r.top<=st.top+c.y*st.height+.5&&r.right>=st.left+(c.x+c.w)*st.width-.5&&r.bottom>=st.top+(c.y+c.h)*st.height-.5;}
+  return {key:b.dataset.key,x:Math.round(r.left),b:Math.round(r.bottom),w:Math.round(r.width),h:Math.round(r.height),hit,covers,haspopup:b.hasAttribute('aria-haspopup'),label:b.getAttribute('aria-label')};
+ }):[];
+ return {
+  view:card._view,imm:shell.classList.contains('eh-imm-home'),portrait:!!host&&host.hasAttribute('data-imm-portrait'),total:host?.style.getPropertyValue('--eh-imm-total'),hostW:host?Math.round(host.getBoundingClientRect().width):0,all:shell.classList.contains('eh-imm-all'),live:!!host,immAttr:!!host&&host.hasAttribute('data-immersive'),
+  layout:ehc?.dataset.layout,scene:ehc?.dataset.scene,heroVisible:vis(root.querySelector('.shell > .hero')),legacyVisible:vis(root.querySelector('.eh26-legacy')),
+  coachVisible:vis(root.querySelector('.eh17-panel')),chartVisible:vis(root.querySelector('.chart-panel')),eh40:!!root.querySelector('.eh40-cockpit'),
+  stage:st&&{l:Math.round(st.left),r:Math.round(st.right),t:Math.round(st.top),b:Math.round(st.bottom),ratio:+(st.width/st.height).toFixed(3)},navTop:Math.round(nav.top),innerW:innerWidth,innerH:innerHeight,
+  overflow:document.documentElement.scrollWidth>innerWidth+1,ambient:!!sr?.querySelector('.eh-imm-ambient'),badge:sr?.querySelector('.ehc-demo')?.textContent,tiles
+ };
+};
+const clickTile=(page,key)=>page.evaluate(k=>{const h=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home');h.shadowRoot.querySelector('.ehm-tiles .tile[data-key="'+k+'"]').click();},key);
+const PAGE=()=>{
+ const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,main=root.querySelector('.eh-imm-page,.cupra-page,.subpage');
+ const ae=root.activeElement;
+ return {view:card._view,detail:card._detail,page:main?.dataset.ehImmPage||null,title:main?.querySelector('h2')?.textContent||null,
+  back:!!root.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]'),backLabel:root.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]')?.getAttribute('aria-label'),
+  follow:!!root.querySelector('.eh-imm-follow[data-eh-page="charge"]'),pane:!!main?.querySelector('.detail-panel'),text:main?.textContent||'',focus:ae?(ae.id||ae.className||ae.tagName):null,
+  live:!!root.querySelector('.eh-live-home'),suspended:card._ehLive?.ctl?.debug.suspended,loads:window.__metricLoads.slice(),overflow:document.documentElement.scrollWidth>innerWidth+1};
+};
+
+(async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const base='http://127.0.0.1:'+server.address().port;
+ const browser=await browserType.launch({headless:true});
+ console.log(browserType.name(),browser.version());
+ async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false}={}){
+  const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:'Europe/Amsterdam',reducedMotion,hasTouch});
+  const page=await ctx.newPage();const errors=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/40[134]|Failed to load resource/.test(m.text()))errors.push(m.text());});
+  await page.addInitScript(()=>{const RO=window.ResizeObserver;window.__ro=0;window.ResizeObserver=class extends RO{constructor(cb){super(cb);window.__ro++;}};});
+  await page.goto(base);if(fontScale!==1)await page.addStyleTag({content:'html{font-size:'+(fontScale*100)+'%}'});await page.evaluate(SETUP,[config,mode]);
+  if(wait&&config.live_cockpit===true)await page.waitForFunction(()=>{const h=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home');const e=h&&h.shadowRoot.querySelector('.ehc');return e&&e.dataset.scene!=='loading';},null,{timeout:15000});
+  await frames(page,4);
+  return {ctx,page,errors};
+ }
+
+ await check('opt-in UIT: live_cockpit zonder immersive = v1.27-gedrag (hero, alle metingen, detaildialoog); immersive zonder live_cockpit = genegeerd',async()=>{
+  const {ctx,page,errors}=await open(LIVE);
+  const a=await page.evaluate(HOME);
+  await clickTile(page,'pv');await frames(page,3);
+  const afterClick=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {view:c._view,dialog:!c.shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.ehc-detail').hidden};});
+  await ctx.close();
+  const b=await (async()=>{const {ctx,page}=await open({live_cockpit_immersive:true,mobile_fixed_navigation:false});const s=await page.evaluate(HOME);await ctx.close();return s;})();
+  assert.equal(a.imm,false);assert.equal(a.immAttr,false);assert.equal(a.legacyVisible,true);assert.ok(a.tiles.every(t=>t.haspopup));
+  assert.deepEqual(afterClick,{view:'overview',dialog:true});
+  assert.equal(b.live,false);assert.equal(b.eh40,true);assert.equal(b.imm,false);
+  assert.deepEqual(errors,[]);
+  return {v127:{imm:a.imm,legacy:a.legacyVisible},afterClick,immersiveWithoutLive:{live:b.live,eh40:b.eh40}};
+ });
+
+ // Portret (smal én hoog): volle-breedte scène + routekaarten eronder (lijst). Tablet, desktop en liggend: kaarten op de master.
+ const VPS=[[320,568,'list',true],[390,844,'list',true],[430,932,'list',true],[768,1024,'compact',false],[1280,800,null,false],[844,390,'compact',false]];
+ for(const [w,h,layout,portrait] of VPS){
+  await check(`immersive Home ${w}×${h}: één visual, oude modules verborgen, master volledig zichtbaar (contain), tikvlakken ≥44 px, geen horizontale scroll`,async()=>{
+   const {ctx,page,errors}=await open(IMM,{width:w,height:h});
+   const s=await page.evaluate(HOME);
+   if(SHOTS)await page.screenshot({path:path.join(SHOTS,`imm-home-${w}x${h}-${browserType.name()}.png`)});
+   await ctx.close();
+   assert.equal(s.imm,true);assert.equal(s.immAttr,true);assert.equal(s.view,'overview');
+   assert.deepEqual([s.heroVisible,s.legacyVisible,s.coachVisible,s.chartVisible,s.eh40],[false,false,false,false,false]);
+   if(layout)assert.equal(s.layout,layout);
+   assert.equal(s.portrait,portrait,'portretstand');
+   if(portrait){
+    assert.ok(s.stage.r-s.stage.l>=s.hostW-10,'portret: scène over (vrijwel) de volle breedte '+JSON.stringify([s.stage,s.hostW]));
+    const cols=new Set(s.tiles.map(t=>t.x)).size;
+    assert.equal(cols,w>=390?2:1,'kolommen routekaarten');
+    if(w>=390)assert.ok(s.tiles.every(t=>t.b<=s.navTop),'portret ≥390: alle zes routes zichtbaar zonder scrollen '+JSON.stringify([s.tiles.map(t=>t.b),s.navTop]));
+   }
+   assert.equal(s.overflow,false);
+   assert.ok(s.stage.l>=0&&s.stage.r<=s.innerW,'scène horizontaal volledig zichtbaar');
+   assert.ok(Math.abs(s.stage.ratio-1330/748)<0.02,'verhouding behouden '+s.stage.ratio);
+   if(s.layout!=='list')assert.ok(s.stage.b<=Math.min(s.innerH,s.navTop)+1,'scène boven de ondernavigatie: '+JSON.stringify([s.stage,s.navTop,s.innerH]));
+   assert.deepEqual(s.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlak');
+   assert.deepEqual(s.tiles.filter(t=>!t.covers).map(t=>t.key),[],'dekking');
+   if(s.layout==='list')assert.ok(s.tiles.every(t=>t.w>=44&&t.h>=44));
+   assert.ok(s.tiles.every(t=>!t.haspopup&&/Pagina openen\./.test(t.label)),'navigatiesemantiek');
+   assert.ok(s.scene!=='ok'||s.ambient,'achtergrondverlenging');
+   assert.deepEqual(errors,[]);
+   return {layout:s.layout,portrait:s.portrait,stage:s.stage,stageShare:+(((s.stage.r-s.stage.l)*(s.stage.b-s.stage.t))/(s.hostW*parseFloat(s.total))).toFixed(2),navTop:s.navTop};
+  });
+ }
+
+ await check('klikroutes: zon/huis/net → eigen pagina met bestaand energiedetail; batterij → Batterij; Cupra → Cupra + Slim laden; praktijk → read-only; telkens terug naar Home met focus op de kaart',async()=>{
+  const {ctx,page,errors}=await open(IMM,{width:390,height:844});
+  const out={};
+  for(const [key,view] of [['pv','sun'],['house','home'],['net','grid'],['battery','battery'],['cupra','cupra'],['practice','practice']]){
+   await page.evaluate(()=>{window.__metricLoads.length=0;});
+   await clickTile(page,key);await frames(page,3);
+   const p=await page.evaluate(PAGE);
+   if(SHOTS&&SHOT_SET)await page.screenshot({path:path.join(SHOTS,`imm-page-${view}-${browserType.name()}.png`),fullPage:true});
+   let follow=null;
+   if(key==='cupra'){await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-follow').click());await frames(page,3);follow=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);}
+   await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]').click());
+   await frames(page,3);
+   const home=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),h=c.shadowRoot.querySelector('.eh-live-home');return {view:c._view,imm:c.shadowRoot.querySelector('.shell').classList.contains('eh-imm-home'),focus:h?.shadowRoot.activeElement?.dataset?.key||null,suspended:c._ehLive.ctl.debug.suspended};});
+   out[key]={view:p.view,page:p.page,title:p.title,pane:p.pane,loads:p.loads,back:p.back,backLabel:p.backLabel,follow,home,practiceNumbers:key==='practice'?/\d+([.,]\d+)?\s?(k?W|kWh)\b/.test(p.text):undefined,live:p.live,suspended:p.suspended,overflow:p.overflow};
+  }
+  await ctx.close();
+  for(const [key,view] of [['pv','sun'],['house','home'],['net','grid']]){const o=out[key];assert.equal(o.view,view);assert.equal(o.page,view);assert.equal(o.pane,true,key+' energiedetail');assert.deepEqual(o.loads,[view],key+' meetdata');}
+  assert.equal(out.pv.title,'Zonnepanelen');assert.equal(out.house.title,'Huisverbruik');assert.equal(out.net.title,'Net');
+  assert.equal(out.battery.view,'battery');assert.equal(out.battery.back,true);
+  assert.equal(out.cupra.view,'cupra');assert.equal(out.cupra.follow,'charge');
+  assert.equal(out.practice.view,'practice');assert.equal(out.practice.practiceNumbers,false);
+  for(const [k,o] of Object.entries(out)){assert.equal(o.live,false,k);assert.equal(o.suspended,true,k+' cockpit gepauzeerd');assert.equal(o.backLabel,'Terug naar Home',k);assert.equal(o.overflow,false,k);
+   if(k!=='cupra'){assert.deepEqual(o.home,{view:'overview',imm:true,focus:k,suspended:false},k);}}
+  assert.deepEqual(errors,[]);
+  return Object.fromEntries(Object.entries(out).map(([k,o])=>[k,o.view+(o.follow?'→'+o.follow:'')]));
+ });
+
+ await check('ondernavigatie en Inzicht: Home-knop terug; Inzicht bevat Zon/Huis/Net/Praktijk/Alle metingen; "Alle metingen" toont de oude Home-inhoud met de cockpit gepauzeerd',async()=>{
+  const {ctx,page,errors}=await open(IMM,{width:1280,height:800});
+  await clickTile(page,'net');await frames(page,3);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-navitem[data-eh-page="overview"]').click());await frames(page,3);
+  const viaNav=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
+  const menu=await page.evaluate(()=>[...document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('.eh26-insight-menu button strong')].map(x=>x.textContent));
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu [data-eh-page="sun"]').click());await frames(page,3);
+  const viaMenu=await page.evaluate(PAGE);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu [data-eh-imm-all]').click());await frames(page,3);
+  const all=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;return {view:c._view,all:r.querySelector('.shell').classList.contains('eh-imm-all'),live:!!r.querySelector('.eh-live-home'),legacyOpen:r.querySelector('.eh26-legacy')?.open,metrics:r.querySelectorAll('.eh26-legacy .metric').length,coach:!!r.querySelector('.eh17-panel'),chart:!!r.querySelector('.chart-panel'),suspended:c._ehLive.ctl.debug.suspended,focus:r.activeElement?.id};});
+  if(SHOTS&&SHOT_SET)await page.screenshot({path:path.join(SHOTS,`imm-alle-metingen-${browserType.name()}.png`),fullPage:true});
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-allhead .eh-imm-back').click());await frames(page,3);
+  const back=await page.evaluate(HOME);
+  await ctx.close();
+  assert.equal(viaNav,'overview');
+  for(const m of ['Zonnepanelen','Huisverbruik','Net','Praktijkruimte','Alle metingen','Cupra inzichten','Thuisbatterij'])assert.ok(menu.includes(m),m);
+  assert.equal(viaMenu.view,'sun');assert.equal(viaMenu.pane,true);
+  assert.deepEqual([all.view,all.all,all.live,all.legacyOpen,all.coach,all.chart,all.suspended,all.focus],['overview',true,false,true,true,true,true,'eh-imm-title']);
+  assert.ok(all.metrics>=6);
+  assert.equal(back.imm,true);assert.equal(back.live,true);
+  assert.deepEqual(errors,[]);
+  return {menu,all};
+ });
+
+ await check('levenscyclus: 60 hass-updates op Home en 3× alle routes heen en terug ⇒ zelfde cockpit en master (1 resolve), geen extra ResizeObservers/timers, één klik = één navigatie',async()=>{
+  log.length=0;
+  const {ctx,page,errors}=await open(IMM,{width:390,height:844});
+  const r=await page.evaluate(async()=>{
+   const card=document.querySelector('energiehuis-card'),host0=card.shadowRoot.querySelector('.eh-live-home'),img0=host0.shadowRoot.querySelector('.ehm-scene');
+   const ro0=window.__ro,fr=()=>new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));
+   let navs=0;const nav=card._ehImmNavigate;card._ehImmNavigate=function(k){navs++;return nav.call(this,k);};
+   for(let i=1;i<=60;i++){window.__push([['net',-400-i]]);if(i%10===0)await fr();}
+   const views=[];
+   for(let round=0;round<3;round++)for(const k of ['pv','house','net','battery','cupra','practice']){
+    card.shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.ehm-tiles .tile[data-key="'+k+'"]').click();await fr();views.push(card._view);
+    card.shadowRoot.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]').click();await fr();
+   }
+   await new Promise(res=>setTimeout(res,200));
+   const host1=card.shadowRoot.querySelector('.eh-live-home');
+   return {sameHost:host0===host1,sameImg:host1.shadowRoot.querySelector('.ehm-scene')===img0,ro:window.__ro-ro0,navs,views:views.length,resolves:window.__resolves,dbg:card._ehLive.ctl.debug,anim:card._ehLive.ctl.cockpit.isAnimating(),net:host1.shadowRoot.querySelector('.tile[data-key="net"] .t-value').textContent};
+  });
+  const media=log.filter(l=>l.startsWith('/media/')).length;await ctx.close();
+  assert.equal(r.sameHost,true);assert.equal(r.sameImg,true);assert.equal(r.ro,0,'geen nieuwe ResizeObservers');
+  assert.equal(r.navs,18,'één klik = één navigatie');assert.equal(r.resolves,1);assert.equal(media,1);
+  assert.equal(r.dbg.suspended,false);assert.equal(r.dbg.timer,true);assert.equal(r.anim,true);
+  assert.match(r.net,/^−460\s?W$/);assert.deepEqual(errors,[]);
+  return r;
+ });
+
+ // Echte pointer- en touchinvoer (geen DOM-.click()): per doel controleren dat het zichtbaar, bereikbaar (eventueel na
+ // scrollen) en op het tikpunt NIET bedekt is (elementFromPoint door alle shadow-roots heen: ondernavigatie, overlays,
+ // waas, lichtpunten), en dan op dat punt klikken of tikken.
+ const TARGET=([sel,key])=>{
+  const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,host=root.querySelector('.eh-live-home');
+  const scope=sel==='back'?root:host.shadowRoot;
+  const el=sel==='back'?root.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]'):scope.querySelector(sel+'[data-key="'+key+'"]');
+  if(!el)return {missing:true};
+  const navTop=root.querySelector('.shell > .nav').getBoundingClientRect().top,limit=Math.min(innerHeight,navTop);
+  let r=el.getBoundingClientRect(),scrolled=false;
+  if(r.top<0||r.bottom>limit){window.scrollBy({top:r.top+r.height/2-limit/2,behavior:'instant'});r=el.getBoundingClientRect();scrolled=true;}
+  const cs=getComputedStyle(el);
+  const visible=r.width>0&&r.height>0&&cs.visibility!=='hidden'&&+cs.opacity>0&&cs.display!=='none';
+  const deep=(x,y)=>{let e=document.elementFromPoint(x,y);for(let i=0;i<4&&e&&e.shadowRoot;i++){const n=e.shadowRoot.elementFromPoint(x,y);if(!n||n===e)break;e=n;}return e;};
+  const cx=r.left+r.width/2,cy=r.top+r.height/2,dx=Math.min(14,r.width*.3),dy=Math.min(10,r.height*.3);
+  const pts=[[cx,cy],[cx-dx,cy],[cx+dx,cy],[cx,cy-dy],[cx,cy+dy]];
+  const blocked=pts.map(([x,y])=>{const e=deep(x,y);return e&&(e===el||el.contains(e))?null:(e?(e.className&&e.className.baseVal===undefined?String(e.className):e.tagName)||e.tagName:'niets');}).filter(Boolean);
+  return {x:Math.round(cx),y:Math.round(cy),w:Math.round(r.width),h:Math.round(r.height),visible,inView:r.top>=0&&r.bottom<=limit+.5&&r.left>=0&&r.right<=innerWidth,blocked,scrolled};
+ };
+ const ROUTES={pv:['sun','sun'],house:['home','home'],net:['grid','grid'],battery:['battery',null],cupra:['cupra',null],practice:['practice',null]};
+ // Portret 320/390/430: muis én touch, kaarten én vlakken. Tablet (touch) en desktop (muis): kaarten op de master.
+ const COMBOS=[[320,568,'pointer'],[320,568,'touch'],[390,844,'pointer'],[390,844,'touch'],[430,932,'pointer'],[430,932,'touch'],[768,1024,'touch'],[1280,800,'pointer']];
+ for(const [w,h,input] of COMBOS){
+  {
+   await check(`echte ${input==='touch'?'touch-tik':'muisklik'} ${w}×${h}: ${w<600?'zes routekaarten én zes vlakken op de master':'zes kaarten op de master'} zichtbaar, bereikbaar, niet bedekt (ondernavigatie/overlays) en navigeren; Terug idem`,async()=>{
+    const {ctx,page,errors}=await open(IMM,{width:w,height:h,hasTouch:input==='touch'});
+    const press=(x,y)=>input==='touch'?page.touchscreen.tap(x,y):page.mouse.click(x,y);
+    const out=[];
+    const list=await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.ehc').dataset.layout==='list');
+    assert.equal(list,w<600,'portret ⇒ lijst met vlakken op de master');
+    for(const sel of list?['.ehm-tiles .tile','.ehm-covers .ehm-plate']:['.ehm-tiles .tile']){
+     for(const key of Object.keys(ROUTES)){
+      await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+      const t=await page.evaluate(TARGET,[sel,key]);
+      assert.ok(!t.missing,sel+' '+key+' ontbreekt');
+      assert.ok(t.visible&&t.inView,sel+' '+key+' zichtbaar: '+JSON.stringify(t));
+      assert.deepEqual(t.blocked,[],sel+' '+key+' bedekt op het tikpunt');
+      if(sel.includes('tile'))assert.ok(t.w>=44&&t.h>=44,'routekaart ≥44 px: '+JSON.stringify(t));
+      await press(t.x,t.y);await frames(page,3);
+      const p=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {view:c._view,detail:c._detail};});
+      assert.deepEqual([p.view,p.detail],ROUTES[key],sel+' '+key+' bestemming');
+      const b=await page.evaluate(TARGET,['back']);
+      assert.ok(b.visible&&b.inView&&!b.blocked.length,'Terug bereikbaar: '+JSON.stringify(b));
+      await press(b.x,b.y);await frames(page,3);
+      assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._view),'overview',key+' terug naar Home');
+      out.push((sel.includes('tile')?'k:':'m:')+key+(t.scrolled?'(scroll)':''));
+     }
+    }
+    await ctx.close();
+    if(w>=390)assert.ok(!out.some(x=>x.includes('scroll')),'≥390 px: geen scroll nodig '+out.join(' '));
+    assert.deepEqual(errors,[]);
+    return {input,targets:out.length,scrolled:out.filter(x=>x.includes('scroll'))};
+   });
+  }
+ }
+
+ await check('toetsenbord en VoiceOver-semantiek: Tab naar kaart, Enter ⇒ pagina met focus op de kop; Enter op "Terug naar Home" ⇒ focus terug op de kaart',async()=>{
+  const {ctx,page,errors}=await open(IMM,{width:1280,height:800});
+  let key=null;
+  for(let i=0;i<20&&!key;i++){await page.keyboard.press('Tab');key=await page.evaluate(()=>{const h=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home');const a=h?.shadowRoot.activeElement;return a?.classList.contains('tile')?a.dataset.key:null;});}
+  await page.keyboard.press('Enter');await frames(page,3);
+  const onPage=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),a=c.shadowRoot.activeElement;return {view:c._view,focus:a?.id||a?.tagName,role:a?.tagName};});
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]').focus());
+  await page.keyboard.press('Enter');await frames(page,3);
+  const back=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),h=c.shadowRoot.querySelector('.eh-live-home');return {view:c._view,focus:h.shadowRoot.activeElement?.dataset?.key};});
+  await ctx.close();
+  assert.ok(key);assert.notEqual(onPage.view,'overview');assert.ok(onPage.role==='H2'||onPage.focus==='eh-imm-title',JSON.stringify(onPage));
+  assert.deepEqual(back,{view:'overview',focus:key});
+  assert.deepEqual(errors,[]);
+  return {key,onPage,back};
+ });
+
+ await check('robuust: ontbrekende master, offline en verouderde Alfen ⇒ Home blijft bruikbaar en alle bestemmingen bereikbaar; geen servicecalls',async()=>{
+  const res={};
+  for(const [name,mode,mut] of [['geen-master','fail',null],['offline','ok','offline'],['alfen-oud','ok','alfen']]){
+   const {ctx,page,errors}=await open(IMM,{width:390,height:844,mode});
+   if(mut==='offline')await page.evaluate(()=>window.__push([],{connected:false}));
+   if(mut==='alfen')await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states},o=s[c.laden];s[c.laden]={...o,state:'2980',last_updated:new Date(Date.now()-7200000).toISOString(),last_changed:new Date(Date.now()-7200000).toISOString(),last_reported:new Date(Date.now()-7200000).toISOString()};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});
+   await frames(page,4);
+   const s=await page.evaluate(HOME);const reached=[];
+   for(const [key,view] of [['pv','sun'],['house','home'],['net','grid'],['battery','battery'],['cupra','cupra'],['practice','practice']]){
+    await clickTile(page,key);await frames(page,3);reached.push((await page.evaluate(()=>document.querySelector('energiehuis-card')._view))===view);
+    await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]').click());await frames(page,3);
+   }
+   // Alleen-lezen WS-opdrachten (beeld, recorder, history) zijn toegestaan; geen servicecalls of schrijfacties.
+   const calls=await page.evaluate(()=>window.__calls.filter(c=>!['media_source/resolve_media','recorder/statistics_during_period','history/history_during_period'].includes(c)));
+   res[name]={layout:s.layout,scene:s.scene,imm:s.imm,badge:s.badge,reached:reached.every(Boolean),calls,errors};
+   await ctx.close();
+  }
+  assert.equal(res['geen-master'].layout,'list');assert.equal(res['geen-master'].scene,'error');
+  assert.match(res.offline.badge,/OFFLINE|Offline/);
+  for(const [n,v] of Object.entries(res)){assert.equal(v.imm,true,n);assert.equal(v.reached,true,n);assert.deepEqual(v.calls,[],n);assert.deepEqual(v.errors,[],n);}
+  return res;
+ });
+
+ await check('reduced motion en 200 % tekst: geen animatielus; navigatie werkt; lijstweergave zonder afkapping of horizontale scroll',async()=>{
+  const {ctx,page,errors}=await open(IMM,{width:390,height:844,reducedMotion:'reduce',fontScale:2});
+  const anim=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehLive.ctl.cockpit.isAnimating());
+  const s=await page.evaluate(HOME);
+  await clickTile(page,'house');await frames(page,3);const v=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);
+  await ctx.close();
+  assert.equal(anim,false);assert.equal(s.layout,'list');assert.equal(s.overflow,false);assert.equal(v,'home');
+  assert.deepEqual(errors,[]);
+  return {anim,layout:s.layout,v};
+ });
+
+ await browser.close();server.close();
+ console.log(`\n${results.length}/${results.length+failed} immersive-controles geslaagd (${browserType.name()} ${''})`);
+ process.exit(failed?1:0);
+})().catch(e=>{console.error(e);process.exit(1);});

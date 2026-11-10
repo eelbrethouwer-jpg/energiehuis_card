@@ -2,22 +2,22 @@
 
 ## Actuele status — 10 november 2026
 
-Gecontroleerd tegen GitHub door ChatGPT. Verifieer actuele HEAD, CI en releases opnieuw vóór de publicatie.
+**Bron van waarheid:** GitHub. Deze momentopname gebruikt `main` `608d1f6bc78a19e582900fae338533618048650b`, PR #56 code-HEAD `457876c11fa9684a36eedaf73cf24e626a58b380` en v1.27.0 als laatste gepubliceerde release. Controleer actuele SHA's en CI voor volgende acties.
 
 | Onderdeel | Status |
 |---|---|
-| Integratie in `main` | PR #54 Live Cockpit gemerged op `c69613ae80b306693326039c37aa03276dd0ad21` |
-| Gebouwde functionaliteit | Premium PVE-04/HA-01 Live Cockpit in bestaande `<energiehuis-card>`; standaard UIT (`live_cockpit: true` activeert). Beeld afzonderlijk via HA Media Source |
-| Releasetraject | Aparte branch `release/energiehuis-v1.27.0-live-cockpit`; release-PR en CI moeten nog worden gecontroleerd |
-| Momenteel gepubliceerde release | `v1.25.0`, gepubliceerd 7 november 2026. Een v1.27.0-release is nog NIET gepubliceerd |
-| Versie vóór release-PR | `main` op mergecommit #54 gebruikt nog `EH_VERSION = 1.25.0`. De afzonderlijke release-PR beoogt `v1.27.0` in broncode, kaartnaam en HACS-bundel |
-| Automatische tests | PR #54 en mergecommit #54: Node UTC/Amsterdam, Chromium en WebKit Live Cockpit, bestaande regressies en validate groen. Voor de release-HEAD opnieuw testen |
-| Praktische HA/iPhone-validatie | NIET uitgevoerd. Echte sensoren, media-authenticatie en Companion-app blijven open |
-| Veiligheid | Nieuwe cockpit alleen-lezen; geen nieuwe Alfen-servicecalls, opslagmigraties of wijzigingen aan laadregeling |
+| Huidige gepubliceerde versie | **v1.27.0** — GitHub-release gepubliceerd op 10 november 2026; de huidige Live Cockpit werkt volgens door eigenaar gedeelde HA/iPhone-screenshots na correcte Media Source-koppeling. |
+| Feature-PR | **#56, Immersive Live Cockpit Home**, draft op `feature/live-cockpit-immersive-home-navigation`; code-HEAD `457876c11fa9684a36eedaf73cf24e626a58b380`, basis `main` `608d1f6`. |
+| Gebouwd | Immersive Home opt-in `live_cockpit: true` + `live_cockpit_immersive: true`, zes klikroutes, portretcompositie, bestaande functies behouden, neutrale Net-presentatie, pointer/touch-toegang. Standaard uit. |
+| Automatisch getest | **5 GitHub Actions-checks groen** op code-HEAD `457876c`: validate, Node, frontend UTC/Amsterdam, Chromium en WebKit-browsercontrole. Nieuwe fysieke tiktests en Net-regressietests inbegrepen. |
+| Visuele acceptatie | **Door eigenaar expliciet goedgekeurd voor PR #56 op `457876c`**; vastgelegd in PR-comment van 10 november 2026. Geen claim dat een fysieke iPhone-test van deze nieuwe versie plaatsvond. |
+| Praktisch getest | **v1.28 immersive: NEE** — HA Companion-app/iPhone safe-areas, werkelijke Media Source-authenticatie, VoiceOver en stale Alfen blijven open. v1.27.0 heeft wel een werkende Live Cockpit in de eigen HA laten zien. |
+| Gepubliceerd | v1.28.0: **NEE**. Voor nieuwe versie aparte release-PR met versie, CI en handmatige publish-workflow; v1.27.0 blijft fallback. |
+| Veiligheid | Geen nieuwe servicecalls, laadbedieningen, opslagsleutels, entiteitswijzigingen of Alfen-aanpassingen. |
 
-**Status volgens AGENTS.md §7:** integratie gebouwd: **ja** (main); automatisch getest: **ja** (feature + merge); praktisch getest: **nee**; gepubliceerd: **nee** (v1.27.0).
+**Besluit van eigenaar (10 november 2026):** visueel GO op bovengenoemde code-HEAD én afzonderlijk akkoord om na controle PR #56 te mergen en v1.28.0 via de normale beveiligde releaseprocedure te publiceren. De formele technische gates en projectregels blijven van kracht. Geen automatische publicatie bij een PR-merge.
 
-**Volgende stap:** aparte v1.27.0-release-PR met handmatige publish-workflow, na volledige groene CI en eigenaarstoestemming mergen. Publicatie alleen na afzonderlijke gevalideerde `workflow_dispatch`, nooit op push/merge. Na HACS-update activeren met `live_cockpit: true` en een `live_cockpit_image` uit de afgeschermde HA-mediamap; standaard blijft de huidige Home intact.
+**Volgende stap:** na groen CI op de uiteindelijke PR-HEAD merge #56; aparte release-PR voor v1.28.0 en handmatige publicatie uitsluitend na succesvolle checks en expliciete bevestiging. Praktische HA/iPhone-test van immersive volgt na opt-in in de bestaande kaart. Rollback: `live_cockpit_immersive: false` (bestaande v1.27.0-interface).
 
 ---
 
