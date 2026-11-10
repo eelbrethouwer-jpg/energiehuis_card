@@ -25,7 +25,7 @@ live_cockpit: true
 live_cockpit_immersive: true           # alleen samen met live_cockpit: true
 ```
 
-- Home toont dan uitsluitend de Live Cockpit, schermvullend. De goedgekeurde master blijft ongewijzigd en volledig zichtbaar (geen uitsnede), met een vervaagde achtergrondverlenging uit hetzelfde beeld.
+- Home toont dan uitsluitend de Live Cockpit, schermvullend. De goedgekeurde master blijft ongewijzigd en volledig zichtbaar (geen uitsnede), met een vervaagde achtergrondverlenging uit hetzelfde beeld. Op een smalle, hoge telefoon (portret) staat de scène over de volle breedte bovenaan, met de zes routes als kaarten eronder. De vlakken op het beeld zijn daar ook aantikbaar. Op tablet, desktop en liggend staan de kaarten op het beeld.
 - **Eén tik op een kaart** opent een vaste bestemming (alleen-lezen, geen bediening):
 
   | Kaart | Bestemming |

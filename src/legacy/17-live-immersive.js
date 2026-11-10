@@ -26,7 +26,24 @@ function ehImmOn(card){return typeof EhLiveCockpit!=='undefined'&&!!card?.config
 function ehImmModel(card){
  const ctl=card._ehLive?.ctl,M=EhLiveCockpit.scope?.EhPve04Model;
  if(!ctl||!M||!card._hass)return null;
- try{return M.computeModel(ctl.adapter.input(card._hass,Date.now()));}catch(_){return null;}
+ // Vorig cockpitmodel meegeven: dezelfde netrichting in de dode band (40–80 W) als de Home-tegel.
+ try{return M.computeModel(ctl.adapter.input(card._hass,Date.now()),ctl.cockpit?.model||null);}catch(_){return null;}
+}
+/**
+ * Net-pagina: EXACT dezelfde neutrale netpresentatie als de Net-tegel op Home (EhPve04Model.netPresentation, RC2).
+ * Een richting (teken, label) alleen bij een ACTIEVE netroute; anders het absolute P1-vermogen zonder teken met
+ * "richting niet bevestigd". De ruwe, ondertekende P1-sensorwaarde staat uitsluitend in de technische diagnose.
+ */
+function ehImmNetView(M,m){
+ const NP=M.netPresentation(m),t=m.tiles.net,rd=m.readings.net;
+ const dir=NP.confirmed?(NP.direction==='import'?'Afname van het net (bevestigd door actieve netroute)':'Teruglevering aan het net (bevestigd door actieve netroute)')
+  :NP.unconfirmed?'Niet bevestigd ('+NP.reason+')'
+  :t.direction==='balance'?'Geen: in balans (onder 40 W)':'Onbekend ('+(rd.reason||'geen actuele P1-meting')+')';
+ const raw=rd&&rd.raw?rd.raw.state+(rd.raw.unit?' '+rd.raw.unit:''):'—';
+ const rows=[['Bevestigde richting',dir],['Ruwe P1-sensorwaarde (ondertekend)',raw]];
+ if(m.critical||m.hold)rows.push(['Meetketen',m.status.text+' · '+m.balanceInfo]);
+ return {value:NP.value,label:NP.unconfirmed?NP.label:NP.sub,direction:NP.direction,confirmed:NP.confirmed,
+  tone:NP.unconfirmed?(m.critical?'bad':'warn'):t.tone,rows};
 }
 function ehImmCss(){
  return [
@@ -64,9 +81,14 @@ function ehImmPageHtml(card,view){
  }else if(t){
   const age=rd&&Number.isFinite(rd.ageMs)?EhLiveCockpit.scope.EhPve04Model.ageLabel(rd.ageMs):'';
   const meta=[['Entiteit',t.entity||'—'],['Tijdstempel',rd?.stampSource?(rd.stampSource+(age?' · '+age:'')):'onbekend']];
-  if(view==='grid')meta.push(['P1-tekenconfiguratie',m.p1Sign==='export_positive'?'Export positief (gecorrigeerd)':'Import positief']);
+  let shown={value:t.value,label:t.sub,tone:t.tone,direction:''};
+  if(view==='grid'){
+   const nv=ehImmNetView(EhLiveCockpit.scope.EhPve04Model,m);
+   shown={value:nv.value,label:nv.label,tone:nv.tone,direction:nv.direction};
+   meta.push(...nv.rows,['P1-tekenconfiguratie',m.p1Sign==='export_positive'?'Export positief (gecorrigeerd)':'Import positief']);
+  }
   if(view==='home')meta.push(['Definitie','Huisverbruik exclusief Cupra (bestaande sensor)']);
-  now='<section class="eh-imm-now" data-tone="'+ehEsc(t.tone)+'" aria-label="Actuele meting"><strong>'+ehEsc(t.value)+'</strong><span>'+ehEsc(t.sub)+'</span></section>'+
+  now='<section class="eh-imm-now" data-tone="'+ehEsc(shown.tone)+'"'+(shown.direction?' data-direction="'+ehEsc(shown.direction)+'"':'')+' aria-label="Actuele meting"><strong>'+ehEsc(shown.value)+'</strong><span>'+ehEsc(shown.label)+'</span></section>'+
    '<dl class="eh-imm-meta">'+meta.map(([k,x])=>'<dt>'+ehEsc(k)+'</dt><dd>'+ehEsc(x)+'</dd>').join('')+'</dl>';
  }else now='<section class="eh-imm-now" data-tone="warn" aria-label="Actuele meting"><strong>—</strong><span>Meting niet beschikbaar</span></section>';
  return '<main class="subpage eh-imm-page" data-eh-imm-page="'+ehEsc(view)+'" aria-labelledby="eh-imm-title">'+

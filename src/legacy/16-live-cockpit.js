@@ -1026,7 +1026,9 @@ const EhLiveCockpit=(function(){
       const sceneShown = sceneOk && rootEl.dataset.scene !== 'error';
       // Integratie: in de immersive Home kan de scène smaller zijn dan de container (contain) ⇒ kleinste breedte telt.
       const stw = stage.getBoundingClientRect().width || rw;
-      const next = !sceneShown || fs / 16 > TEXT_SCALE_MAX || rw / fs < LIST_MAX_EM ? 'list' : Math.min(rw, stw) >= OVERLAY_MIN ? 'overlay' : 'compact';
+      // Immersive portret (smal en hoog): leesbare routekaarten onder een volle-breedte scène (zie HOST_CSS).
+      const portrait = typeof options.preferList === 'function' && options.preferList();
+      const next = !sceneShown || portrait || fs / 16 > TEXT_SCALE_MAX || rw / fs < LIST_MAX_EM ? 'list' : Math.min(rw, stw) >= OVERLAY_MIN ? 'overlay' : 'compact';
       if (next !== layout) {
         layout = next; rootEl.dataset.layout = next;
         if (!controls.dataset.touched) controls.open = next === 'overlay';   // mobiel: scenario's standaard ingeklapt
@@ -1134,6 +1136,9 @@ const EhLiveCockpit=(function(){
       opener = null;
     }
     on(tiles, 'click', e => { const b = e.target.closest('.tile'); if (!b) return; const k = b.dataset.key; if (NAV) { closeDetail(false); options.onTileNavigate(k); return; } if (openKey === k) closeDetail(); else openDetail(k, b); });
+    // Immersive portret: de glasvlakken op de master zijn óók aantikbaar (pointer/touch). Toetsenbord en schermlezer
+    // gebruiken de routekaarten eronder (zelfde bestemming); de vlakken blijven aria-hidden.
+    if (NAV) on(covers, 'click', e => { if (layout !== 'list') return; const p = e.target.closest('.ehm-plate'); if (p && KEYS.includes(p.dataset.key)) options.onTileNavigate(p.dataset.key); });
     on(D.close, 'click', () => closeDetail());
     on(rootEl, 'keydown', e => { if (e.key === 'Escape' && openKey) { e.preventDefault(); e.stopPropagation(); closeDetail(); } });
     const docListeners = [['pointerdown', e => { if (!openKey) return; const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target]; if (!path.includes(detail) && !path.some(n => n && n.classList && n.classList.contains('tile'))) closeDetail(false); }]];
@@ -1191,6 +1196,8 @@ const EhLiveCockpit=(function(){
       get scenario() { return scenario; },
       get layout() { return layout; },
       get live() { return LIVE; },
+      /** Weergave opnieuw bepalen (bijv. na een gewijzigde immersive portretstand); één rAF, geen volledige render. */
+      relayout() { scheduleGeo(); },
       setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
       setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
@@ -1473,6 +1480,18 @@ const EhLiveCockpit=(function(){
   ':host([data-immersive]) .ehm-legend{margin:.45rem .2rem 0;font-size:.74rem}' +
   ':host([data-immersive]) .ehc-summary{margin:.3rem .2rem 0;font-size:.86rem}' +
   ':host([data-immersive]) .ehm-stage{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}' +
+  // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
+  // eronder als glas over dezelfde vervaagde master; glasvlakken op de scène zijn tikvlakken (≥44 px).
+  ':host([data-imm-portrait]){margin:0 -6px}' +
+  ':host([data-imm-portrait]) .ehc,:host([data-imm-portrait]) .ehc[data-layout="list"]{justify-content:flex-start;min-height:var(--eh-imm-total);padding:4px 4px 10px;border-radius:18px}' +
+  ':host([data-imm-portrait]) .ehc-head{margin:2px 6px 6px}' +
+  ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-stage{border-radius:14px}' +
+  ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{margin-top:.5rem;gap:.45rem}' +
+  ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles .tile{background:color-mix(in srgb,var(--bg-2) 80%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}' +
+  '@container (min-width:21rem){:host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
+  ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-covers .ehm-plate{pointer-events:auto;cursor:pointer;overflow:visible}' +
+  ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-plate::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}' +
+  ':host([data-imm-portrait]) .ehm-legend{margin:.5rem .4rem 0}:host([data-imm-portrait]) .ehc-summary{margin:.3rem .4rem 0}' +
   '@media (prefers-reduced-motion:reduce){:host([data-immersive]) .eh-imm-ambient{filter:blur(22px) brightness(.62)}}' +
   // Zeer kleine scène: "Nog niet gekoppeld" past niet zonder woordafbreking ⇒ gedempt streepje (pagina legt het uit).
   '.ehc--master[data-layout="compact"][data-density="xs"] .tile[data-key="practice"][data-tone="muted"] .t-sub{display:none}' +
@@ -1529,6 +1548,7 @@ const EhLiveCockpit=(function(){
    mode: 'live', specs: adapter.specs,
    onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
    onImageLoad: immersive ? ambient : undefined,
+   preferList: immersive ? () => host.hasAttribute('data-imm-portrait') : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
    imageMissingText: norm.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd (live_cockpit_image) — alleen interface'
   });
@@ -1547,6 +1567,7 @@ const EhLiveCockpit=(function(){
   // Immersive: beschikbare hoogte METEN (bovenkant van de cockpit t.o.v. het document, hoogte van de ondernavigatie
   // van de kaart) i.p.v. schatten; alleen tijdens zichtbaarheid een resize-listener (geen extra observers).
   const win = doc.defaultView;
+  const PORTRAIT_MAX_W = 600, PORTRAIT_MIN_RATIO = 1.1;
   function measure() {
    if (!immersive || destroyed || suspended || !host.isConnected) return;
    const top = host.getBoundingClientRect().top + (win.scrollY || 0);
@@ -1554,6 +1575,11 @@ const EhLiveCockpit=(function(){
    const navH = nav ? nav.getBoundingClientRect().height : 0;
    const total = Math.max(220, Math.round(win.innerHeight - Math.max(0, top) - navH - 8));
    if (host.style.getPropertyValue('--eh-imm-total') !== total + 'px') host.style.setProperty('--eh-imm-total', total + 'px');
+   // Portret: een 16:9-master past op een smal, hoog scherm alleen klein (contain, nooit bijsnijden). Dan de scène over
+   // de volle breedte bovenaan en de zes routes als leesbare kaarten eronder i.p.v. een klein beeld in veel waas.
+   const w = host.getBoundingClientRect().width;
+   const portrait = w > 0 && w < PORTRAIT_MAX_W && total >= w * PORTRAIT_MIN_RATIO;
+   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(); }
   }
   let listening = false;
   function listen(on) {

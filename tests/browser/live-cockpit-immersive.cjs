@@ -104,10 +104,10 @@ const HOME=()=>{
    const e=sr.elementFromPoint(x,y);return !!e&&e.closest('.tile')===b;});
   let covers=true;
   if(layout!=='list'&&S){const c=S.covers[b.dataset.key].baked;covers=r.left<=st.left+c.x*st.width+.5&&r.top<=st.top+c.y*st.height+.5&&r.right>=st.left+(c.x+c.w)*st.width-.5&&r.bottom>=st.top+(c.y+c.h)*st.height-.5;}
-  return {key:b.dataset.key,w:Math.round(r.width),h:Math.round(r.height),hit,covers,haspopup:b.hasAttribute('aria-haspopup'),label:b.getAttribute('aria-label')};
+  return {key:b.dataset.key,x:Math.round(r.left),b:Math.round(r.bottom),w:Math.round(r.width),h:Math.round(r.height),hit,covers,haspopup:b.hasAttribute('aria-haspopup'),label:b.getAttribute('aria-label')};
  }):[];
  return {
-  view:card._view,imm:shell.classList.contains('eh-imm-home'),all:shell.classList.contains('eh-imm-all'),live:!!host,immAttr:!!host&&host.hasAttribute('data-immersive'),
+  view:card._view,imm:shell.classList.contains('eh-imm-home'),portrait:!!host&&host.hasAttribute('data-imm-portrait'),total:host?.style.getPropertyValue('--eh-imm-total'),hostW:host?Math.round(host.getBoundingClientRect().width):0,all:shell.classList.contains('eh-imm-all'),live:!!host,immAttr:!!host&&host.hasAttribute('data-immersive'),
   layout:ehc?.dataset.layout,scene:ehc?.dataset.scene,heroVisible:vis(root.querySelector('.shell > .hero')),legacyVisible:vis(root.querySelector('.eh26-legacy')),
   coachVisible:vis(root.querySelector('.eh17-panel')),chartVisible:vis(root.querySelector('.chart-panel')),eh40:!!root.querySelector('.eh40-cockpit'),
   stage:st&&{l:Math.round(st.left),r:Math.round(st.right),t:Math.round(st.top),b:Math.round(st.bottom),ratio:+(st.width/st.height).toFixed(3)},navTop:Math.round(nav.top),innerW:innerWidth,innerH:innerHeight,
@@ -129,8 +129,8 @@ const PAGE=()=>{
  const base='http://127.0.0.1:'+server.address().port;
  const browser=await browserType.launch({headless:true});
  console.log(browserType.name(),browser.version());
- async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1}={}){
-  const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:'Europe/Amsterdam',reducedMotion});
+ async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false}={}){
+  const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:'Europe/Amsterdam',reducedMotion,hasTouch});
   const page=await ctx.newPage();const errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/40[134]|Failed to load resource/.test(m.text()))errors.push(m.text());});
   await page.addInitScript(()=>{const RO=window.ResizeObserver;window.__ro=0;window.ResizeObserver=class extends RO{constructor(cb){super(cb);window.__ro++;}};});
@@ -154,8 +154,9 @@ const PAGE=()=>{
   return {v127:{imm:a.imm,legacy:a.legacyVisible},afterClick,immersiveWithoutLive:{live:b.live,eh40:b.eh40}};
  });
 
- const VPS=[[320,568,'list'],[390,844,'compact'],[430,932,'compact'],[768,1024,'compact'],[1280,800,null],[844,390,'compact']];
- for(const [w,h,layout] of VPS){
+ // Portret (smal én hoog): volle-breedte scène + routekaarten eronder (lijst). Tablet, desktop en liggend: kaarten op de master.
+ const VPS=[[320,568,'list',true],[390,844,'list',true],[430,932,'list',true],[768,1024,'compact',false],[1280,800,null,false],[844,390,'compact',false]];
+ for(const [w,h,layout,portrait] of VPS){
   await check(`immersive Home ${w}×${h}: één visual, oude modules verborgen, master volledig zichtbaar (contain), tikvlakken ≥44 px, geen horizontale scroll`,async()=>{
    const {ctx,page,errors}=await open(IMM,{width:w,height:h});
    const s=await page.evaluate(HOME);
@@ -164,6 +165,13 @@ const PAGE=()=>{
    assert.equal(s.imm,true);assert.equal(s.immAttr,true);assert.equal(s.view,'overview');
    assert.deepEqual([s.heroVisible,s.legacyVisible,s.coachVisible,s.chartVisible,s.eh40],[false,false,false,false,false]);
    if(layout)assert.equal(s.layout,layout);
+   assert.equal(s.portrait,portrait,'portretstand');
+   if(portrait){
+    assert.ok(s.stage.r-s.stage.l>=s.hostW-10,'portret: scène over (vrijwel) de volle breedte '+JSON.stringify([s.stage,s.hostW]));
+    const cols=new Set(s.tiles.map(t=>t.x)).size;
+    assert.equal(cols,w>=390?2:1,'kolommen routekaarten');
+    if(w>=390)assert.ok(s.tiles.every(t=>t.b<=s.navTop),'portret ≥390: alle zes routes zichtbaar zonder scrollen '+JSON.stringify([s.tiles.map(t=>t.b),s.navTop]));
+   }
    assert.equal(s.overflow,false);
    assert.ok(s.stage.l>=0&&s.stage.r<=s.innerW,'scène horizontaal volledig zichtbaar');
    assert.ok(Math.abs(s.stage.ratio-1330/748)<0.02,'verhouding behouden '+s.stage.ratio);
@@ -174,7 +182,7 @@ const PAGE=()=>{
    assert.ok(s.tiles.every(t=>!t.haspopup&&/Pagina openen\./.test(t.label)),'navigatiesemantiek');
    assert.ok(s.scene!=='ok'||s.ambient,'achtergrondverlenging');
    assert.deepEqual(errors,[]);
-   return {layout:s.layout,stage:s.stage,navTop:s.navTop};
+   return {layout:s.layout,portrait:s.portrait,stage:s.stage,stageShare:+(((s.stage.r-s.stage.l)*(s.stage.b-s.stage.t))/(s.hostW*parseFloat(s.total))).toFixed(2),navTop:s.navTop};
   });
  }
 
@@ -255,6 +263,62 @@ const PAGE=()=>{
   assert.match(r.net,/^−460\s?W$/);assert.deepEqual(errors,[]);
   return r;
  });
+
+ // Echte pointer- en touchinvoer (geen DOM-.click()): per doel controleren dat het zichtbaar, bereikbaar (eventueel na
+ // scrollen) en op het tikpunt NIET bedekt is (elementFromPoint door alle shadow-roots heen: ondernavigatie, overlays,
+ // waas, lichtpunten), en dan op dat punt klikken of tikken.
+ const TARGET=([sel,key])=>{
+  const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,host=root.querySelector('.eh-live-home');
+  const scope=sel==='back'?root:host.shadowRoot;
+  const el=sel==='back'?root.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]'):scope.querySelector(sel+'[data-key="'+key+'"]');
+  if(!el)return {missing:true};
+  const navTop=root.querySelector('.shell > .nav').getBoundingClientRect().top,limit=Math.min(innerHeight,navTop);
+  let r=el.getBoundingClientRect(),scrolled=false;
+  if(r.top<0||r.bottom>limit){window.scrollBy({top:r.top+r.height/2-limit/2,behavior:'instant'});r=el.getBoundingClientRect();scrolled=true;}
+  const cs=getComputedStyle(el);
+  const visible=r.width>0&&r.height>0&&cs.visibility!=='hidden'&&+cs.opacity>0&&cs.display!=='none';
+  const deep=(x,y)=>{let e=document.elementFromPoint(x,y);for(let i=0;i<4&&e&&e.shadowRoot;i++){const n=e.shadowRoot.elementFromPoint(x,y);if(!n||n===e)break;e=n;}return e;};
+  const cx=r.left+r.width/2,cy=r.top+r.height/2,dx=Math.min(14,r.width*.3),dy=Math.min(10,r.height*.3);
+  const pts=[[cx,cy],[cx-dx,cy],[cx+dx,cy],[cx,cy-dy],[cx,cy+dy]];
+  const blocked=pts.map(([x,y])=>{const e=deep(x,y);return e&&(e===el||el.contains(e))?null:(e?(e.className&&e.className.baseVal===undefined?String(e.className):e.tagName)||e.tagName:'niets');}).filter(Boolean);
+  return {x:Math.round(cx),y:Math.round(cy),w:Math.round(r.width),h:Math.round(r.height),visible,inView:r.top>=0&&r.bottom<=limit+.5&&r.left>=0&&r.right<=innerWidth,blocked,scrolled};
+ };
+ const ROUTES={pv:['sun','sun'],house:['home','home'],net:['grid','grid'],battery:['battery',null],cupra:['cupra',null],practice:['practice',null]};
+ // Portret 320/390/430: muis én touch, kaarten én vlakken. Tablet (touch) en desktop (muis): kaarten op de master.
+ const COMBOS=[[320,568,'pointer'],[320,568,'touch'],[390,844,'pointer'],[390,844,'touch'],[430,932,'pointer'],[430,932,'touch'],[768,1024,'touch'],[1280,800,'pointer']];
+ for(const [w,h,input] of COMBOS){
+  {
+   await check(`echte ${input==='touch'?'touch-tik':'muisklik'} ${w}×${h}: ${w<600?'zes routekaarten én zes vlakken op de master':'zes kaarten op de master'} zichtbaar, bereikbaar, niet bedekt (ondernavigatie/overlays) en navigeren; Terug idem`,async()=>{
+    const {ctx,page,errors}=await open(IMM,{width:w,height:h,hasTouch:input==='touch'});
+    const press=(x,y)=>input==='touch'?page.touchscreen.tap(x,y):page.mouse.click(x,y);
+    const out=[];
+    const list=await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.ehc').dataset.layout==='list');
+    assert.equal(list,w<600,'portret ⇒ lijst met vlakken op de master');
+    for(const sel of list?['.ehm-tiles .tile','.ehm-covers .ehm-plate']:['.ehm-tiles .tile']){
+     for(const key of Object.keys(ROUTES)){
+      await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+      const t=await page.evaluate(TARGET,[sel,key]);
+      assert.ok(!t.missing,sel+' '+key+' ontbreekt');
+      assert.ok(t.visible&&t.inView,sel+' '+key+' zichtbaar: '+JSON.stringify(t));
+      assert.deepEqual(t.blocked,[],sel+' '+key+' bedekt op het tikpunt');
+      if(sel.includes('tile'))assert.ok(t.w>=44&&t.h>=44,'routekaart ≥44 px: '+JSON.stringify(t));
+      await press(t.x,t.y);await frames(page,3);
+      const p=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card');return {view:c._view,detail:c._detail};});
+      assert.deepEqual([p.view,p.detail],ROUTES[key],sel+' '+key+' bestemming');
+      const b=await page.evaluate(TARGET,['back']);
+      assert.ok(b.visible&&b.inView&&!b.blocked.length,'Terug bereikbaar: '+JSON.stringify(b));
+      await press(b.x,b.y);await frames(page,3);
+      assert.equal(await page.evaluate(()=>document.querySelector('energiehuis-card')._view),'overview',key+' terug naar Home');
+      out.push((sel.includes('tile')?'k:':'m:')+key+(t.scrolled?'(scroll)':''));
+     }
+    }
+    await ctx.close();
+    if(w>=390)assert.ok(!out.some(x=>x.includes('scroll')),'≥390 px: geen scroll nodig '+out.join(' '));
+    assert.deepEqual(errors,[]);
+    return {input,targets:out.length,scrolled:out.filter(x=>x.includes('scroll'))};
+   });
+  }
+ }
 
  await check('toetsenbord en VoiceOver-semantiek: Tab naar kaart, Enter ⇒ pagina met focus op de kop; Enter op "Terug naar Home" ⇒ focus terug op de kaart',async()=>{
   const {ctx,page,errors}=await open(IMM,{width:1280,height:800});
