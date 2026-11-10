@@ -11,13 +11,15 @@ const bundle=read('energiehuis-card.js');
 const workflow=read('.github/workflows/publish-v1270.yml');
 const notes=read('RELEASE_NOTES_v1.27.0.md');
 
-test('v1.27.0: source, HACS bundle and card catalogue are consistent',()=>{
- for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.27\.0';/);
- for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.27\.0'/);
+test('v1.27.0: historical published release identity remains pinned',()=>{
+ assert.ok(workflow.includes("const EH_VERSION = '1.27.0';"));
+ assert.ok(workflow.includes("name:'Energiehuis v1.27.0'"));
+ assert.match(notes,/Energiehuis v1\.27\.0/);
  assert.match(bundle,/function eh40Cockpit\(/);
  assert.match(bundle,/function createController\(card, cfg\)/);
  assert.match(bundle,/live_cockpit === true/);
 });
+
 test('v1.27.0: release workflow manual on main with an explicit confirmation; no auto-publish',()=>{
  assert.match(workflow,/^on:\s*\n\s+workflow_dispatch:/m);
  assert.doesNotMatch(workflow,/^\s{2}(?:push|pull_request|schedule|release):/m);
