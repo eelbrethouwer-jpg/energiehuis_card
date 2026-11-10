@@ -2,7 +2,8 @@
 // v1.27 browseracceptatie: Live Cockpit als Home binnen <energiehuis-card>, met GESIMULEERDE Home Assistant-data.
 //   node tests/browser/live-cockpit-home.cjs [--screenshots=<map>]   (EH_LIVE_MASTER=<pad naar master.webp> optioneel)
 // Geen echte Home Assistant. De getekende Media Source-route wordt nagebootst: /media/… alleen met geldige authSig.
-const {chromium}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
+const {chromium,webkit}=require(require.resolve('playwright',{paths:[process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||process.cwd()]}));
+const browserType=process.argv.includes('--browser=webkit') ? webkit : chromium;
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),zlib=require('node:zlib'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 
 const source=fs.readFileSync(path.join(__dirname,'..','..','energiehuis-card.js'),'utf8');
@@ -88,8 +89,8 @@ async function check(name,fn){
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const base='http://127.0.0.1:'+server.address().port;
- const browser=await chromium.launch({headless:true});
- console.log('chromium',browser.version());
+ const browser=await browserType.launch({headless:true});
+ console.log(browserType.name(),browser.version());
  async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true}={}){
   const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:'Europe/Amsterdam'});
   const page=await ctx.newPage();const errors=[];
