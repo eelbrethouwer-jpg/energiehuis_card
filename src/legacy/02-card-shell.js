@@ -889,6 +889,6 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.25.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.27.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
 }
 

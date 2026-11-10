@@ -37,7 +37,7 @@ test('PR1: generated file remains valid JavaScript and retains the unchanged pub
  assert.equal(syntax.status,0,syntax.stderr);
  const source=fs.readFileSync(original,'utf8');
  assert.match(source,/customElements\.define\('energiehuis-card',EnergiehuisCard\)/);
- assert.match(source,/const EH_VERSION = '1\.25\.0';/);
+ assert.match(source,/const EH_VERSION = '1\.27\.0';/);
  assert.match(source,/charge_control_enabled: false/);
 });
 test('PR1: changed HACS output is detected; --write deterministically restores it in isolated temp root',()=>fixture(dir=>{
