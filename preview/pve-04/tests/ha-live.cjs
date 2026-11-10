@@ -93,7 +93,7 @@ const STATE = () => {
       const imp = s.routes.includes('grid-home'), exp = s.routes.includes('home-grid');
       if (imp && !(s.net.dir === 'import' && s.net.extra === '↑ van net')) problems.push(id + ': afname inconsistent');
       if (exp && !(s.net.dir === 'export' && s.net.extra === '↓ naar net' && s.net.value.startsWith('−'))) problems.push(id + ': teruglevering inconsistent');
-      if (!imp && !exp && (s.net.extra || ['import', 'export'].includes(s.net.dir))) problems.push(id + ': richting zonder netroute');
+      if (!imp && !exp && ((s.net.extra && !['P1-meting', 'P1 · richting onbevestigd'].includes(s.net.extra)) || ['import', 'export'].includes(s.net.dir))) problems.push(id + ': richting zonder netroute');
     }
     const want = { afname: ['grid-home', 'home-ev', 'sun-home'], teruglevering: ['home-grid', 'sun-home'], zonneladen: ['home-ev', 'home-grid', 'sun-home'], 'nul-watt': [], offline: [], unavailable: [], tegenstrijdig: [], 'p1-omgekeerd': ['home-grid', 'sun-home'], 'p1-omgekeerd-fout': [], verouderd: ['sun-home'], 'constant-nacht': ['grid-home'], 'deels-vertraagd': ['home-grid'], 'niet-synchroon': [] };
     for (const [id, r] of Object.entries(want)) if (JSON.stringify(out[id].routes) !== JSON.stringify(r)) problems.push(id + ': routes ' + JSON.stringify(out[id].routes));
@@ -107,6 +107,12 @@ const STATE = () => {
     if (!/Niet live/.test(out['deels-vertraagd'].cupra.sub)) problems.push('deels-vertraagd: cupra');
     if (out['niet-synchroon'].status !== 'Meetketen niet synchroon' || /Controle nodig/.test(out['niet-synchroon'].text)) problems.push('niet-synchroon: status');
     if (out.tegenstrijdig.status !== 'Controle nodig') problems.push('tegenstrijdig: status');
+    // RC2: zonder bevestigde richting geen minteken, geen pijl, expliciet P1-label
+    for (const id of ['tegenstrijdig', 'niet-synchroon', 'p1-omgekeerd-fout']) {
+      const n = out[id].net;
+      if (/[−-]/.test(n.value) || n.extra !== 'P1-meting' || n.dir !== 'unconfirmed' || n.sub !== 'Richting niet bevestigd') problems.push(id + ': net ' + JSON.stringify(n));
+    }
+    if (!out.teruglevering.net.value.startsWith('−') || out.teruglevering.net.dir !== 'export') problems.push('teruglevering: net normaal');
     if (out['niet-synchroon'].warnTone !== 'warn' || out.tegenstrijdig.warnTone !== 'bad') problems.push('meldingstoon ' + JSON.stringify([out['niet-synchroon'].warnTone, out.tegenstrijdig.warnTone]));
     if (!/Laatste stand/.test(out['constant-nacht'].pv.sub) || out['constant-nacht'].pv.tone !== 'warn') problems.push('constant-nacht: laatste stand');
     if (!/Onbekende eenheid/.test(out['eenheid-fout'].net.sub)) problems.push('eenheid-fout');
@@ -135,7 +141,8 @@ const STATE = () => {
     await ctx.close();
     assert.ok(r.burstUpdates >= 1 && r.burstUpdates <= 3, 'burst ' + r.burstUpdates);
     assert.equal(r.unchangedUpdates, 0); assert.equal(r.structural, 0);
-    assert.equal(r.value, '−1,20 kW');
+    // RC2: de burst-waarden sluiten niet met de (15 min oude) Alfen-meting ⇒ netroute gepauzeerd ⇒ grootte zonder teken
+    assert.equal(r.value, '1,20 kW');
     assert.deepEqual(errors, []);
     return r;
   });
@@ -328,12 +335,105 @@ const STATE = () => {
     await ctx.close();
     const by = Object.fromEntries(steps.map(s => [s.name.slice(0, 1), s]));
     assert.match(by[1].status, /5\/5/); assert.deepEqual(by[1].particles, ['home-ev', 'home-grid', 'sun-home']);
-    for (const k of ['2', '4']) { assert.equal(by[k].status, 'Meetketen niet synchroon', k); assert.deepEqual(by[k].particles, [], k); assert.equal(by[k].badge, 'degraded'); assert.match(by[k].net, /niet bevestigd|Afname|Teruglevering/); }
+    for (const k of ['2', '4']) { assert.equal(by[k].status, 'Meetketen niet synchroon', k); assert.deepEqual(by[k].particles, [], k); assert.equal(by[k].badge, 'degraded'); assert.equal(by[k].net, 'Richting niet bevestigd'); }
     for (const k of ['3', '5']) { assert.match(by[k].status, /5\/5/, k); assert.deepEqual(by[k].particles, ['grid-home', 'home-ev', 'sun-home'], k); }
     assert.equal(by[6].status, 'Controle nodig'); assert.deepEqual(by[6].particles, []);
     assert.ok(!steps.slice(0, 5).some(s => s.status === 'Controle nodig'));
     assert.deepEqual(errors, []);
     return steps.map(s => s.name + ' ⇒ ' + s.status + ' · ' + (s.particles.join(',') || '-'));
+  });
+
+  // ---------------------------------------------------------------- RC2: netpresentatie bij meetproblemen
+  await check('RC2: niet-synchroon/tegenstrijdig ⇒ Net-kaart absoluut zonder teken/pijl; detailpaneel houdt ruwe ondertekende waarde, tijdstempel en tekenconfiguratie; herstel ⇒ normaal', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=niet-synchroon' });
+    const r = await page.evaluate(async () => {
+      const sr = window.__ha.card.shadowRoot, frame = () => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+      const tile = () => { const b = sr.querySelector('.ehm-tiles .tile[data-key="net"]'); return { value: b.querySelector('.t-value').textContent, sub: b.querySelector('.t-sub').textContent, dir: b.dataset.direction, extra: b.querySelector('.t-extra').hidden ? '' : b.querySelector('.t-extra').textContent, aria: b.getAttribute('aria-label'), plate: sr.querySelector('.ehm-plate[data-key="net"]').dataset.direction, accent: getComputedStyle(b.querySelector('.t-extra')).color }; };
+      const detail = () => { const d = sr.querySelector('.ehc-detail'); const rows = {}; const dts = [...d.querySelectorAll('dt')]; dts.forEach(dt => { rows[dt.textContent] = dt.nextElementSibling.textContent; }); return { value: d.querySelector('.d-value').textContent, rows }; };
+      const hold = tile();
+      sr.querySelector('.ehm-tiles .tile[data-key="net"]').click(); await frame();
+      const dHold = detail();
+      window.__ha.set('teruglevering'); await frame(); await new Promise(res => setTimeout(res, 100));
+      const back = tile(), dBack = detail();
+      window.__ha.set('nul-watt'); await frame(); await new Promise(res => setTimeout(res, 100));
+      const zero = tile();
+      return { hold, dHold, back, dBack, zero };
+    });
+    await ctx.close();
+    assert.match(r.hold.value, /^1,88\s?kW$/); assert.equal(r.hold.dir, 'unconfirmed'); assert.equal(r.hold.plate, 'unconfirmed'); assert.equal(r.hold.extra, 'P1-meting');
+    assert.equal(r.hold.sub, 'Richting niet bevestigd');
+    assert.equal(r.hold.aria, 'Net: 1,88 kW, P1-meting · richting niet bevestigd (meetketen niet synchroon). Details openen.');
+    assert.equal(r.hold.accent, 'rgb(170, 180, 195)');
+    assert.equal(r.dHold.value, '1,88 kW');
+    assert.match(r.dHold.rows['Ruwe P1-sensorwaarde'], /^-1880 W \(zoals de bron meldt/);
+    assert.match(r.dHold.rows['Tijdstempel'], /^last_updated · \d\d:\d\d:\d\d · zojuist — tijdstip van de HA-statusmelding, geen bewezen fysieke meettijd$/);
+    assert.equal(r.dHold.rows['P1-tekenconfiguratie'], 'Import positief');
+    assert.match(r.dHold.rows['Richting'], /Niet bevestigd/);
+    assert.match(r.back.value, /^−1,88\s?kW$/); assert.equal(r.back.dir, 'export'); assert.equal(r.back.extra, '↓ naar net'); assert.equal(r.back.sub, 'Teruglevering aan het net');
+    assert.equal(r.dBack.value, '−1,88 kW'); assert.match(r.dBack.rows['Richting'], /Teruglevering/);
+    assert.match(r.zero.value, /^0\s?W$/); assert.equal(r.zero.dir, 'none'); assert.equal(r.zero.sub, 'In balans');
+    assert.deepEqual(errors, []);
+    return { hold: r.hold.value + ' · ' + r.hold.sub, raw: r.dHold.rows['Ruwe P1-sensorwaarde'], back: r.back.value };
+  });
+
+  await check('RC2: compacte mobiele weergave (390 px) ⇒ chip "P1 · richting onbevestigd", grootte zonder teken; list (320 px) ⇒ "P1-meting" + regel', async () => {
+    const res = {};
+    for (const [w, h] of [[390, 844], [320, 700]]) {
+      const { ctx, page, errors } = await open(browser, base, { width: w, height: h, query: '?scenario=niet-synchroon', dpr: 2 });
+      res[w] = await page.evaluate(() => { const sr = window.__ha.card.shadowRoot, b = sr.querySelector('.ehm-tiles .tile[data-key="net"]'), x = b.querySelector('.t-extra'); return { layout: sr.querySelector('.ehc').dataset.layout, value: b.querySelector('.t-value').textContent, extra: x.hidden ? '' : x.textContent, extraVisible: !x.hidden && getComputedStyle(x).display !== 'none', sub: b.querySelector('.t-sub').textContent, dir: b.dataset.direction }; });
+      res[w].errors = errors; await ctx.close();
+    }
+    assert.equal(res[390].layout, 'compact'); assert.equal(res[390].extra, 'P1 · richting onbevestigd'); assert.equal(res[390].extraVisible, true);
+    assert.equal(res[320].layout, 'list'); assert.equal(res[320].extra, 'P1-meting'); assert.equal(res[320].sub, 'Richting niet bevestigd');
+    for (const r of Object.values(res)) { assert.match(r.value, /^1,88\s?kW$/); assert.equal(r.dir, 'unconfirmed'); assert.deepEqual(r.errors, []); }
+    return res;
+  });
+
+  // ---------------------------------------------------------------- RC2: lifecycle van de beeldaanvraag
+  await check('RC2: ontkoppelen tijdens een hangende resolve ⇒ geen time-out-timer, geen wachter, geen terugval; opnieuw koppelen ⇒ één nieuwe resolve en beeld', async () => {
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=teruglevering&resolve=hang&resolveTimeout=60000', waitScene: false });
+    await page.waitForFunction(() => window.__ha.resolves === 1);
+    const r = await page.evaluate(async () => {
+      const card = window.__ha.card, parent = card.parentNode, sc = () => card.shadowRoot.querySelector('.ehc').dataset.scene;
+      const before = { pending: card.debug.pendingResolve, scene: sc() };
+      card.remove(); await new Promise(res => setTimeout(res, 300));
+      const detached = { timeouts: window.__live.timeouts.size, rafs: window.__live.rafs.size, pending: card.debug.pendingResolve, waiters: card.debug.hassWaiters, scene: sc(), resolves: window.__ha.resolves };
+      window.__ha.resolveMode = 'ok';
+      parent.appendChild(card);
+      for (let i = 0; i < 40 && sc() !== 'ok'; i++) await new Promise(res => setTimeout(res, 100));
+      return { before, detached, after: { scene: sc(), resolves: window.__ha.resolves, pending: card.debug.pendingResolve } };
+    });
+    await ctx.close();
+    assert.deepEqual(r.before, { pending: true, scene: 'loading' });
+    assert.deepEqual(r.detached, { timeouts: 0, rafs: 0, pending: false, waiters: 0, scene: 'loading', resolves: 1 });
+    assert.deepEqual(r.after, { scene: 'ok', resolves: 2, pending: false });
+    assert.deepEqual(errors, []);
+    return r;
+  });
+  await check('RC2: laat antwoord na ontkoppelen wordt genegeerd (geen beeldbron, geen /media-verzoek); 25× koppelen zonder hass ⇒ hooguit één wachter', async () => {
+    log.length = 0;
+    const { ctx, page, errors } = await open(browser, base, { query: '?scenario=teruglevering&resolve=slow&slowMs=2500', waitScene: false });
+    const r = await page.evaluate(async () => {
+      const card = window.__ha.card, parent = card.parentNode, sr = card.shadowRoot;
+      if (card.debug.cockpit.el.dataset.scene !== 'loading' || !card.debug.pendingResolve) return { precondition: 'resolve al afgerond vóór ontkoppelen' };
+      card.remove();
+      await new Promise(res => setTimeout(res, 2800));                 // het trage antwoord (2,5 s) komt binnen terwijl ontkoppeld
+      const late = { src: sr.querySelector('.ehm-scene').getAttribute('src') || '', scene: sr.querySelector('.ehc').dataset.scene, pending: card.debug.pendingResolve };
+      // kaart zonder hass: herhaald koppelen/ontkoppelen mag geen wachters of timers opstapelen
+      const c = document.createElement('energiehuis-live-cockpit-preview');
+      c.setConfig({ image: 'media-source://media_source/local/energiehuis/approved-visual-20261109.webp' });
+      const box = document.createElement('div'); document.body.appendChild(box);
+      let maxW = 0;
+      for (let i = 0; i < 25; i++) { box.appendChild(c); await new Promise(res => setTimeout(res, 10)); maxW = Math.max(maxW, c.debug.hassWaiters); c.remove(); }
+      await new Promise(res => setTimeout(res, 50));
+      return { late, mediaWhileDetached: performance.getEntriesByType('resource').filter(e => /\/media\//.test(e.name)).length, maxW, endW: c.debug.hassWaiters, endPending: c.debug.pendingResolve, timeouts: window.__live.timeouts.size };
+    });
+    await ctx.close();
+    assert.deepEqual(r.late, { src: '', scene: 'loading', pending: false });
+    assert.equal(r.mediaWhileDetached, 0); assert.equal(log.filter(l => l.path.startsWith('/media/')).length, 0);
+    assert.ok(r.maxW <= 1, 'wachters ' + r.maxW); assert.equal(r.endW, 0); assert.equal(r.endPending, false); assert.equal(r.timeouts, 0);
+    assert.deepEqual(errors, []);
+    return r;
   });
 
   // ---------------------------------------------------------------- RC1-C: offline ondubbelzinnig
@@ -415,9 +515,9 @@ const STATE = () => {
 
   // ---------------------------------------------------------------- screenshots
   if (WANT_SHOTS) {
-    await check('screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon', async () => {
+    await check('screenshots LIVE (gesimuleerde HA): desktop en mobiel × teruglevering / zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon', async () => {
       const files = [];
-      for (const [vp, w, h] of [['desktop', 1440, 900], ['mobiel', 390, 844]]) for (const sc of ['zonneladen', 'afname', 'nul-watt', 'offline', 'constant-nacht', 'deels-vertraagd', 'niet-synchroon']) {
+      for (const [vp, w, h] of [['desktop', 1440, 900], ['mobiel', 390, 844]]) for (const sc of ['teruglevering', 'zonneladen', 'afname', 'nul-watt', 'offline', 'constant-nacht', 'deels-vertraagd', 'niet-synchroon']) {
         const { ctx, page } = await open(browser, base, { width: w, height: h, query: '?scenario=' + sc, dpr: vp === 'mobiel' ? 2 : 1 });
         await page.waitForTimeout(600);
         const f = `ha-live-${vp}-${sc}${IS_CHROMIUM ? '' : '-' + ENGINE}.jpg`;

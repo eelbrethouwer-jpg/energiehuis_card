@@ -36,7 +36,7 @@
       super();
       this._hass = null; this._config = null; this._adapter = null; this._cockpit = null;
       this._raf = 0; this._timer = 0; this._dirty = false; this._updates = 0; this._hassWaiters = [];
-      this._resolveTimeoutMs = RESOLVE_TIMEOUT_MS; this._wasConnected = null;
+      this._resolveTimeoutMs = RESOLVE_TIMEOUT_MS; this._wasConnected = null; this._pendingResolve = null;
       this.attachShadow({ mode: 'open' });
     }
     setConfig(config) {
@@ -60,6 +60,9 @@
       if (this._raf) cancelAnimationFrame(this._raf); this._raf = 0;
       if (this._timer) clearTimeout(this._timer); this._timer = 0;
       if (this._cockpit) this._cockpit.suspend();
+      // RC2: een lopende beeldaanvraag afbreken (time-out-timer en hass-wachter weg; een laat antwoord wordt genegeerd).
+      // Bij opnieuw koppelen lost de cockpit het beeld opnieuw op als het nog niet geladen was.
+      this._cancelResolve('ontkoppeld');
     }
     _build() {
       const base = (this._config && this._config.asset_base) || SCRIPT_BASE;
@@ -74,19 +77,37 @@
         imageMissingText: cfg.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd — alleen interface'
       });
     }
-    _teardown() { if (this._cockpit) this._cockpit.destroy(); this._cockpit = null; }
+    _teardown() { this._cancelResolve('afgebroken'); if (this._cockpit) this._cockpit.destroy(); this._cockpit = null; }
+    /**
+     * Begrensd in tijd én aantal: hooguit één lopende aanvraag (een nieuwe breekt de vorige af), één hass-wachter en
+     * één time-out-timer. Een hangende WS-opdracht of een nooit verschijnend hass-object mag de kaart niet in "laden"
+     * laten hangen: na de time-out volgt de veilige terugval (alleen interface).
+     */
     _resolveImage(id) {
-      // Begrensd in tijd: een hangende WS-opdracht of een nooit verschijnend hass-object mag de kaart niet in
-      // "laden" laten hangen. Na de time-out: veilige terugval (alleen interface).
-      let to = 0;
-      const timeout = new Promise((_, rej) => { to = setTimeout(() => rej(new Error('time-out')), this._resolveTimeoutMs); });
-      return Promise.race([this._resolveImageNow(id), timeout]).finally(() => clearTimeout(to));
+      this._cancelResolve('vervangen');
+      const job = { done: false, to: 0, waiter: null, cancel: null };
+      this._pendingResolve = job;
+      return new Promise((resolve, reject) => {
+        const finish = (fn, v) => {
+          if (job.done) return; job.done = true;
+          clearTimeout(job.to); this._dropWaiter(job);
+          if (this._pendingResolve === job) this._pendingResolve = null;
+          fn(v);
+        };
+        job.cancel = why => finish(reject, new Error(why));
+        job.to = setTimeout(() => finish(reject, new Error('time-out')), this._resolveTimeoutMs);
+        this._resolveImageNow(id, job).then(v => finish(resolve, v), e => finish(reject, e));
+      });
     }
-    async _resolveImageNow(id) {
+    _cancelResolve(why) { const j = this._pendingResolve; if (j && j.cancel) j.cancel(why); this._pendingResolve = null; }
+    _dropWaiter(job) { if (!job.waiter) return; const i = this._hassWaiters.indexOf(job.waiter); if (i >= 0) this._hassWaiters.splice(i, 1); job.waiter = null; }
+    async _resolveImageNow(id, job) {
       // wacht op het eerste hass-object (de kaart kan eerder aan de DOM hangen dan hass beschikbaar is)
-      const h = this._hass || await new Promise(res => this._hassWaiters.push(res));
+      const h = this._hass || await new Promise(res => { job.waiter = res; this._hassWaiters.push(res); });
+      if (job.done) return null;                                   // afgebroken: geen callWS meer
       if (!h || typeof h.callWS !== 'function') return null;
       const r = await h.callWS({ type: 'media_source/resolve_media', media_content_id: id });
+      if (job.done) return null;                                   // laat antwoord na afbreken: negeren
       const origin = (typeof h.hassUrl === 'function' ? new URL(h.hassUrl('/')).origin : location.origin);
       const url = safeResolvedUrl(r && r.url, origin);
       return url && typeof h.hassUrl === 'function' ? h.hassUrl(url) : url;
@@ -112,7 +133,7 @@
       this._timer = setTimeout(() => { this._timer = 0; this._update(true); }, this._adapter.nextCheckMs(h, now));
     }
     /** Alleen voor tests en diagnose. */
-    get debug() { return { updates: this._updates, cockpit: this._cockpit, adapter: this._adapter, timer: !!this._timer }; }
+    get debug() { return { updates: this._updates, cockpit: this._cockpit, adapter: this._adapter, timer: !!this._timer, pendingResolve: !!this._pendingResolve, hassWaiters: this._hassWaiters.length }; }
   }
 
   if (!customElements.get('energiehuis-live-cockpit-preview')) customElements.define('energiehuis-live-cockpit-preview', EnergiehuisLiveCockpitPreview);

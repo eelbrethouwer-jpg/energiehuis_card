@@ -9,7 +9,10 @@
  *                gebruikt deze grenzen alleen voor tegels en balkjes ("Geen energiebalans"), NIET voor een live animatie.
  *   routeTtlS  — BEWEGEN: hoe recent een vermogensmeting bevestigd moet zijn voor een actieve route, bewegende
  *                lichtpunten en de balanscontrole. Bewust conservatief (P1/huis 60 s, GoodWe/Alfen 90 s) zolang de
- *                werkelijke updatefrequenties in Home Assistant niet zijn gemeten. Per bron instelbaar met route_ttl_s. "Bevestigd in code" ≠ "bevestigd in een echte Home Assistant": de status van
+ *                werkelijke updatefrequenties in Home Assistant niet zijn gemeten. Per bron instelbaar met route_ttl_s.
+ *                VOORLOPIG (RC2): 60/90 s zijn configuratiewaarden, geen meetresultaten.
+ *   Tijdstempel  — last_reported/last_updated is het tijdstip van de HA-STATUSMELDING, niet de fysieke meettijd in de
+ *                meter of omvormer (polling, buffering en integratievertraging zitten ertussen). "Bevestigd in code" ≠ "bevestigd in een echte Home Assistant": de status van
  * elke bron in een echte installatie is ONBEVESTIGD totdat een afzonderlijk goedgekeurde HA-test is uitgevoerd.
  */
 (function (root, factory) {
@@ -43,7 +46,9 @@
   const ROUTE_TTL_KEYS = Object.freeze(['net', 'pv', 'house', 'ev']);
   const ROUTE_TTL_MIN_S = 5;
   // RC1-B: maximale spreiding (s) tussen de bron-tijdstempels van P1, PV, Alfen en huis waarbinnen de balans als
-  // "voldoende synchroon gemeten" geldt. Conservatief klein: alleen dan mag een afwijking als KRITIEK worden gemeld.
+  // "voldoende synchroon" geldt. Conservatief klein: alleen dan mag een afwijking als KRITIEK worden gemeld.
+  // VOORLOPIG (RC2): 10 s is geen gemeten waarde. De tijdstempels zijn HA-statusmeldingen (last_reported >= last_updated),
+  // geen bewezen fysieke meettijd; synchroniciteit van bronmeldingen is dus een benadering tot echte HA-data is onderzocht.
   const BALANCE_SKEW_DEFAULT_S = 10, BALANCE_SKEW_MIN_S = 1, BALANCE_SKEW_MAX_S = 120;
   const ENTITY_RE = /^[a-z_]+\.[a-z0-9_]+$/;
   const IMAGE_RE = /^media-source:\/\/media_source\/[A-Za-z0-9_\-./ ]+\.(webp|jpe?g|png)$/;
@@ -92,5 +97,7 @@
     return Object.freeze(out);
   }
 
-  return Object.freeze({ SCHEMA: 'energiehuis.ha-contract/1', SOURCES, P1_SIGNS, ROUTE_TTL_KEYS, BALANCE_SKEW_DEFAULT_S, normalizeConfig, modelSpecs, ENTITY_RE, IMAGE_RE });
+  // RC2: expliciet voorlopig — bij te stellen na meting in een afzonderlijk goedgekeurde, alleen-lezen HA-test.
+  const PROVISIONAL = Object.freeze({ routeTtlS: true, balanceMaxSkewS: true, timestampsAreHaReports: true });
+  return Object.freeze({ SCHEMA: 'energiehuis.ha-contract/1', PROVISIONAL, SOURCES, P1_SIGNS, ROUTE_TTL_KEYS, BALANCE_SKEW_DEFAULT_S, normalizeConfig, modelSpecs, ENTITY_RE, IMAGE_RE });
 });

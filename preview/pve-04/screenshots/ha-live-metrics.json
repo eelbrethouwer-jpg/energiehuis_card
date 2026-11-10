@@ -59,6 +59,22 @@
       "ok": true
     },
     {
+      "name": "RC2: niet-synchroon/tegenstrijdig ⇒ Net-kaart absoluut zonder teken/pijl; detailpaneel houdt ruwe ondertekende waarde, tijdstempel en tekenconfiguratie; herstel ⇒ normaal",
+      "ok": true
+    },
+    {
+      "name": "RC2: compacte mobiele weergave (390 px) ⇒ chip \"P1 · richting onbevestigd\", grootte zonder teken; list (320 px) ⇒ \"P1-meting\" + regel",
+      "ok": true
+    },
+    {
+      "name": "RC2: ontkoppelen tijdens een hangende resolve ⇒ geen time-out-timer, geen wachter, geen terugval; opnieuw koppelen ⇒ één nieuwe resolve en beeld",
+      "ok": true
+    },
+    {
+      "name": "RC2: laat antwoord na ontkoppelen wordt genegeerd (geen beeldbron, geen /media-verzoek); 25× koppelen zonder hass ⇒ hooguit één wachter",
+      "ok": true
+    },
+    {
       "name": "RC1-C: verbinding weg ⇒ kop en pil rood OFFLINE (geen groene LIVE), \"sinds HH:MM\", geen waarden/lichtpunten; herstel ⇒ groen LIVE",
       "ok": true
     },
@@ -71,7 +87,7 @@
       "ok": true
     },
     {
-      "name": "screenshots LIVE (gesimuleerde HA): desktop en mobiel × zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon",
+      "name": "screenshots LIVE (gesimuleerde HA): desktop en mobiel × teruglevering / zonneladen / afname / 0 W / offline / nacht / deels vertraagd / niet synchroon",
       "ok": true
     }
   ]

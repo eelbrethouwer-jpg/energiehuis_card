@@ -39,13 +39,14 @@
     function callWS(msg) {
       // Simulatie van media_source/resolve_media (alleen-lezen WS-opdracht): de testserver tekent het pad tijdelijk.
       if (!msg || msg.type !== 'media_source/resolve_media') return Promise.reject(new Error('niet ondersteund in de simulatie'));
-      // Testhaken (RC1-D): ?resolve=fail|hang|local|external|empty of window.__ha.resolveMode tijdens de test.
+      // Testhaken (RC1-D): ?resolve=fail|hang|local|external|empty|slow of window.__ha.resolveMode tijdens de test.
       var mode = window.__ha.resolveMode;
       if (mode === 'fail') { window.__ha.resolves++; return Promise.reject(new Error('media_source: niet gevonden')); }
       if (mode === 'hang') { window.__ha.resolves++; return new Promise(function () {}); }
       if (mode === 'local') { window.__ha.resolves++; return Promise.resolve({ url: '/local/energiehuis/approved-visual-20261109.webp', mime_type: 'image/webp' }); }
       if (mode === 'external') { window.__ha.resolves++; return Promise.resolve({ url: 'https://cdn.example.invalid/media/local/energiehuis/x.webp?authSig=a.b', mime_type: 'image/webp' }); }
       if (mode === 'empty') { window.__ha.resolves++; return Promise.resolve({}); }
+      if (mode === 'slow') return new Promise(function (r) { setTimeout(r, +(q.get('slowMs') || 600)); }).then(function () { window.__ha.resolves++; return fetch('/__sign?ttl=' + ttl + '&path=' + encodeURIComponent('/media/local/energiehuis/approved-visual-20261109.webp')).then(function (r) { return r.json(); }); });
       var m = /^media-source:\/\/media_source\/local\/(.+)$/.exec(msg.media_content_id || '');
       if (!m) return Promise.reject(new Error('onbekende bron'));
       window.__ha.resolves++;

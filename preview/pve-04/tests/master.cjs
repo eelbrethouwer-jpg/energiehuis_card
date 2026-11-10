@@ -213,7 +213,9 @@ function glyphPixels(png, inset) {
       for (const [f, a] of Object.entries(want)) if (r.P[f].active !== a) problems.push(`${r.id}: ${f} actief=${r.P[f].active}, model=${a}`);
       if (r.routes['grid-home'] && !(r.P['flow-net'].dir === -1 && r.P['flow-net'].color === '#FF8A3D' && r.net.dataDir === 'import' && r.net.extra === '↑ van net' && /Afname/.test(r.net.sub) && r.net.accent === '#ff8a3d')) problems.push(r.id + ': afname inconsistent ' + JSON.stringify(r.net));
       if (r.routes['home-grid'] && !(r.P['flow-net'].dir === 1 && r.P['flow-net'].color === '#3FE6F2' && r.net.dataDir === 'export' && r.net.extra === '↓ naar net' && /Teruglevering/.test(r.net.sub) && r.net.value.startsWith('−') && r.net.accent === '#3fe6f2')) problems.push(r.id + ': teruglevering inconsistent ' + JSON.stringify(r.net));
-      if (!r.routes['grid-home'] && !r.routes['home-grid'] && (r.net.extra || ['import', 'export'].includes(r.net.dataDir) || /^(Afname|Teruglevering)/.test(r.net.sub))) problems.push(r.id + ': richting getoond zonder actieve netroute ' + JSON.stringify(r.net));
+      if (!r.routes['grid-home'] && !r.routes['home-grid'] && ((r.net.extra && !['P1-meting', 'P1 · richting onbevestigd'].includes(r.net.extra)) || ['import', 'export'].includes(r.net.dataDir) || /^(Afname|Teruglevering)/.test(r.net.sub))) problems.push(r.id + ': richting getoond zonder actieve netroute ' + JSON.stringify(r.net));
+      // RC2: actuele P1 zonder bevestigde richting ⇒ grootte zonder teken, chip "P1-meting" (compact: "P1 · richting onbevestigd"), neutraal
+      if (r.net.dataDir === 'unconfirmed' && (/[−-]/.test(r.net.value) || !['P1-meting', 'P1 · richting onbevestigd'].includes(r.net.extra) || r.net.sub !== 'Richting niet bevestigd')) problems.push(r.id + ': onbevestigde netrichting ' + JSON.stringify(r.net));
     }
     for (const id of ['nul-watt', 'offline']) { const r = rows.find(x => x.id === id); if (Object.values(r.P).some(p => p.active)) problems.push(id + ': lichtpunten actief'); }
     assert.deepEqual(problems, []);

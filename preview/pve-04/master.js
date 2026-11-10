@@ -50,6 +50,7 @@
   }
   const setData = (node, key, v) => { if (node.dataset[key] !== v) node.dataset[key] = v; };
   /** "1,46 kW" → ["1,46", " kW"]; "—" → ["—", ""]. */
+  const hms = t => { const d = new Date(t); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':'); };
   function splitValue(v) { const m = /^(.*\S)(\s\S+)$/.exec(v); return m ? [m[1], m[2]] : [v, '']; }
 
   /** Gemiddelde kleuren net buiten een kaartvlak (boven/onder), voor het ondoorzichtige glasbasisvlak. Gooit nooit. */
@@ -79,7 +80,7 @@
     const S = options.scene !== undefined ? options.scene : root.EhPve04MasterScene;
     const id = 'ehm' + (++seq);
     let scenario = M.SCENARIO_IDS.includes(options.scenario) ? options.scenario : 'zon-export';
-    let tick = 0, model = null, offlineSince = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null, suspended = false, liveInput = null, imgRetry = 0, imgJob = 0;
+    let tick = 0, model = null, offlineSince = null, ticker = 0, destroyed = false, openKey = null, opener = null, geoRaf = 0, layout = null, suspended = false, liveInput = null, imgRetry = 0, imgJob = 0, imgInFlight = false, imgPending = false;
     // DEMO (standaard): fictieve scenario's. LIVE: invoer uitsluitend via setInput() (HA-adapter); geen DEMO-labels,
     // geen scenario's, geen schommeling, geen fictieve waarden.
     const LIVE = options.mode === 'live';
@@ -251,6 +252,7 @@
       if (next !== layout) {
         layout = next; rootEl.dataset.layout = next;
         if (!controls.dataset.touched) controls.open = next === 'overlay';   // mobiel: scenario's standaard ingeklapt
+        if (model) render();                                               // RC2: kaartteksten per weergave
       }
       const r = stage.getBoundingClientRect();
       sw = r.width; sh = r.height;
@@ -276,21 +278,22 @@
       setData(warn, 'tone', m.critical ? 'bad' : 'warn');   // RC1-B: niet-kritieke melding (bijv. niet synchroon) oranje, niet rood
       // Netrichting (pijl, kaartkleur, lichtpunten) alleen tonen bij een ACTIEVE netroute: zo kloppen tekst, kleur en
       // richting altijd. Bij een tegenstrijdige meetketen staat de route stil en is de richting niet bevestigd.
-      const netActive = !!(m.routes['grid-home'].active || m.routes['home-grid'].active);
+      // RC2: zonder bevestigde richting toont de Net-kaart het absolute P1-vermogen, zonder teken of pijl.
+      const NP = M.netPresentation(m), netActive = NP.confirmed;
       for (const k of KEYS) {
         const d = m.tiles[k], N = T[k];
         setText(N.title, d.title);
-        const [num, unit] = splitValue(d.value); setText(N.num, num); setText(N.unit, unit);
-        let sub = d.sub, dir = d.direction || 'none';
-        if (k === 'net' && !netActive && NET_DIR[d.direction]) { dir = 'none'; sub = 'Richting niet bevestigd' + (m.critical ? ' (meetketen tegenstrijdig)' : m.hold ? ' (meetketen niet synchroon)' : ''); }
+        const shown = k === 'net' ? NP.value : d.value;
+        const [num, unit] = splitValue(shown); setText(N.num, num); setText(N.unit, unit);
+        const sub = k === 'net' ? NP.sub : d.sub, dir = k === 'net' ? NP.direction : 'none';
         setText(N.sub, sub);
         let extra = k === 'cupra' ? 'Accu ' + d.soc : k === 'battery' ? 'Simulatie' : (d.tone === 'sim' ? 'Simulatie' : '');
-        if (k === 'net') { const nd = netActive ? NET_DIR[d.direction] : null; extra = nd ? nd.arrow + ' ' + nd.text : ''; }
+        if (k === 'net') { const nd = netActive ? NET_DIR[d.direction] : null; extra = nd ? nd.arrow + ' ' + nd.text : (layout === 'compact' ? NP.badgeCompact : NP.badge) || ''; }
         setText(N.extra, extra); N.extra.hidden = !extra;
         setData(N.b, 'tone', d.tone); setData(PL[k], 'tone', d.tone);
         if (k === 'net') { setData(N.b, 'direction', dir); setData(PL[k], 'direction', dir); }
         const nd = k === 'net' && netActive && NET_DIR[d.direction] ? ', ' + NET_DIR[d.direction].name + ' (' + NET_DIR[d.direction].text + ')' : '';
-        const al = `${d.title}: ${d.value}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. Details openen.`;
+        const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. Details openen.` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. Details openen.`;
         if (N.b.getAttribute('aria-label') !== al) N.b.setAttribute('aria-label', al);
       }
       const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -320,14 +323,17 @@
     function fillDetail(key) {
       const d = model.tiles[key];
       setText(D.title, d.title);
-      setText(D.value, d.value + (key === 'cupra' ? ' · accu ' + d.soc : ''));
+      setText(D.value, (key === 'net' ? M.netPresentation(model).value : d.value) + (key === 'cupra' ? ' · accu ' + d.soc : ''));
       const rows = [['Status', d.sub], [LIVE ? 'Entiteit' : 'Bron (DEMO-label)', d.entity || '—']];
       if (key === 'cupra' && LIVE) rows.push(['Accuniveau', d.soc + (d.socReason && d.socReason !== 'Actueel' ? ' · ' + d.socReason : '') + (d.socEntity ? ' (' + d.socEntity + ')' : '')]);
-      if (LIVE && model.readings) { const rk = { pv: 'pv', house: 'house', net: 'net', cupra: 'ev', battery: 'battery' }[key]; const rd = rk && model.readings[rk]; if (rd && rd.stampSource) rows.push(['Tijdstempel', rd.stampSource + (Number.isFinite(rd.ageMs) ? ' · ' + M.ageLabel(rd.ageMs) : '')]); }
+      if (LIVE && model.readings) { const rk = { pv: 'pv', house: 'house', net: 'net', cupra: 'ev', battery: 'battery' }[key]; const rd = rk && model.readings[rk]; if (rd && rd.stampSource) rows.push(['Tijdstempel', rd.stampSource + (Number.isFinite(rd.stampMs) ? ' · ' + hms(rd.stampMs) : '') + (Number.isFinite(rd.ageMs) ? ' · ' + M.ageLabel(rd.ageMs) : '') + ' — tijdstip van de HA-statusmelding, geen bewezen fysieke meettijd']); }
       if (key === 'net') {
         const na = model.routes['grid-home'].active || model.routes['home-grid'].active;
         rows.push(['Richting', !na && (d.direction === 'import' || d.direction === 'export') ? 'Niet bevestigd: netroute staat stil (' + model.routes['home-grid'].reason + ')' : d.direction === 'import' ? '↑ Afname van het net (oranje lichtpunten, net → huis)' : d.direction === 'export' ? '↓ Teruglevering aan het net (cyaan lichtpunten, huis → net)' : d.direction === 'balance' ? 'In balans: geen stroomrichting' : 'Onbekend: geen stroomrichting']);
         rows.push(['P1-tekenconfiguratie', model.p1Sign === 'export_positive' ? 'Export positief (gecorrigeerd)' : 'Import positief']);
+        // RC2: de ondertekende ruwe sensortekst blijft zichtbaar voor diagnose, ook als de kaart geen richting toont.
+        const raw = model.readings && model.readings.net && model.readings.net.raw;
+        rows.push(['Ruwe P1-sensorwaarde', raw ? (raw.state + (raw.unit ? ' ' + raw.unit : '') + ' (zoals de bron meldt, vóór tekenconfiguratie)') : '—']);
       }
       if (key === 'battery') rows.push(['Let op', 'Virtuele batterij: rekensimulatie, geen fysieke opslag en geen stroomroute.']);
       if (key === 'practice') rows.push(['Let op', d.tone === 'sim' ? 'Gesimuleerde waarde, niet gemeten en niet opgeteld bij het huis.' : 'Geen submeter gekoppeld: er wordt geen vermogen getoond.']);
@@ -372,14 +378,21 @@
     // Beeldbron: DEMO = master uit de repository; LIVE = options.resolveImage() (bijv. een geauthenticeerde,
     // tijdelijk getekende Media Source-URL). Bij een laadfout één keer opnieuw oplossen (verlopen handtekening),
     // daarna veilige terugval: alleen interface.
+    // RC2: ontkoppeld (suspend) ⇒ geen nieuwe aanvraag en geen vervolgactie op een lopende aanvraag; die wordt bij
+    // resume() opnieuw gestart als het beeld toen nog niet geladen was.
     function loadImage() {
+      if (destroyed) return;
+      if (suspended && options.resolveImage) { imgPending = true; return; }
+      imgPending = false;
       const job = ++imgJob;
       if (!options.resolveImage) { img.src = base + S.image.file; return; }
+      imgInFlight = true;
       Promise.resolve().then(() => options.resolveImage()).then(url => {
         if (destroyed || job !== imgJob) return;
+        imgInFlight = false;
         if (!url) { sceneState('error', options.imageMissingText || 'Geen beeld beschikbaar — alleen interface'); scheduleGeo(); return; }
         img.src = url;
-      }, () => { if (!destroyed && job === imgJob) { sceneState('error', 'Beeld kon niet worden opgehaald — alleen interface'); scheduleGeo(); } });
+      }, () => { if (destroyed || job !== imgJob) return; imgInFlight = false; sceneState('error', 'Beeld kon niet worden opgehaald — alleen interface'); scheduleGeo(); });
     }
     if (sceneOk) {
       on(img, 'load', () => { imgRetry = 0; onImageLoad(); });
@@ -413,11 +426,13 @@
         if (raf) win.cancelAnimationFrame(raf); raf = 0;
         if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0;
         ro.disconnect(); detachDoc();
+        if (imgInFlight) { imgJob++; imgInFlight = false; imgPending = true; }   // laat antwoord wordt genegeerd
       },
       resume() {
         if (!suspended || destroyed) return; suspended = false;
         attachDoc(); ro.observe(rootEl); ro.observe(stage);
         scheduleGeo(); setTicker(); kick();
+        if (imgPending) loadImage();
       },
       get suspended() { return suspended; },
       step() { tick++; compute(); },

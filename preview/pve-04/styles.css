@@ -298,6 +298,8 @@ body {
 .ehc--master [data-key="net"] { --accent: #8fd9c6; }
 .ehc--master [data-key="net"][data-direction="import"] { --accent: #ff8a3d; }
 .ehc--master [data-key="net"][data-direction="export"] { --accent: #3fe6f2; }
+/* RC2: actuele P1 zonder bevestigde richting: neutraal grijs (niet verwarren met cyaan teruglevering/oranje afname). */
+.ehc--master [data-key="net"][data-direction="unconfirmed"] { --accent: #aab4c3; }
 .ehc--master .tile[data-tone="warn"] { --accent: var(--warn); }
 .ehc--master .tile[data-tone="bad"] { --accent: var(--bad); }
 

@@ -53,11 +53,13 @@ Extra sleutels:
 - **Netrichting:**
   - afname vanaf +80 W, teruglevering vanaf −80 W, onder 40 W in balans; daartussen een dode band zonder tijdsvertraging;
   - *afwijking van de productie-cockpit:* die gebruikt ±50 W;
-  - richting, pijl, kaartkleur en lichtpunten worden alleen getoond bij een **actieve** netroute; anders "Richting niet bevestigd".
+  - richting, pijl, kaartkleur en lichtpunten worden alleen getoond bij een **actieve** netroute.
+  - **RC2 — geen onbevestigde richting:** is er een actuele P1-waarde maar staat de netroute stil (meetketen tegenstrijdig of niet synchroon), dan toont de Net-kaart het **absolute** vermogen zonder minteken of pijl, met de chip "P1-meting" en de regel "Richting niet bevestigd" (in de compacte mobiele weergave, waar de subregel verborgen is, de chip "P1 · richting onbevestigd") en een neutrale grijze kaartkleur; de reden (tegenstrijdig / niet synchroon) staat in het detailpaneel en de statusregel; schermlezers horen "P1-meting · richting niet bevestigd (…)". Een vertraagde P1 toont eveneens alleen de grootte. Het detailpaneel behoudt voor diagnose de **ruwe ondertekende sensortekst** (zoals de bron die meldt, vóór de tekenconfiguratie), de tijdstempel(bron) en de P1-tekenconfiguratie. De sensorwaarde en de P1-berekening veranderen niet; zodra de netroute weer actief is, verschijnen teken, pijl en kleur weer.
 
 ## 4. Versheid (brongebonden, geen schijnactualiteit)
 
 1. **Tijdstempel:** de meest recente geldige bron-tijdstempel van het state-object: `last_reported` ≥ `last_updated` ≥ `last_changed`.
+   - **RC2:** dit is het tijdstip van de **HA-statusmelding**, **geen bewezen fysieke meettijd** in de meter of omvormer. Tussen meting en melding zitten polling, buffering en integratievertraging die per integratie verschillen en onbekend zijn. "Actueel" en "synchroon" betekenen in deze preview dus: recent resp. gelijktijdig **gemeld** door Home Assistant.
    - Er wordt **nooit** een eigen tijdstempel gemaakt, ook niet bij een ongewijzigde waarde.
    - Geen of een ongeldige tijdstempel, of meer dan 120 s in de toekomst ⇒ "Tijdstempel onbekend" (niet actueel).
 2. **Leeftijd ≤ route-TTL** ⇒ actueel ("live"): telt mee voor routes, lichtpunten, netrichting en balans.
@@ -77,6 +79,8 @@ Extra sleutels:
 **Getest (Node, `tests/ha-freshness-sync.test.cjs`, en browser, `tests/ha-live.cjs`):** actieve PV- en Alfen-meting 2, 5, 10, 20 en 35 min niet bevestigd met recente P1 ⇒ geen zon-/laadroute en geen lichtpunten, waarde zichtbaar als "niet live", netroute op basis van P1 blijft; 36 min ⇒ "—"; route-grens zonder nieuwe update; instelbaarheid en validatie van `route_ttl_s`.
 
 ## 4b. Asynchrone meetketen (RC1-B)
+
+> **Benadering (RC2).** De synchroniciteit hieronder gaat over de tijdstempels van HA-bronmeldingen, niet over bewezen gelijktijdige fysieke metingen. Ze blijft een benadering totdat echte HA-data is onderzocht (meetplan §4.7). De waarden **10 s** (`balance_max_skew_s`), **2 s** (huismarge) en de route-TTL's **60/90 s** zijn **voorlopige configuratiewaarden**, geen meetresultaten (`C.PROVISIONAL` in `contract.js`).
 
 De balanscontrole vergelijkt net + zon − Cupra met de huissensor. Een verschil > 150 W is pas een **echte tegenstrijdigheid** als de keten voldoende synchroon is gemeten:
 
