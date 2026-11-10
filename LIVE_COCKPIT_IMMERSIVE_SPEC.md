@@ -1,6 +1,6 @@
 # Energiehuis — Immersive Home & klikbare energieroutes
 
-**Ontwerpstatus:** functionele opdracht, nog niet geïmplementeerd of getest.
+**Ontwerpstatus:** geïmplementeerd op de featurebranch en **automatisch getest** (zie §7). **Niet praktisch getest** in een echte Home Assistant of op een iPhone. Niet gemerged en niet gepubliceerd.
 **Productiebaseline:** `main` op `608d1f6bc78a19e582900fae338533618048650b` (gepubliceerde v1.27.0).
 **Werkbranch:** `feature/live-cockpit-immersive-home-navigation`.
 **Goedgekeurde master:** `preview/pve-03/reference/approved-visual-20261109.webp` (ongewijzigd).
@@ -52,3 +52,19 @@ Verplicht: `node scripts/build.cjs --check`, `node --check energiehuis-card.js`,
 ## 6. Releasegrenzen
 
 Maak codecommits op de featurebranch. Open een draft-PR met testresultaten en documenteer wat alleen op echte HA/iPhone kan. **Geen merge, tag, release of HACS-publicatie zonder afzonderlijk expliciet akkoord van de eigenaar voor deze wijziging.** v1.27.0 blijft werkende fallback; `live_cockpit_immersive: false` herstelt de huidige interface.
+
+## 7. Implementatie en automatische tests (featurebranch)
+
+| Onderdeel | Uitvoering |
+|---|---|
+| Opt-in | `live_cockpit_immersive: true` werkt alleen met `live_cockpit: true` (`EhLiveCockpit.immersiveEnabled`). Met de opt-in uit doet de nieuwe laag niets: v1.27.0-gedrag. |
+| `src/legacy/16-live-cockpit.js` | `createMasterCockpit` kreeg de optionele `onTileNavigate(key)` en `onImageLoad(img)`; zonder die opties is het gedrag ongewijzigd (detaildialoog). Verder: de controller weet of hij immersive draait (signatuur `createController(card, cfg)` ongewijzigd); er is CSS voor `:host([data-immersive])`. De beschikbare hoogte wordt gemeten (bovenkant van de cockpit, ondernavigatie), met alleen tijdens zichtbaarheid een resize-listener. De achtergrondverlenging is een canvas van 160 × 90 uit dezelfde, al geladen master (geen tweede beeldaanvraag). Bij een kleine scène is de laagkeuze afhankelijk van de scènebreedte. **Bugfix:** de focus wordt niet teruggezet in de cockpit terwijl het Inzicht-menu open staat; anders sluit het menu meteen (iOS/Safari). |
+| `src/legacy/17-live-immersive.js` (nieuw, laatste fragment) | Centrale whitelist `EH_IMM_ROUTES`/`EH_IMM_VIEWS`, navigatie via `_view`/`_detail`, nieuwe views `sun`/`home`/`grid`/`practice` (hergebruik van `_energyDetailHtml` via het bestaande detailpaneel), "Alle metingen" (oude Home-inhoud, cockpit gepauzeerd), "Terug naar Home" op elk scherm, "Naar Slim laden" op de Cupra-pagina, items in het Inzicht-menu, en focusbeheer (paginakop ↔ originerende kaart). Geen externe URL's, `pushState`, servicecalls of opslag. |
+| `scripts/build.cjs` | Fragment `17-live-immersive.js` na `16-regisseur-cockpit.js`. |
+| Tests | Nieuw: `tests/browser/live-cockpit-immersive.cjs` (13 controles, Chromium en WebKit, ook in de CI-workflow `stroomvergelijker-browser.yml`). Bijgewerkt: de fragmentvolgorde en -telling in `v126-visual-experience`, `v127-live-cockpit-home` en `v2-build-parity`. |
+
+**Alleen te verifiëren op een echte HA/iPhone:**
+- de werkelijke hoogte onder de HA-toolbar en de Companion-app (safe-areas, dynamische adresbalk);
+- VoiceOver-uitspraak van de kaarten ("Pagina openen");
+- de echte Media Source-authenticatie;
+- gedrag met echte sensoren (stale Alfen, offline).

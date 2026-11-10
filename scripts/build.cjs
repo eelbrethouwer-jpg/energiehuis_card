@@ -30,7 +30,9 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'15-homewizard-history.js'},
   // v1.27: Live Cockpit vóór de EnergieRegisseur, zodat die zijn cockpit overslaat als de Live Cockpit actief is.
   {kind:'legacy',name:'16-live-cockpit.js'},
-  {kind:'legacy',name:'16-regisseur-cockpit.js'}
+  {kind:'legacy',name:'16-regisseur-cockpit.js'},
+  // v1.28-voorstel: immersive Live Cockpit Home (opt-in live_cockpit_immersive; na alle Home-renderlagen).
+  {kind:'legacy',name:'17-live-immersive.js'}
 ]);
 if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
  console.error('Build aborted: unknown build step kind.');

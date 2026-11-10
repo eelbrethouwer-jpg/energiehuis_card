@@ -18,6 +18,30 @@ live_cockpit_image: media-source://media_source/local/energiehuis/approved-visua
 - Het masterbeeld komt uitsluitend via de afgeschermde Media Source (`media_source/resolve_media`, tijdelijk getekende `/media/…`-URL). Zet het bestand in de HA-mediamap, **niet** in `/config/www` (`/local/` is publiek). Zonder of bij een mislukt beeld: duidelijke terugval naar alleen de interface.
 - Terugdraaien: `live_cockpit: false` of de regel verwijderen. Details, testresultaten en het releaseplan: [LIVE_COCKPIT_HOME.md](LIVE_COCKPIT_HOME.md).
 
+### Voorstel (v1.28, draft PR #56): immersive Home met klikbare energieroutes — standaard uit
+
+```yaml
+live_cockpit: true
+live_cockpit_immersive: true           # alleen samen met live_cockpit: true
+```
+
+- Home toont dan uitsluitend de Live Cockpit, schermvullend. De goedgekeurde master blijft ongewijzigd en volledig zichtbaar (geen uitsnede), met een vervaagde achtergrondverlenging uit hetzelfde beeld.
+- **Eén tik op een kaart** opent een vaste bestemming (alleen-lezen, geen bediening):
+
+  | Kaart | Bestemming |
+  |---|---|
+  | Zonnepanelen | Pagina Zonnepanelen |
+  | Huis | Pagina Huisverbruik |
+  | Net | Pagina Net |
+  | Virtuele batterij | Bestaande Batterij-pagina |
+  | Cupra | Bestaande Cupra-pagina, met een knop "Naar Slim laden" |
+  | Praktijkruimte | Read-only "Nog niet gekoppeld" |
+
+  Zonnepanelen, Huis en Net hergebruiken het bestaande energiedetail met periodes, grafiek en historie.
+- Elk scherm heeft "Terug naar Home"; de ondernavigatie blijft gelijk.
+- Via **Inzicht** bereik je ook Zonnepanelen, Huis, Net, Praktijkruimte en "Alle metingen". "Alle metingen" bevat de oude Home-inhoud: alle tegels, de grafiek en de energiecoach.
+- Terugdraaien: `live_cockpit_immersive: false` (of weglaten). Dan is het v1.27.0-gedrag identiek. Specificatie en status: [LIVE_COCKPIT_IMMERSIVE_SPEC.md](LIVE_COCKPIT_IMMERSIVE_SPEC.md).
+
 ## In ontwikkeling: Energiehuis v1.12.0 – drie afzonderlijke batterijen (RC)
 
 Nieuwe capaciteitsvergelijking [concept-PR #17](https://github.com/eelbrethouwer-jpg/energiehuis_card/pull/17): afzonderlijke 5/10/15-kWh SOC, optioneel per capaciteit instelbare laad-/ontlaadvermogens, bruikbare opslag en theoretische niet opgeslagen zonne-energie door volle batterij of laadlimiet. **Geen Home Assistant-YAML nodig**, geen laadbesturing. Zie [release notes](RELEASE_NOTES_v1.12.0_RC.md) en [testinstructies](BATTERY_PROFILES_V112.md). Niet gepubliceerd in HACS.

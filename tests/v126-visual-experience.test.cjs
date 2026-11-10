@@ -13,7 +13,8 @@ const addition=fragment.split('/* v1.26.0-rc Visual Experience:')[1];
 
 test('v1.26 RC: JS parses and built bundle ends with identical source fragment',()=>{
  assert.ok(addition,'Visual Experience must be in last source fragment');
- assert.ok(bundle.endsWith(fragment),'Generated HACS resource must contain identical final fragment');
+ // v1.28-voorstel: 17-live-immersive.js volgt als laatste fragment; dit fragment staat er direct vóór, ongewijzigd.
+ assert.ok(bundle.endsWith(fragment+read('src/legacy/17-live-immersive.js')),'Generated HACS resource must contain identical fragment, followed only by 17-live-immersive.js');
  assert.doesNotThrow(()=>new vm.Script(bundle));
 });
 test('v1.26 RC: four navigation destinations and preserved insight pages',()=>{

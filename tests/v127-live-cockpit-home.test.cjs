@@ -26,7 +26,8 @@ test('v1.27 build: Live Cockpit-fragment staat vóór de EnergieRegisseur, die h
  const a=build.indexOf("'16-live-cockpit.js'"),b=build.indexOf("'16-regisseur-cockpit.js'");
  assert.ok(a>0&&b>a);
  assert.ok(bundle.includes(fragment),'fragment ongewijzigd in de bundel');
- assert.ok(bundle.endsWith(read('src/legacy/16-regisseur-cockpit.js')));
+ // v1.28-voorstel: alleen 17-live-immersive.js (opt-in) volgt nog op de EnergieRegisseur.
+ assert.ok(bundle.endsWith(read('src/legacy/16-regisseur-cockpit.js')+read('src/legacy/17-live-immersive.js')));
  assert.ok(bundle.indexOf(fragment)<bundle.indexOf('function eh40Cockpit('));
 });
 

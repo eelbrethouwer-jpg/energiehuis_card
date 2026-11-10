@@ -858,6 +858,8 @@ const EhLiveCockpit=(function(){
     // DEMO (standaard): fictieve scenario's. LIVE: invoer uitsluitend via setInput() (HA-adapter); geen DEMO-labels,
     // geen scenario's, geen schommeling, geen fictieve waarden.
     const LIVE = options.mode === 'live';
+    // v1.28-integratie (immersive Home): één tik op een kaart navigeert via de kaartcontroller i.p.v. het detailpaneel.
+    const NAV = LIVE && typeof options.onTileNavigate === 'function';
     const listeners = [];
     const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); listeners.push(() => t.removeEventListener(type, fn, o)); };
     const sceneOk = !!(S && S.image && S.image.natural && Array.isArray(S.flows) && S.covers && KEYS.every(k => S.covers[k]));
@@ -887,7 +889,7 @@ const EhLiveCockpit=(function(){
     const tiles = el(doc, 'div', 'ehm-tiles');
     const T = {};
     for (const k of KEYS) {
-      const b = el(doc, 'button', 'tile', { type: 'button', 'data-key': k, 'aria-haspopup': 'dialog', 'aria-controls': id + '-detail', 'aria-expanded': 'false' });
+      const b = el(doc, 'button', 'tile', NAV ? { type: 'button', 'data-key': k } : { type: 'button', 'data-key': k, 'aria-haspopup': 'dialog', 'aria-controls': id + '-detail', 'aria-expanded': 'false' });
       b.innerHTML = `<span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[k]}</svg></span><span class="t-body"><span class="t-title"></span><span class="t-value"><span class="t-num"></span><span class="t-unit"></span></span><span class="t-extra"></span><span class="t-sub"></span></span>`;
       tiles.appendChild(b);
       T[k] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), num: b.querySelector('.t-num'), unit: b.querySelector('.t-unit'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
@@ -1022,7 +1024,9 @@ const EhLiveCockpit=(function(){
       const rw = rootEl.getBoundingClientRect().width;
       const fs = parseFloat(win.getComputedStyle(doc.documentElement).fontSize) || 16;
       const sceneShown = sceneOk && rootEl.dataset.scene !== 'error';
-      const next = !sceneShown || fs / 16 > TEXT_SCALE_MAX || rw / fs < LIST_MAX_EM ? 'list' : rw >= OVERLAY_MIN ? 'overlay' : 'compact';
+      // Integratie: in de immersive Home kan de scène smaller zijn dan de container (contain) ⇒ kleinste breedte telt.
+      const stw = stage.getBoundingClientRect().width || rw;
+      const next = !sceneShown || fs / 16 > TEXT_SCALE_MAX || rw / fs < LIST_MAX_EM ? 'list' : Math.min(rw, stw) >= OVERLAY_MIN ? 'overlay' : 'compact';
       if (next !== layout) {
         layout = next; rootEl.dataset.layout = next;
         if (!controls.dataset.touched) controls.open = next === 'overlay';   // mobiel: scenario's standaard ingeklapt
@@ -1030,7 +1034,7 @@ const EhLiveCockpit=(function(){
       }
       const r = stage.getBoundingClientRect();
       sw = r.width; sh = r.height;
-      rootEl.dataset.density = sw >= 560 ? 'mid' : 'small';
+      rootEl.dataset.density = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
       rootEl.style.setProperty('--u', (sw / (sceneOk ? S.image.natural.w : 1330)).toFixed(4));
       dpr = Math.min(2, win.devicePixelRatio || 1);
       particles.width = Math.max(1, Math.round(sw * dpr)); particles.height = Math.max(1, Math.round(sh * dpr));
@@ -1067,7 +1071,7 @@ const EhLiveCockpit=(function(){
         setData(N.b, 'tone', d.tone); setData(PL[k], 'tone', d.tone);
         if (k === 'net') { setData(N.b, 'direction', dir); setData(PL[k], 'direction', dir); }
         const nd = k === 'net' && netActive && NET_DIR[d.direction] ? ', ' + NET_DIR[d.direction].name + ' (' + NET_DIR[d.direction].text + ')' : '';
-        const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. Details openen.` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. Details openen.`;
+        const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. ${NAV ? 'Pagina openen.' : 'Details openen.'}` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. ${NAV ? 'Pagina openen.' : 'Details openen.'}`;
         if (N.b.getAttribute('aria-label') !== al) N.b.setAttribute('aria-label', al);
       }
       const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -1129,7 +1133,7 @@ const EhLiveCockpit=(function(){
       if (restore && opener && opener.isConnected) opener.focus();
       opener = null;
     }
-    on(tiles, 'click', e => { const b = e.target.closest('.tile'); if (!b) return; const k = b.dataset.key; if (openKey === k) closeDetail(); else openDetail(k, b); });
+    on(tiles, 'click', e => { const b = e.target.closest('.tile'); if (!b) return; const k = b.dataset.key; if (NAV) { closeDetail(false); options.onTileNavigate(k); return; } if (openKey === k) closeDetail(); else openDetail(k, b); });
     on(D.close, 'click', () => closeDetail());
     on(rootEl, 'keydown', e => { if (e.key === 'Escape' && openKey) { e.preventDefault(); e.stopPropagation(); closeDetail(); } });
     const docListeners = [['pointerdown', e => { if (!openKey) return; const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target]; if (!path.includes(detail) && !path.some(n => n && n.classList && n.classList.contains('tile'))) closeDetail(false); }]];
@@ -1169,7 +1173,7 @@ const EhLiveCockpit=(function(){
       }, () => { if (destroyed || job !== imgJob) return; imgInFlight = false; sceneState('error', 'Beeld kon niet worden opgehaald — alleen interface'); scheduleGeo(); });
     }
     if (sceneOk) {
-      on(img, 'load', () => { imgRetry = 0; onImageLoad(); });
+      on(img, 'load', () => { imgRetry = 0; onImageLoad(); if (options.onImageLoad) { try { options.onImageLoad(img); } catch (e) { /* alleen presentatie */ } } });
       on(img, 'error', () => {
         if (destroyed) return;
         if (options.resolveImage && imgRetry < 1) { imgRetry++; loadImage(); return; }
@@ -1428,6 +1432,8 @@ const EhLiveCockpit=(function(){
 
  /** Schakelaar: alleen exact `live_cockpit: true` activeert de nieuwe Home (standaard uit). */
  function enabled(c) { return !!c && c.live_cockpit === true; }
+ /** v1.28-opt-in: alleen exact `live_cockpit_immersive: true` én `live_cockpit: true` (standaard uit). */
+ function immersiveEnabled(c) { return enabled(c) && c.live_cockpit_immersive === true; }
 
  /** Vertaalt de kaartconfiguratie naar het HA-01-datacontract (zelfde entiteitssleutels als de productiekaart). */
  function liveConfig(c) {
@@ -1454,10 +1460,27 @@ const EhLiveCockpit=(function(){
   '.ehl-mount{padding:0}' +
   // In de kaart staat de titel al in het masterbeeld en de kaartkop: kop visueel verbergen (blijft voor schermlezers).
   '.ehc-brand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}' +
-  '.ehc-head{justify-content:flex-start}';
+  '.ehc-head{justify-content:flex-start}' +
+  // v1.28 immersive Home: schermvullend, master volledig zichtbaar (contain), achtergrondverlenging uit dezelfde master.
+  ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:104px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
+  // Lage, liggende schermen: alleen de statusregel boven de scène meetellen; legenda en samenvatting volgen eronder.
+  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:44px}}' +
+  ':host([data-immersive]) .ehc{max-width:none;margin:0;display:flex;flex-direction:column;justify-content:center;min-height:var(--eh-imm-total);isolation:isolate;border-radius:20px;overflow:hidden;padding:6px 8px 8px;background:radial-gradient(120% 90% at 50% 30%,#1b2a3c,#081320)}' +
+  ':host([data-immersive]) .ehc[data-layout="list"]{min-height:0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{width:min(100%,calc(var(--eh-imm-stage-h) * 1330 / 748));margin:0 auto}' +
+  ':host([data-immersive]) .eh-imm-ambient{position:absolute;inset:-6%;width:112%;height:112%;z-index:-1;filter:blur(22px) saturate(1.15) brightness(.62);pointer-events:none}' +
+  ':host([data-immersive]) .ehc-head{margin:0 2px 6px}' +
+  ':host([data-immersive]) .ehm-legend{margin:.45rem .2rem 0;font-size:.74rem}' +
+  ':host([data-immersive]) .ehc-summary{margin:.3rem .2rem 0;font-size:.86rem}' +
+  ':host([data-immersive]) .ehm-stage{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}' +
+  '@media (prefers-reduced-motion:reduce){:host([data-immersive]) .eh-imm-ambient{filter:blur(22px) brightness(.62)}}' +
+  // Zeer kleine scène: "Nog niet gekoppeld" past niet zonder woordafbreking ⇒ gedempt streepje (pagina legt het uit).
+  '.ehc--master[data-layout="compact"][data-density="xs"] .tile[data-key="practice"][data-tone="muted"] .t-sub{display:none}' +
+  '.ehc--master[data-layout="compact"][data-density="xs"] .tile[data-key="practice"][data-tone="muted"] .t-value{display:block;color:var(--dim)}';
 
  /** Eén controller per kaart. Geeft { error } terug bij een ongeldige configuratie (kaart blijft werken). */
  function createController(card, cfg) {
+  const immersive = immersiveEnabled(card.config);   // v1.28-opt-in; signatuur ongewijzigd t.o.v. v1.27
   const norm = C.normalizeConfig(cfg);
   if (norm.errors.length) return { error: norm.errors.join('; ') };
   const adapter = A.createAdapter(cfg);
@@ -1465,6 +1488,7 @@ const EhLiveCockpit=(function(){
   const host = doc.createElement('div');
   host.className = 'eh-live-home';
   host.setAttribute('data-eh-live', 'home');
+  if (immersive) host.setAttribute('data-immersive', '');
   const sr = host.attachShadow({ mode: 'open' });
   const style = doc.createElement('style'); style.textContent = LIVE_CSS + '\n' + HOST_CSS;
   const mount = doc.createElement('div'); mount.className = 'ehl-mount';
@@ -1493,8 +1517,18 @@ const EhLiveCockpit=(function(){
    });
   }
 
+  // Immersive Home: sfeervolle achtergrondverlenging uit DEZELFDE, al geladen master (klein canvas, vervaagd via CSS;
+  // geen tweede netwerkaanvraag, geen nieuw beeldbestand). Voorgrondscène, kaarten en canvas blijven exact uitgelijnd.
+  function ambient(img) {
+   if (!immersive || !img.naturalWidth) return;
+   const root = cockpit.el; let cv = root.querySelector(':scope > .eh-imm-ambient');
+   if (!cv) { cv = doc.createElement('canvas'); cv.className = 'eh-imm-ambient'; cv.setAttribute('aria-hidden', 'true'); cv.width = 160; cv.height = 90; root.prepend(cv); }
+   try { cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); } catch (e) { /* alleen presentatie */ }
+  }
   const cockpit = X.createMasterCockpit(mount, {
    mode: 'live', specs: adapter.specs,
+   onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
+   onImageLoad: immersive ? ambient : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
    imageMissingText: norm.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd (live_cockpit_image) — alleen interface'
   });
@@ -1510,9 +1544,27 @@ const EhLiveCockpit=(function(){
    if (timer) clearTimeout(timer);
    timer = setTimeout(() => { timer = 0; update(card._hass, true); }, adapter.nextCheckMs(hass, now));
   }
+  // Immersive: beschikbare hoogte METEN (bovenkant van de cockpit t.o.v. het document, hoogte van de ondernavigatie
+  // van de kaart) i.p.v. schatten; alleen tijdens zichtbaarheid een resize-listener (geen extra observers).
+  const win = doc.defaultView;
+  function measure() {
+   if (!immersive || destroyed || suspended || !host.isConnected) return;
+   const top = host.getBoundingClientRect().top + (win.scrollY || 0);
+   const nav = card.shadowRoot && card.shadowRoot.querySelector('.shell > .nav');
+   const navH = nav ? nav.getBoundingClientRect().height : 0;
+   const total = Math.max(220, Math.round(win.innerHeight - Math.max(0, top) - navH - 8));
+   if (host.style.getPropertyValue('--eh-imm-total') !== total + 'px') host.style.setProperty('--eh-imm-total', total + 'px');
+  }
+  let listening = false;
+  function listen(on) {
+   if (!immersive || on === listening) return;
+   listening = on;
+   if (on) win.addEventListener('resize', measure, { passive: true }); else win.removeEventListener('resize', measure);
+  }
   function suspend() {
    if (destroyed || suspended) return;
    suspended = true;
+   listen(false);
    if (timer) clearTimeout(timer); timer = 0;
    cockpit.suspend();
    cancelResolve('ontkoppeld');
@@ -1521,6 +1573,7 @@ const EhLiveCockpit=(function(){
    if (destroyed || !suspended) return;
    suspended = false;
    cockpit.resume();
+   listen(true);
   }
   function destroy() {
    if (destroyed) return;
@@ -1529,7 +1582,7 @@ const EhLiveCockpit=(function(){
   }
   suspended = false;
   return Object.freeze({
-   host, cockpit, adapter, update, suspend, resume, destroy,
+   host, cockpit, adapter, update, suspend, resume, destroy, immersive, measure,
    get debug() { return { updates, resolves, suspended, destroyed, timer: !!timer, pendingResolve: !!pending }; }
   });
  }
@@ -1543,7 +1596,7 @@ const EhLiveCockpit=(function(){
    state.ctl = null; state.key = ''; state.error = null;
    return;
   }
-  const cfg = liveConfig(c), key = JSON.stringify(cfg);
+  const imm = immersiveEnabled(c), cfg = liveConfig(c), key = JSON.stringify(cfg) + (imm ? '|immersive' : '');
   if (key !== state.key) {
    if (state.ctl) state.ctl.destroy();
    state.ctl = null; state.key = key; state.error = null;
@@ -1567,8 +1620,10 @@ const EhLiveCockpit=(function(){
   if (metrics) metrics.insertAdjacentElement('beforebegin', ctl.host); else body.prepend(ctl.host);
   card._ehLiveShown = true;
   ctl.resume();
+  if (ctl.measure) ctl.measure();
   ctl.update(card._hass, false);
-  if (focused && focused.isConnected && typeof focused.focus === 'function') focused.focus({ preventScroll: true });
+  // Niet terugzetten terwijl het Inzicht-menu open staat: een focus buiten het menu sluit het meteen (iOS/Safari).
+  if (focused && !card._eh26MenuOpen && focused.isConnected && typeof focused.focus === 'function') focused.focus({ preventScroll: true });
  }
 
  (function install() {
@@ -1586,5 +1641,5 @@ const EhLiveCockpit=(function(){
   P._ehLiveSuspend = function () { const st = this._ehLive; if (st && st.ctl) st.ctl.suspend(); };
  })();
 
- return Object.freeze({ enabled, liveConfig, safeResolvedUrl, RESOLVE_TIMEOUT_MS, scope });
+ return Object.freeze({ enabled, immersiveEnabled, liveConfig, safeResolvedUrl, RESOLVE_TIMEOUT_MS, scope });
 })();
