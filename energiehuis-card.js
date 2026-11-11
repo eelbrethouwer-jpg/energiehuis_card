@@ -5387,7 +5387,7 @@ const EhLiveCockpit=(function(){
       get layout() { return layout; },
       get live() { return LIVE; },
       /** Weergave opnieuw bepalen (bijv. na een gewijzigde immersive portretstand); één rAF, geen volledige render. */
-      relayout() { scheduleGeo(); },
+      relayout(now) { if (now && !destroyed && !suspended) { if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0; geometry(); } else scheduleGeo(); },
       setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
       setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
@@ -5661,7 +5661,7 @@ const EhLiveCockpit=(function(){
   // v1.28 immersive Home: schermvullend, master volledig zichtbaar (contain), achtergrondverlenging uit dezelfde master.
   ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:104px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
   // Lage, liggende schermen: alleen de statusregel boven de scène meetellen; legenda en samenvatting volgen eronder.
-  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:44px}}' +
+  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:10px}}' +
   ':host([data-immersive]) .ehc{max-width:none;margin:0;display:flex;flex-direction:column;justify-content:center;min-height:var(--eh-imm-total);isolation:isolate;border-radius:20px;overflow:hidden;padding:6px 8px 8px;background:radial-gradient(120% 90% at 50% 30%,#1b2a3c,#081320)}' +
   ':host([data-immersive]) .ehc[data-layout="list"]{min-height:0}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{width:min(100%,calc(var(--eh-imm-stage-h) * 1330 / 748));margin:0 auto}' +
@@ -5670,6 +5670,17 @@ const EhLiveCockpit=(function(){
   ':host([data-immersive]) .ehm-legend{margin:.45rem .2rem 0;font-size:.74rem}' +
   ':host([data-immersive]) .ehc-summary{margin:.3rem .2rem 0;font-size:.86rem}' +
   ':host([data-immersive]) .ehm-stage{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}' +
+  // Landscape first: liggende telefoon. Scène links over de volle beschikbare hoogte, status, samenvatting en legenda in een
+  // smalle kolom rechts (geen schaalvergroting, geen uitsnede: de scène blijft contain-fit).
+  '@media (max-height:500px) and (orientation:landscape){' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]){display:grid;grid-template-columns:minmax(0,1fr) clamp(168px,28%,260px);grid-template-rows:auto auto auto auto 1fr;column-gap:12px;align-content:center;align-items:start;padding:4px 8px}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{grid-column:1;grid-row:1 / -1;align-self:center;justify-self:center}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-head{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:6px;margin:0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-warn{grid-column:2;grid-row:2}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-summary{grid-column:2;grid-row:3;margin:.5rem 0 0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehm-legend{grid-column:2;grid-row:4;margin:.5rem 0 0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > :not(.ehc-head):not(.ehc-warn):not(.ehc-summary):not(.ehm-legend):not(.ehm-frame):not(.eh-imm-ambient){grid-column:2;grid-row:5}' +
+  '}' +
   // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
   // eronder als glas over dezelfde vervaagde master; glasvlakken op de scène zijn tikvlakken (≥44 px).
   ':host([data-imm-portrait]){margin:0 -6px}' +
@@ -5769,13 +5780,16 @@ const EhLiveCockpit=(function(){
    // de volle breedte bovenaan en de zes routes als leesbare kaarten eronder i.p.v. een klein beeld in veel waas.
    const w = host.getBoundingClientRect().width;
    const portrait = w > 0 && w < PORTRAIT_MAX_W && total >= w * PORTRAIT_MIN_RATIO;
-   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(); }
+   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(true); }   // direct: geen tussenframe met de oude laag
   }
+  // iOS meldt na het draaien soms nog de oude innerHeight: één extra meting op het volgende frame (geen nieuwe listeners).
+  function onViewport() { measure(); win.requestAnimationFrame(measure); }
   let listening = false;
   function listen(on) {
    if (!immersive || on === listening) return;
    listening = on;
-   if (on) win.addEventListener('resize', measure, { passive: true }); else win.removeEventListener('resize', measure);
+   if (on) { win.addEventListener('resize', onViewport, { passive: true }); win.addEventListener('orientationchange', onViewport, { passive: true }); }
+   else { win.removeEventListener('resize', onViewport); win.removeEventListener('orientationchange', onViewport); }
   }
   function suspend() {
    if (destroyed || suspended) return;
@@ -5797,6 +5811,7 @@ const EhLiveCockpit=(function(){
    cockpit.destroy(); host.remove();
   }
   suspended = false;
+  listen(true);   // ook de eerste keer: anders volgt de hoogte pas na een suspend/resume op een draai van het toestel
   return Object.freeze({
    host, cockpit, adapter, update, suspend, resume, destroy, immersive, measure,
    get debug() { return { updates, resolves, suspended, destroyed, timer: !!timer, pendingResolve: !!pending }; }
@@ -5836,7 +5851,7 @@ const EhLiveCockpit=(function(){
   if (metrics) metrics.insertAdjacentElement('beforebegin', ctl.host); else body.prepend(ctl.host);
   card._ehLiveShown = true;
   ctl.resume();
-  if (ctl.measure) ctl.measure();
+  if (ctl.measure) { ctl.measure(); const w = card.ownerDocument && card.ownerDocument.defaultView; if (w) w.requestAnimationFrame(ctl.measure); }   // na de stijlen van deze render nogmaals (nav-hoogte)
   ctl.update(card._hass, false);
   // Niet terugzetten terwijl het Inzicht-menu open staat: een focus buiten het menu sluit het meteen (iOS/Safari).
   if (focused && !card._eh26MenuOpen && focused.isConnected && typeof focused.focus === 'function') focused.focus({ preventScroll: true });
@@ -6351,7 +6366,21 @@ function ehImmCss(){
   '.eh-imm-follow{appearance:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:9px 14px;border-radius:12px;border:1px solid #38dfa3aa;background:#0d3d34;color:#eafff8;font:inherit;font-size:13px;font-weight:750;cursor:pointer}',
   '.eh-imm-headback{margin:0 0 8px}',
   '.eh-imm-allhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:6px 2px 12px}.eh-imm-allhead h2{margin:0;font-size:22px}',
-  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}'
+  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}',
+  // Landscape first (telefoon liggend, lage schermen): slanke app- en ondernavigatie zodat de scène de hoogte krijgt,
+  // veilige zones (notch links/rechts, home-indicator onder) en een Inzicht-menu dat binnen het scherm blijft.
+  // De testvariabelen --eh-safe-test-* laten de tests een notch simuleren; echte waarden komen uit env().
+  '.shell{--eh-sl:var(--eh-safe-test-l,env(safe-area-inset-left,0px));--eh-sr:var(--eh-safe-test-r,env(safe-area-inset-right,0px));--eh-sb:var(--eh-safe-test-b,env(safe-area-inset-bottom,0px))}',
+  '@media (max-height:500px) and (orientation:landscape){',
+  ' .shell{padding-left:var(--eh-sl);padding-right:var(--eh-sr)}',
+  ' .shell>.eh19-appbar{padding:3px 12px;gap:8px;min-height:0}',
+  ' .shell>.eh19-appbar button{min-height:40px}',
+  ' .shell>.nav{padding:3px 8px calc(3px + var(--eh-sb));gap:6px}',
+  ' .shell>.nav .eh26-navitem{flex-direction:row;min-height:44px;gap:8px;padding:4px 10px;justify-content:center}',
+  ' .shell>.nav .eh26-insight-menu{grid-template-columns:repeat(2,minmax(0,1fr));width:min(560px,calc(100% - 24px));max-height:calc(100svh - 70px);overflow:auto;overscroll-behavior:contain;right:calc(12px + var(--eh-sr))}',
+  ' .shell>.nav .eh26-insight-menu button{min-height:48px;padding:6px 10px}',
+  ' .shell.eh-imm-home>.body{padding:4px 8px 4px}',
+  '}'
  ].join('\n');
 }
 function ehImmPageHtml(card,view){

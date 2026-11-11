@@ -69,7 +69,21 @@ function ehImmCss(){
   '.eh-imm-follow{appearance:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:9px 14px;border-radius:12px;border:1px solid #38dfa3aa;background:#0d3d34;color:#eafff8;font:inherit;font-size:13px;font-weight:750;cursor:pointer}',
   '.eh-imm-headback{margin:0 0 8px}',
   '.eh-imm-allhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:6px 2px 12px}.eh-imm-allhead h2{margin:0;font-size:22px}',
-  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}'
+  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}',
+  // Landscape first (telefoon liggend, lage schermen): slanke app- en ondernavigatie zodat de scène de hoogte krijgt,
+  // veilige zones (notch links/rechts, home-indicator onder) en een Inzicht-menu dat binnen het scherm blijft.
+  // De testvariabelen --eh-safe-test-* laten de tests een notch simuleren; echte waarden komen uit env().
+  '.shell{--eh-sl:var(--eh-safe-test-l,env(safe-area-inset-left,0px));--eh-sr:var(--eh-safe-test-r,env(safe-area-inset-right,0px));--eh-sb:var(--eh-safe-test-b,env(safe-area-inset-bottom,0px))}',
+  '@media (max-height:500px) and (orientation:landscape){',
+  ' .shell{padding-left:var(--eh-sl);padding-right:var(--eh-sr)}',
+  ' .shell>.eh19-appbar{padding:3px 12px;gap:8px;min-height:0}',
+  ' .shell>.eh19-appbar button{min-height:40px}',
+  ' .shell>.nav{padding:3px 8px calc(3px + var(--eh-sb));gap:6px}',
+  ' .shell>.nav .eh26-navitem{flex-direction:row;min-height:44px;gap:8px;padding:4px 10px;justify-content:center}',
+  ' .shell>.nav .eh26-insight-menu{grid-template-columns:repeat(2,minmax(0,1fr));width:min(560px,calc(100% - 24px));max-height:calc(100svh - 70px);overflow:auto;overscroll-behavior:contain;right:calc(12px + var(--eh-sr))}',
+  ' .shell>.nav .eh26-insight-menu button{min-height:48px;padding:6px 10px}',
+  ' .shell.eh-imm-home>.body{padding:4px 8px 4px}',
+  '}'
  ].join('\n');
 }
 function ehImmPageHtml(card,view){

@@ -70,3 +70,20 @@ Maak codecommits op de featurebranch. Open een draft-PR met testresultaten en do
 - VoiceOver-uitspraak van de kaarten ("Pagina openen");
 - de echte Media Source-authenticatie;
 - gedrag met echte sensoren (stale Alfen, offline).
+
+## 8. Landscape first (branch `feature/live-cockpit-landscape-first`)
+
+Alleen actief bij `live_cockpit_immersive: true`. Op een laag, liggend scherm (`max-height: 500px` en `orientation: landscape`, zoals een telefoon liggend) wordt de scène groter. Portret, tablet en desktop houden dezelfde compositie.
+
+| Onderdeel | Uitvoering |
+|---|---|
+| Scène + zijkolom | De scène (contain, ongewijzigd beeld) staat links over de beschikbare hoogte. Status, samenvatting en legenda staan in een smalle kolom rechts. Op 844×390 gaat de scène van 312×176 naar 478×269 px (±69 % van de hoogte), op 932×430 van 330×186 naar 549×309 px. De samenvatting stond voorheen onder de ondernavigatie. |
+| Slanke balken | De appbalk is ±47 px en de ondernavigatie ±51 px (icoon naast label, tikvlak ≥ 44 px). Het Inzicht-menu heeft 2 kolommen, een maximale hoogte en scrollt zo nodig; alle items blijven zichtbaar en bereikbaar. |
+| Veilige zones | `env(safe-area-inset-left/right/bottom)` als marge op de kaart (alleen in deze liggende stand). De tests simuleren een notch via `--eh-safe-test-l/r/b`. |
+| Meting en rotatie | **Bugfix:** de resize-listener werd pas na een suspend/resume geplaatst, dus de hoogte volgde niet na een eerste draai. Nu wordt hij bij het aanmaken geplaatst (één paar add/remove, ook voor `orientationchange`). Na elke render volgt één extra meting op het volgende frame (navigatiehoogte na het toepassen van de stijlen). Een wisseling van portret naar liggend past de laag direct toe (`relayout(true)`), zonder tussenframe. |
+| Gevolg buiten landscape | Door de herstelde meting vult de kaart op portret en tablet nu de beschikbare hoogte (de ondernavigatie staat onderaan in plaats van los te zweven). De inhoud en de compositie zijn ongewijzigd; de vervaagde ruimte rond de scène is ±50 px groter. |
+| Niet gewijzigd | Hotspots/kaarten op de master (`covers`), kaartnavigatie, routes, detailpagina's, het `live_cockpit_immersive: false`-gedrag en alle HA-gegevens (alleen lezen). Geen nieuw beeld. |
+
+Tests (`tests/browser/live-cockpit-immersive.cjs`, nu 32 controles): landscape 844×390, 932×430 en 667×375 (scène ≥ 60 % van de hoogte, zes kaarten binnen de scène, zijkolom naast de scène, geen overflow of overlap met de navigatie); veilige zones; alle functies via echte touch-tikken in landscape (Laden → Slim laden, Inzicht-menu met alle items, Meer, Cupra, Batterij, historie, kosten/contracten, Alle metingen); rotatie portret ⇄ landscape (zelfde host en beeld, 0 nieuwe resolves, 0 extra listeners of observers, geen frame zonder scène of beeld, geen tussenlaag, huidige pagina en meetdata blijven staan); landscape zonder meting, zonder beeld en offline; landscape met reduced motion.
+
+**Alleen te verifiëren op een echte iPhone:** werkelijke safe-areas en adresbalk in Safari en de Companion-app, het gedrag van `orientationchange` en `innerHeight` bij het draaien in iOS, en de leesbaarheid van de kaarten op het scherm in de hand.
