@@ -1483,12 +1483,14 @@ const EhLiveCockpit=(function(){
   // Landscape first: liggende telefoon. Scène links over de volle beschikbare hoogte, status, samenvatting en legenda in een
   // smalle kolom rechts (geen schaalvergroting, geen uitsnede: de scène blijft contain-fit).
   '@media (max-height:500px) and (orientation:landscape){' +
-  ':host([data-immersive]) .ehc:not([data-layout="list"]){display:grid;grid-template-columns:minmax(0,1fr) clamp(168px,28%,260px);grid-template-rows:auto auto auto auto 1fr;column-gap:12px;align-content:center;align-items:start;padding:4px 8px}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]){display:grid;grid-template-columns:minmax(0,1fr) clamp(124px,18%,168px);grid-template-rows:auto auto auto auto 1fr;column-gap:8px;align-content:center;align-items:start;padding:2px 6px}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{grid-column:1;grid-row:1 / -1;align-self:center;justify-self:center}' +
-  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-head{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:6px;margin:0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-head{grid-column:2;grid-row:1;flex-direction:column;align-items:flex-start;gap:4px;margin:0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehc-demo{font-size:.7rem;padding:.25rem .55rem}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehc-status{font-size:.7rem}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-warn{grid-column:2;grid-row:2}' +
-  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-summary{grid-column:2;grid-row:3;margin:.5rem 0 0}' +
-  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehm-legend{grid-column:2;grid-row:4;margin:.5rem 0 0}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehc-summary{grid-column:2;grid-row:3;margin:.4rem 0 0;font-size:.74rem;line-height:1.3}' +
+  ':host([data-immersive]) .ehc:not([data-layout="list"]) > .ehm-legend{grid-column:2;grid-row:4;margin:.35rem 0 0;font-size:.62rem;line-height:1.3}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) > :not(.ehc-head):not(.ehc-warn):not(.ehc-summary):not(.ehm-legend):not(.ehm-frame):not(.eh-imm-ambient){grid-column:2;grid-row:5}' +
   '}' +
   // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
@@ -1583,7 +1585,8 @@ const EhLiveCockpit=(function(){
    if (!immersive || destroyed || suspended || !host.isConnected) return;
    const top = host.getBoundingClientRect().top + (win.scrollY || 0);
    const nav = card.shadowRoot && card.shadowRoot.querySelector('.shell > .nav');
-   const navH = nav ? nav.getBoundingClientRect().height : 0;
+   const nr = nav ? nav.getBoundingClientRect() : null;
+   const navH = nr && nr.width >= win.innerWidth * 0.5 ? nr.height : 0;   // liggend: rail links, geen balk onder de scène
    const total = Math.max(220, Math.round(win.innerHeight - Math.max(0, top) - navH - 8));
    if (host.style.getPropertyValue('--eh-imm-total') !== total + 'px') host.style.setProperty('--eh-imm-total', total + 'px');
    // Portret: een 16:9-master past op een smal, hoog scherm alleen klein (contain, nooit bijsnijden). Dan de scène over

@@ -94,12 +94,12 @@ const HOME=()=>{
  const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,shell=root.querySelector('.shell'),host=root.querySelector('.eh-live-home');
  const sr=host&&host.shadowRoot,ehc=sr&&sr.querySelector('.ehc'),stage=sr&&sr.querySelector('.ehm-stage');
  const vis=el=>!!el&&el.getClientRects().length>0&&getComputedStyle(el).visibility!=='hidden';
- const st=stage?stage.getBoundingClientRect():null,nav=root.querySelector('.shell > .nav').getBoundingClientRect();
+ const st=stage?stage.getBoundingClientRect():null,nav=root.querySelector('.shell > .nav').getBoundingClientRect(),rail=nav.width<innerWidth*.5;
  const S=card._ehLive?.ctl?EhLiveCockpit.scope.EhPve04MasterScene:null;
  const tiles=sr?[...sr.querySelectorAll('.ehm-tiles .tile')].map(b=>{
   const r=b.getBoundingClientRect(),layout=ehc.dataset.layout,cx=r.left+r.width/2,cy=r.top+r.height/2;
   const pts=layout==='list'?[[cx,cy]]:[[cx,cy],[cx-21,cy],[cx+21,cy],[cx,cy-21],[cx,cy+21]];
-  const navTop=root.querySelector('.shell > .nav').getBoundingClientRect().top;
+  const nb=root.querySelector('.shell > .nav').getBoundingClientRect(),navTop=nb.width<innerWidth*.5?innerHeight:nb.top;   // liggend: rail links, geen balk onder de scène
   const hit=pts.every(([x,y])=>{if(x<0||y<0||x>innerWidth||y>=Math.min(innerHeight,navTop))return true;   // onder de ondernavigatie: na scrollen bereikbaar
    const e=sr.elementFromPoint(x,y);return !!e&&e.closest('.tile')===b;});
   let covers=true;
@@ -110,7 +110,7 @@ const HOME=()=>{
   view:card._view,imm:shell.classList.contains('eh-imm-home'),portrait:!!host&&host.hasAttribute('data-imm-portrait'),total:host?.style.getPropertyValue('--eh-imm-total'),hostW:host?Math.round(host.getBoundingClientRect().width):0,all:shell.classList.contains('eh-imm-all'),live:!!host,immAttr:!!host&&host.hasAttribute('data-immersive'),
   layout:ehc?.dataset.layout,scene:ehc?.dataset.scene,heroVisible:vis(root.querySelector('.shell > .hero')),legacyVisible:vis(root.querySelector('.eh26-legacy')),
   coachVisible:vis(root.querySelector('.eh17-panel')),chartVisible:vis(root.querySelector('.chart-panel')),eh40:!!root.querySelector('.eh40-cockpit'),
-  stage:st&&{l:Math.round(st.left),r:Math.round(st.right),t:Math.round(st.top),b:Math.round(st.bottom),ratio:+(st.width/st.height).toFixed(3)},navTop:Math.round(nav.top),innerW:innerWidth,innerH:innerHeight,
+  stage:st&&{l:Math.round(st.left),r:Math.round(st.right),t:Math.round(st.top),b:Math.round(st.bottom),ratio:+(st.width/st.height).toFixed(3)},navTop:Math.round(rail?innerHeight:nav.top),innerW:innerWidth,innerH:innerHeight,
   overflow:document.documentElement.scrollWidth>innerWidth+1,ambient:!!sr?.querySelector('.eh-imm-ambient'),badge:sr?.querySelector('.ehc-demo')?.textContent,tiles
  };
 };
@@ -272,7 +272,7 @@ const PAGE=()=>{
   const scope=sel==='back'?root:host.shadowRoot;
   const el=sel==='back'?root.querySelector('.eh-imm-back[data-eh-page="overview"],.back-button[data-eh-page="overview"]'):scope.querySelector(sel+'[data-key="'+key+'"]');
   if(!el)return {missing:true};
-  const navTop=root.querySelector('.shell > .nav').getBoundingClientRect().top,limit=Math.min(innerHeight,navTop);
+  const nb=root.querySelector('.shell > .nav').getBoundingClientRect(),navTop=nb.width<innerWidth*.5?innerHeight:nb.top,limit=Math.min(innerHeight,navTop);
   let r=el.getBoundingClientRect(),scrolled=false;
   if(r.top<0||r.bottom>limit){window.scrollBy({top:r.top+r.height/2-limit/2,behavior:'instant'});r=el.getBoundingClientRect();scrolled=true;}
   const cs=getComputedStyle(el);
@@ -332,13 +332,13 @@ const PAGE=()=>{
   const side=['.ehc-head','.ehc-summary','.ehm-legend'].map(q=>sr&&sr.querySelector(q));
   const st=R(stage),tiles=[...(sr?sr.querySelectorAll('.ehm-tiles .tile'):[])].map(b=>({key:b.dataset.key,vis:vis(b),...R(b)}));
   return {layout:ehc?.dataset.layout,scene:ehc?.dataset.scene,portrait:host?.hasAttribute('data-imm-portrait'),stage:st,
-   side:side.map(R),sideVis:side.map(vis),tiles,appbar:R(root.querySelector('.shell > .eh19-appbar')),nav:R(root.querySelector('.shell > .nav')),
+   side:side.map(R),sideVis:side.map(vis),tiles,appbar:R(root.querySelector('.shell > .eh19-appbar')),nav:R(root.querySelector('.shell > .nav')),rail:root.querySelector('.shell > .nav').getBoundingClientRect().width<innerWidth*.5,navItems:[...root.querySelectorAll('.shell > .nav .eh26-navitem')].map(R),
    body:R(root.querySelector('.shell > .body')),host:R(host),innerW:innerWidth,innerH:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1,
    shellOverflow:root.querySelector('.shell').scrollWidth>root.querySelector('.shell').clientWidth+1};
  };
  const SAFE=(page,l,r,b)=>page.evaluate(([l,r,b])=>{const c=document.querySelector('energiehuis-card');c.style.setProperty('--eh-safe-test-l',l+'px');c.style.setProperty('--eh-safe-test-r',r+'px');c.style.setProperty('--eh-safe-test-b',b+'px');window.dispatchEvent(new Event('resize'));},[l,r,b]);   // echte zones veranderen bij het draaien, dat geeft een resize
  for(const [w,h] of [[844,390],[932,430],[667,375]]){
-  await check(`landscape ${w}×${h}: scène groot (≥ 60 % van de hoogte), zes kaarten op de scène, zijkolom naast (niet over) de scène, geen overflow, geen overlap met app- of ondernavigatie`,async()=>{
+  await check(`landscape ${w}×${h}: scène dominant (≥ 80 % van de hoogte, ≥ 60 % van de breedte), zes kaarten op de scène, navigatie als rail links, tekst naast de scène, geen overflow of overlap`,async()=>{
    const {ctx,page,errors}=await open(IMM,{width:w,height:h});
    const m=await page.evaluate(LAND),home=await page.evaluate(HOME);
    if(SHOTS)await page.screenshot({path:path.join(SHOTS,`landscape-${w}x${h}-${browserType.name()}.png`)});
@@ -347,17 +347,20 @@ const PAGE=()=>{
    assert.equal(m.overflow,false);assert.equal(m.shellOverflow,false);
    assert.ok(m.stage.l>=0&&m.stage.r<=w,'scène binnen scherm');
    assert.ok(Math.abs(m.stage.w/m.stage.h-1330/748)<0.02,'verhouding');
-   assert.ok(m.stage.h>=h*0.6,`scène ≥ 60 % van de hoogte: ${m.stage.h}/${h}`);
-   assert.ok(m.stage.t>=m.appbar.b&&m.stage.b<=m.nav.t,'scène tussen app- en ondernavigatie '+JSON.stringify([m.appbar,m.stage,m.nav]));
-   assert.ok(m.appbar.h<=60&&m.nav.h<=60,'slanke balken '+m.appbar.h+'/'+m.nav.h);
-   assert.ok(m.nav.b<=h+0.5,'ondernavigatie binnen het scherm');
+   // 667×375 is breedtebeperkt (rail + tekstkolom): daar volstaat 60 % van de hoogte.
+   assert.ok(m.stage.h>=h*(w>=800?0.8:0.6),`scène groot: ${m.stage.h}/${h}`);
+   assert.ok(m.stage.w>=w*(w>=800?0.6:0.55),`scène breed: ${m.stage.w}/${w}`);
+   assert.equal(m.rail,true,'navigatie als rail');
+   assert.ok(m.stage.l>=m.nav.r-1&&m.stage.t>=m.appbar.b-1&&m.stage.b<=h,'scène rechts van de rail, onder de appbalk, binnen het scherm '+JSON.stringify([m.appbar,m.stage,m.nav]));
+   assert.ok(m.appbar.h<=52,'slanke appbalk '+m.appbar.h);
+   assert.ok(m.nav.b<=h+0.5&&m.navItems.length===4&&m.navItems.every(r=>r.t>=0&&r.b<=h&&r.h>=44&&r.r<=m.stage.l),'vier navigatieknoppen ≥44 px in de rail '+JSON.stringify(m.navItems));
    assert.ok(m.sideVis.every(Boolean),'status, samenvatting en legenda zichtbaar');
-   assert.ok(m.side.every(r=>r.l>=m.stage.r-1&&r.r<=w&&r.b<=m.nav.t),'zijkolom naast de scène, boven de navigatie '+JSON.stringify(m.side));
+   assert.ok(m.side.every(r=>r.l>=m.stage.r-1&&r.r<=w&&r.b<=h),'tekst naast de scène '+JSON.stringify(m.side));
    assert.equal(m.tiles.length,6);
    assert.ok(m.tiles.every(t=>t.vis&&t.l>=m.stage.l-1&&t.r<=m.stage.r+1&&t.t>=m.stage.t-1&&t.b<=m.stage.b+1),'zes kaarten binnen de scène');
    assert.deepEqual(home.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlak');assert.deepEqual(home.tiles.filter(t=>!t.covers).map(t=>t.key),[],'dekking');
    assert.deepEqual(errors,[]);
-   return {stage:m.stage,share:+(m.stage.h/h).toFixed(2),appbar:m.appbar.h,nav:m.nav.h};
+   return {stage:m.stage,shareH:+(m.stage.h/h).toFixed(2),shareW:+(m.stage.w/w).toFixed(2),rail:m.nav.w};
   });
  }
  await check('landscape veilige zones: notch links/rechts (47 px) en home-indicator (21 px) ⇒ app-/ondernavigatie, scène en zijkolom blijven erbinnen; zonder zones ongewijzigd',async()=>{
@@ -370,14 +373,13 @@ const PAGE=()=>{
    await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
    const menu=await page.evaluate(()=>{const m=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'),r=m.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom};});
    await ctx.close();
-   assert.ok(b.nav.l>=47&&b.nav.r<=w-47,'ondernavigatie binnen de notch '+JSON.stringify(b.nav));
-   assert.ok(b.appbar.l>=47&&b.appbar.r<=w-47,'appbalk binnen de notch');
-   assert.ok(b.stage.l>=47&&b.side.every(r=>r.r<=w-47),'scène en zijkolom binnen de notch '+JSON.stringify([b.stage,b.side]));
-   assert.ok(b.nav.h>=a.nav.h+20,'ondernavigatie krijgt ruimte voor de home-indicator: '+a.nav.h+'→'+b.nav.h);
-   assert.ok(b.nav.b<=h+0.5&&b.stage.b<=b.nav.t,'scène boven de navigatie '+JSON.stringify([b.nav,b.stage,b.host,b.body]));
-   assert.ok(menu.l>=47&&menu.r<=w-47&&menu.t>=0&&menu.b<=b.nav.t,'Inzicht-menu binnen veilige zone '+JSON.stringify(menu));
+   assert.ok(b.navItems.every(r=>r.l>=47&&r.b<=h-21),'rail-knoppen binnen notch en home-indicator '+JSON.stringify(b.navItems));
+   assert.ok(a.navItems.some(r=>r.l<47),'zonder zones geen extra marge');
+   assert.ok(b.appbar.r<=w-47,'appbalk binnen de rechternotch');
+   assert.ok(b.stage.l>=47&&b.side.every(r=>r.r<=w-47),'scène en tekst binnen de notch '+JSON.stringify([b.stage,b.side]));
+   assert.ok(b.stage.l>=b.nav.r-1&&b.stage.b<=h,'scène rechts van de rail');
+   assert.ok(menu.l>=b.nav.r&&menu.r<=w-47&&menu.t>=0&&menu.b<=h-21+0.5,'Inzicht-menu binnen veilige zone '+JSON.stringify(menu));
    assert.equal(b.overflow,false);assert.equal(b.shellOverflow,false);
-   assert.ok(a.nav.l<=1&&a.appbar.l<=1,'zonder zones geen extra marge');
    assert.deepEqual(home.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlak met veilige zones');
    assert.deepEqual(errors,[]);
    out[w+'x'+h]={nav:b.nav,stage:b.stage};
@@ -405,7 +407,7 @@ const PAGE=()=>{
      items:[...m.querySelectorAll('button')].map(b=>{const r=b.getBoundingClientRect();return {key:b.hasAttribute('data-eh-imm-all')?'all':(b.dataset.ehPage||b.textContent.trim()),label:b.querySelector('strong')?.textContent,h:Math.round(r.height),t:Math.round(r.top),b:Math.round(r.bottom),l:Math.round(r.left),r:Math.round(r.right)};})};});};
   const first=await items();
   assert.ok(first.items.length>=7,'menu-items '+first.items.length);
-  assert.ok(first.menu.t>=0&&first.menu.b<=first.nav+0.5&&first.menu.l>=0&&first.menu.r<=844,'menu binnen scherm '+JSON.stringify(first.menu));
+  assert.ok(first.menu.t>=0&&first.menu.b<=first.innerH+0.5&&first.menu.l>=0&&first.menu.r<=844,'menu binnen scherm '+JSON.stringify(first.menu));
   assert.ok(first.items.every(i=>i.h>=44&&i.t>=first.menu.t-1&&i.b<=first.menu.b+1),'alle items zichtbaar ≥44 px '+JSON.stringify(first.items));
   const keys=first.items.map(i=>i.key);
   for(const k of ['sun','home','grid','practice','all'])assert.ok(keys.includes(k),'menu mist '+k);
@@ -467,7 +469,7 @@ const PAGE=()=>{
   assert.ok(homeEnd.lay.every(l=>['list+p','compact'].includes(l)),'geen tussenlagen (compact in portret, lijst zonder portret): '+homeEnd.lay);
   assert.equal(homeEnd.dbg.timer,true);assert.equal(homeEnd.dbg.suspended,false);
   assert.equal(landed[0].layout,'compact');assert.equal(landed[1].portrait,true);assert.equal(landed[2].layout,'compact');
-  for(const m of landed){assert.equal(m.overflow,false);assert.ok(m.stage.b<=m.nav.t+0.5,'scène boven navigatie na draaien');}
+  for(const m of landed){assert.equal(m.overflow,false);assert.ok(m.rail?(m.stage.l>=m.nav.r-1&&m.stage.b<=m.innerH):m.stage.b<=m.nav.t+0.5,'scène overlapt de navigatie niet na draaien');}
   // Pagina blijft staan: Net-pagina, Cupra-pagina en Alle metingen
   const pages={};
   for(const [name,open_] of [['grid',()=>clickTile(page,'net')],['cupra',()=>clickTile(page,'cupra')]]){
@@ -503,7 +505,7 @@ const PAGE=()=>{
    const m=await page.evaluate(LAND),home=await page.evaluate(HOME);
    if(SHOTS)await page.screenshot({path:path.join(SHOTS,`landscape-${name}-${browserType.name()}.png`)});
    assert.equal(m.overflow,false,name);assert.equal(m.shellOverflow,false,name);
-   if(m.layout!=='list'){assert.ok(m.stage.b<=m.nav.t+0.5,name+' scène boven navigatie');assert.ok(m.tiles.every(t=>t.vis&&t.r<=m.stage.r+1&&t.l>=m.stage.l-1&&t.b<=m.stage.b+1),name+' kaarten binnen de scène');}
+   if(m.layout!=='list'){assert.ok(m.rail?m.stage.l>=m.nav.r-1:m.stage.b<=m.nav.t+0.5,name+' scène overlapt navigatie niet');assert.ok(m.tiles.every(t=>t.vis&&t.r<=m.stage.r+1&&t.l>=m.stage.l-1&&t.b<=m.stage.b+1),name+' kaarten binnen de scène');}
    const reach=[];
    for(const [key,view] of [['pv','sun'],['house','home'],['net','grid'],['battery','battery'],['cupra','cupra'],['practice','practice']]){
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));

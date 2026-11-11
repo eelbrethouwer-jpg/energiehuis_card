@@ -75,14 +75,18 @@ function ehImmCss(){
   // De testvariabelen --eh-safe-test-* laten de tests een notch simuleren; echte waarden komen uit env().
   '.shell{--eh-sl:var(--eh-safe-test-l,env(safe-area-inset-left,0px));--eh-sr:var(--eh-safe-test-r,env(safe-area-inset-right,0px));--eh-sb:var(--eh-safe-test-b,env(safe-area-inset-bottom,0px))}',
   '@media (max-height:500px) and (orientation:landscape){',
-  ' .shell{padding-left:var(--eh-sl);padding-right:var(--eh-sr)}',
-  ' .shell>.eh19-appbar{padding:3px 12px;gap:8px;min-height:0}',
-  ' .shell>.eh19-appbar button{min-height:40px}',
-  ' .shell>.nav{padding:3px 8px calc(3px + var(--eh-sb));gap:6px}',
-  ' .shell>.nav .eh26-navitem{flex-direction:row;min-height:44px;gap:8px;padding:4px 10px;justify-content:center}',
-  ' .shell>.nav .eh26-insight-menu{grid-template-columns:repeat(2,minmax(0,1fr));width:min(560px,calc(100% - 24px));max-height:calc(100svh - 70px);overflow:auto;overscroll-behavior:contain;right:calc(12px + var(--eh-sr))}',
+  // Navigatie als slanke rail links (geen balk onder de scène): de scène krijgt bijna de volle hoogte en breedte.
+  ' .shell{display:grid;grid-template-columns:calc(76px + var(--eh-sl)) minmax(0,1fr);grid-auto-rows:auto;padding:0 var(--eh-sr) 0 0}',
+  ' .shell>*{grid-column:2;min-width:0}',
+  ' .shell>.eh19-appbar{padding:2px 12px;gap:8px;min-height:0;border-radius:0 20px 0 0}',
+  ' .shell>.eh19-appbar button{min-height:32px;position:relative}',
+  ' .shell>.eh19-appbar button::before{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}',
+  ' .shell>.nav{grid-column:1;grid-row:1 / span 8;position:sticky;top:0;bottom:auto;align-self:start;height:min(100svh,100%);flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:6px 6px calc(6px + var(--eh-sb)) calc(6px + var(--eh-sl));border-radius:20px 0 0 20px;box-sizing:border-box;overflow:visible}',
+  ' .shell>.nav .eh26-navitem{flex:none;flex-direction:column;min-height:52px;width:100%;gap:3px;padding:5px 2px;justify-content:center}',
+  ' .shell>.nav .eh26-navitem>span{font-size:10px!important}',
+  ' .shell>.nav .eh26-insight-menu{grid-template-columns:repeat(2,minmax(0,1fr));left:calc(100% + 10px);right:auto;bottom:calc(10px + var(--eh-sb));width:min(560px,calc(100vw - 76px - var(--eh-sl) - var(--eh-sr) - 28px));max-height:calc(100svh - 20px - var(--eh-sb));overflow:auto;overscroll-behavior:contain}',
   ' .shell>.nav .eh26-insight-menu button{min-height:48px;padding:6px 10px}',
-  ' .shell.eh-imm-home>.body{padding:4px 8px 4px}',
+  ' .shell.eh-imm-home>.body{padding:2px 6px 4px}',
   '}'
  ].join('\n');
 }
