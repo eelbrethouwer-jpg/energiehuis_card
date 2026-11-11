@@ -77,7 +77,7 @@ Alleen actief bij `live_cockpit_immersive: true`. Op een laag, liggend scherm (`
 
 | Onderdeel | Uitvoering |
 |---|---|
-| Scène + zijkolom | De scène (contain, ongewijzigd beeld) staat links over de beschikbare hoogte. Status, samenvatting en legenda staan in een smalle kolom rechts. Op 844×390 gaat de scène van 312×176 naar 478×269 px (±69 % van de hoogte), op 932×430 van 330×186 naar 549×309 px. De samenvatting stond voorheen onder de ondernavigatie. |
+| Scène + zijkolom | De scène (contain, ongewijzigd beeld) staat links over de beschikbare hoogte. Status, samenvatting en legenda staan in een smalle kolom rechts. Op 844×390 en 932×430 was de scène op main (v1.28.0) steeds 313×176 px. Nu is ze 478×269 px (±69 % van de hoogte) op 844×390 en 549×309 px (±72 %) op 932×430. De samenvatting stond voorheen onder de ondernavigatie. |
 | Slanke balken | De appbalk is ±47 px en de ondernavigatie ±51 px (icoon naast label, tikvlak ≥ 44 px). Het Inzicht-menu heeft 2 kolommen, een maximale hoogte en scrollt zo nodig; alle items blijven zichtbaar en bereikbaar. |
 | Veilige zones | `env(safe-area-inset-left/right/bottom)` als marge op de kaart (alleen in deze liggende stand). De tests simuleren een notch via `--eh-safe-test-l/r/b`. |
 | Meting en rotatie | **Bugfix:** de resize-listener werd pas na een suspend/resume geplaatst, dus de hoogte volgde niet na een eerste draai. Nu wordt hij bij het aanmaken geplaatst (één paar add/remove, ook voor `orientationchange`). Na elke render volgt één extra meting op het volgende frame (navigatiehoogte na het toepassen van de stijlen). Een wisseling van portret naar liggend past de laag direct toe (`relayout(true)`), zonder tussenframe. |
