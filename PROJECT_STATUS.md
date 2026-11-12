@@ -1,6 +1,14 @@
 # PROJECT_STATUS — Energiehuis
 
-## Actuele status — 10 november 2026
+## Actuele status — 12 november 2026
+
+- Gecontroleerde `main`: `cd38a2ecd4fcf9d544c2badc435c623a7b429b45`; v1.28.0 is gepubliceerd.
+- PR #58: draft, beoordeelde HEAD `d140a0c7f0ecd8d733b0ffc2d306027d94dd428e`; CI 5/5 groen.
+- Reviewfix op `fix/live-cockpit-sparse-session`, gebaseerd op die PR-HEAD: onzekere sessiegrens bij schaarse tellerhistorie geeft geen bevestigd kWh-totaal. Deze correctie wordt apart aangeboden aan de featurebranch.
+- Gebouwd: ja, bron en gegenereerde bundel op de fixbranch. Automatische testresultaten staan bij de fix-PR; echte iPhone/HA-praktijktest: niet uitgevoerd. De correctie is niet gepubliceerd.
+- Vervolg: herreview van de fix en PR #58, daarna echte iPhone/HA-praktijktest. Merge en release blijven afzonderlijke eigenaarsbesluiten.
+
+## Historische status — 10 november 2026
 
 Deze status verwijst naar de geverifieerde **featuremerge** `main` `86c92ceb2ea619466f107d13c2fe630af4373709` (PR #56) en de gepubliceerde release v1.27.0. De afzonderlijke v1.28-release-PR moet zijn eigen CI nog doorlopen.
 

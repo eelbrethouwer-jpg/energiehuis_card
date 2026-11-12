@@ -204,7 +204,9 @@ function ehImmCurrentSession(points,live,nowMs){
   const d=next.k-prev.k;
   if(d<-0.01){cur=null;breakT=next.t;continue;}                      // tellerreset of bronwissel
   if(d<=0.001)continue;                                              // pauze of stilstand
-  if(d>dt/EH_IMM_HOUR*12+0.1||dt>6*EH_IMM_HOUR){cur=null;breakT=next.t;continue;}   // meetgat of onmogelijke sprong
+  // Bij change-only historie ontbreken vlakke punten tijdens stilstand. Een stijging na >45 min kan dus
+  // een nieuwe sessie verbergen; zonder gemeten startstand geen bevestigd totaal, ook bij plausibel vermogen.
+  if(d>dt/EH_IMM_HOUR*12+0.1||dt>EH_IMM_IDLE_MAX){cur=null;breakT=next.t;continue;}   // onzekere sessiegrens of onmogelijke sprong
   if(!cur||prev.t-cur.last>EH_IMM_IDLE_MAX){
    cur={start:prev.t,startK:prev.k,last:next.t,uncertain:breakT!==null&&prev.t-breakT<=EH_IMM_IDLE_MAX,first:i===1};
   }

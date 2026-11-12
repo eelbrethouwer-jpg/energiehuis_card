@@ -163,6 +163,28 @@ test('sessie: pauze ≤ 45 min en hervatten blijft dezelfde sessie; pauze van 60
  const b=meter([[-100,-70,2.98],[-20,0,2.98]]),rb=sess(b);
  assert.equal(rb.ok,true);assert.ok(Math.abs(rb.kwh-2.98*20/60)<0.03,'pauze 50 min: nieuwe sessie van 20 min: '+rb.kwh);
 });
+test('sessie: schaarse change-only historie met 90 minuten meetgat geeft geen bevestigd totaal',()=>{
+ const pts=[[-180,100],[-130,100],[-120,101],[-110,102],[-20,103],[-10,104],[0,105]]
+  .map(([m,v])=>({t:T0+m*60000,v,unit:'kWh'}));
+ assert.deepEqual(T.sess(pts,{kwh:105,t:T0},T0),{ok:false,reason:'onderbroken meting'});
+});
+test('sessie: stijgende meetinterval tot 45 minuten blijft toegestaan, daarboven is de grens onzeker',()=>{
+ for(const minutes of [45,46]){
+  const pts=[[-180,100],[-120,100],[-110,101],[-110+minutes,102],[0,103]]
+   .map(([m,v])=>({t:T0+m*60000,v,unit:'kWh'}));
+  // Voeg na het te beoordelen gat regelmatige stijgingen toe tot nu.
+  pts.pop();let v=102;for(let m=-110+minutes+5;m<0;m+=5)pts.push({t:T0+m*60000,v:++v,unit:'kWh'});
+  const last=pts[pts.length-1];
+  const r=T.sess(pts,{kwh:last.v,t:last.t},T0);
+  assert.equal(r.ok,minutes===45,'meetinterval '+minutes+' min');
+ }
+});
+test('sessie: na een onzeker meetgat en aantoonbare lange stilstand wordt een nieuwe sessie weer beschikbaar',()=>{
+ const pts=[[-300,100],[-290,100],[-280,101],[-180,102],[-170,103],[-60,103],[-30,103],[-20,104],[-10,105],[0,106]]
+  .map(([m,v])=>({t:T0+m*60000,v,unit:'kWh'}));
+ const r=T.sess(pts,{kwh:106,t:T0},T0);
+ assert.equal(r.ok,true);assert.equal(r.kwh,3);assert.equal(r.start,T0-30*60000);
+});
 test('sessie: nieuwe sessie na een eerdere sessie telt alleen de nieuwe',()=>{
  const m=meter([[-300,-200,7.4],[-30,0,7.4]]),r=sess(m);assert.equal(r.ok,true);assert.ok(Math.abs(r.kwh-7.4*30/60)<0.05,String(r.kwh));
 });
