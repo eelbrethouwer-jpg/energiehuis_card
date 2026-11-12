@@ -1,0 +1,6 @@
+{
+  "source_head": "be2f2b943b7ddb77baa42eb135ab33084cea44b4",
+  "test_type": "custom:energiehuis-card-pr59-test",
+  "changes": "Only custom element registration, stub type and card picker name in source fragment 02; generated with scripts/build.cjs. Not the unmodified PR bundle.",
+  "sha256": "50480f570a662ec85edae8d24266f7a364a12751a32458b2618fd3ffacee55af"
+}

@@ -1113,7 +1113,7 @@ class EnergiehuisCard extends HTMLElement {
  }
  set hass(hass){this._hass=hass;this._schedule();this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();}
  getCardSize(){return 9}
- static getStubConfig(){return {type:'custom:energiehuis-card'}}
+ static getStubConfig(){return {type:'custom:energiehuis-card-pr59-test'}}
  connectedCallback(){
   this._loadHistory();this._loadMetricData();this._loadCostCompare();this._loadCupraInsights();
   if(!this._refreshTimer)this._refreshTimer=setInterval(()=>{this._loadHistory();this._loadCostCompare();this._loadCupraInsights();},5*60*1000);
@@ -1652,10 +1652,10 @@ class EnergiehuisCard extends HTMLElement {
 </article>`;
  }
 }
-if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
+if(!customElements.get('energiehuis-card-pr59-test'))customElements.define('energiehuis-card-pr59-test',EnergiehuisCard);
 window.customCards=window.customCards||[];
-if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.28.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
+if(!window.customCards.some(x=>x.type==='energiehuis-card-pr59-test')){
+ window.customCards.push({type:'energiehuis-card-pr59-test',name:'Energiehuis PR59 TEST be2f2b9',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
