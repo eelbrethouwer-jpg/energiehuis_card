@@ -98,11 +98,11 @@ const SETUP=([config,mode])=>{
   // Alfen-historie (compact): elke 5 minuten over 36 uur + de knikpunten van de segmenten; eerste punt met eenheid.
   const pts=new Set();for(let t=now-36*H;t<=now;t+=5*60000)pts.add(Math.round(t));
   for(const [f,e] of segs){pts.add(f);pts.add(e);} if(resetT!==null){pts.add(resetT-1);pts.add(resetT);} pts.add(now);
-  const hist=[...pts].filter(t=>t<=now&&t>=now-36*H).sort((x,y)=>x-y).map((t,i)=>({s:String(+A(t).toFixed(4)),lu:t/1000,...(i===0?{a:{unit_of_measurement:'kWh'}}:{})}));
+  const hist=[...pts].filter(t=>t<=now&&t>=now-36*H).sort((x,y)=>x-y).map((t,i)=>({s:String(A(t)),lu:t/1000,...(i===0?{a:{unit_of_measurement:'kWh'}}:{})}));
   window.__sim={rows,history:cfg.noHistory?{}:{[c.laad_energie]:hist},t0,full,
    expected:{imp:F(meters[c.import],now)-F(meters[c.import],t0),exp:F(meters[c.export],now)-F(meters[c.export],t0),ev:A(now)-A(t0)}};
-  states[c.import]=st(c.import,+F(meters[c.import],now).toFixed(4),'kWh');states[c.export]=st(c.export,+F(meters[c.export],now).toFixed(4),'kWh');
-  states[c.laad_energie]=st(c.laad_energie,+A(now).toFixed(4),'kWh',cfg.alfenStaleMin!=null?cfg.alfenStaleMin*60:2);
+  states[c.import]=st(c.import,F(meters[c.import],now),'kWh');states[c.export]=st(c.export,F(meters[c.export],now),'kWh');
+  states[c.laad_energie]=st(c.laad_energie,A(now),'kWh',cfg.alfenStaleMin!=null?cfg.alfenStaleMin*60:2);
   // Zonneplan-kwartierprijzen: echte tijdstempels (92/96/100 per dag), optioneel negatief of met gaten.
   const dayEnd=new Date(t0);dayEnd.setDate(dayEnd.getDate()+1);const nq=Math.round((dayEnd.getTime()-t0)/900000);
   const fc=[];for(let i=0;i<nq;i++){if(cfg.quarterGaps&&i%7===3)continue;fc.push({start_date:new Date(t0+i*900000).toISOString(),price_tax_included:+((cfg.negative?-0.05:0.2)+0.08*Math.sin(i/9)+(i>=68&&i<80?0.07:0)).toFixed(4)});}
@@ -201,7 +201,7 @@ const PAGE=()=>{
   fs.writeFileSync(path.join(SHOTS,name),Buffer.from(url.split(',')[1],'base64'));
  }
  console.log(browserType.name(),browser.version());
- async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null,sim=null,time=null,tz='Europe/Amsterdam'}={}){
+ async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null,sim=null,time=process.env.EH_TEST_TIME||null,tz='Europe/Amsterdam'}={}){
   const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:tz,reducedMotion,hasTouch});
   const page=await ctx.newPage();const errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/40[134]|Failed to load resource/.test(m.text()))errors.push(m.text());});
@@ -662,9 +662,9 @@ const PAGE=()=>{
    for(const k of ['pv','house','cupra','net']){assert.equal(T[k].shown,true,k+' dagregel zichtbaar');assert.ok(T[k].font>=8.99,k+' tekst ≥ 9 px: '+T[k].font);assert.equal(T[k].clip,false,k+' niets afgekapt');assert.equal(T[k].inside,true,k+' dagregel binnen het vakje');}
    assert.match(T.net.aria,/Afname vandaag: .* kWh\. Teruggeleverd vandaag: .* kWh\. Kosten vandaag: € 0,31\./,'volledige toegankelijke naam');
    assert.match(T.cupra.aria,/Huidige laadsessie: 1,99 kWh\./);
-   assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,96);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
-   assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,96);assert.equal(x.price.pe,'auto');
-   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \(96 van 96 kwartieren bekend\)\. Tik voor het prijsoverzicht\.$/);
+   assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,x.sim.quarters);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
+   assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,x.sim.quarters);assert.equal(x.price.pe,'auto');
+   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Tik voor het prijsoverzicht\.$/);
    if(x.layout!=='list'){
     const p=x.price.rect,ks=Object.keys(T);
     for(const k of ks){const r=T[k].rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
@@ -679,7 +679,7 @@ const PAGE=()=>{
   });
  }
  const sessLine=async(sim,time,opts={})=>{
-  const {ctx,page}=await open(IMM,{width:932,height:430,sim,time,...opts});await settle(page);
+  const {ctx,page}=await open(IMM,{width:932,height:430,sim,time:time||'2026-11-12T14:37:00+01:00',...opts});await settle(page);   // vaste dag: uurgat en eerdere sessie liggen dan vandaag
   if(opts.afterOpen)await opts.afterOpen(page);
   const x=await page.evaluate(EXTRA);await ctx.close();return x;
  };
@@ -729,7 +729,7 @@ const PAGE=()=>{
   const before=await page.evaluate(EXTRA);
   await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states},e=s[c.prijs],fc=e.attributes.forecast.map((q,i)=>i===85?{...q,price_tax_included:+(q.price_tax_included+0.05).toFixed(4)}:q);s[c.prijs]={...e,attributes:{...e.attributes,forecast:fc}};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
   const after=await page.evaluate(EXTRA);await ctx.close();
-  assert.notEqual(before.price.svg,after.price.svg,'gewijzigde toekomstige prijs ⇒ grafiek opnieuw gerenderd');assert.equal(after.price.bars,96);
+  assert.notEqual(before.price.svg,after.price.svg,'gewijzigde toekomstige prijs ⇒ grafiek opnieuw gerenderd');assert.equal(after.price.bars,after.sim.quarters);
   out.update=true;return out;
  });
  await check('kwartierprijs-knop: tik, klik en toetsenbord (Enter/Space) openen het bestaande prijsoverzicht (Slim laden); ≥ 44×44, bereikbaar en onbedekt op 320/390/430/844/932; terug naar Home met focus op de knop',async()=>{
@@ -790,7 +790,7 @@ const PAGE=()=>{
  await check('pil bovenaan: datum en buitentemperatuur naast de tijd (weer-entiteit, anders Cupra-buitentemperatuur; verouderd/onbekend ⇒ alleen datum; offline ⇒ niets extra)',async()=>{
   const PILL=()=>{const sr=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot,p=sr.querySelector('.ehm-pill'),x=p.querySelector('.p-extra'),r=p.getBoundingClientRect(),xr=x?x.getBoundingClientRect():null;
    return {text:p.textContent.replace(/\s+/g,' ').trim(),extra:x&&!x.hidden?x.textContent:null,fits:!!xr&&xr.right<=r.right+0.5&&xr.left>=r.left-0.5&&p.scrollWidth<=p.clientWidth+1,time:p.querySelector('.p-time').textContent};};
-  const date=new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const date=process.env.EH_TEST_TIME?new Date(process.env.EH_TEST_TIME).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,''):new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
   const out={};
   for(const [w,h] of [[844,390],[390,844],[1280,800]]){
    const {ctx,page,errors}=await open(IMM,{width:w,height:h});await settle(page);const a=await page.evaluate(PILL);await ctx.close();
