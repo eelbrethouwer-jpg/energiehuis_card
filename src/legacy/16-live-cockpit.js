@@ -879,8 +879,8 @@ const EhLiveCockpit=(function(){
     const img = el(doc, 'img', 'ehm-scene', { alt: 'Goedgekeurde avondscène: woning met zonnepanelen, houten praktijkruimte links en een groene Cupra bij de laadpaal rechts. De lichtlijnen in het beeld zijn decoratief; de ingebakken voorbeeldkaarten zijn afgedekt door ' + (LIVE ? 'live kaarten met actuele meetwaarden.' : 'live DEMO-kaarten.'), decoding: 'async', fetchpriority: 'high', draggable: 'false' });
     const particles = el(doc, 'canvas', 'ehm-particles', { 'aria-hidden': 'true' });
     const covers = el(doc, 'div', 'ehm-covers', { 'aria-hidden': 'true' });
-    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
-    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
+    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' + (typeof options.pillExtra === 'function' ? '<span class="p-extra" hidden></span>' : '') : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
+    const pillExtra = pill.querySelector('.p-extra'), pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
     covers.appendChild(pill);
     const PL = {};   // lege glasvlakken (alleen in de lijstweergave zichtbaar; de lijst eronder toont de waarden)
     for (const k of KEYS) { const p = el(doc, 'div', 'ehm-cover ehm-plate', { 'data-key': k }); p.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; covers.appendChild(p); PL[k] = p; }
@@ -890,9 +890,9 @@ const EhLiveCockpit=(function(){
     const T = {};
     for (const k of KEYS) {
       const b = el(doc, 'button', 'tile', NAV ? { type: 'button', 'data-key': k } : { type: 'button', 'data-key': k, 'aria-haspopup': 'dialog', 'aria-controls': id + '-detail', 'aria-expanded': 'false' });
-      b.innerHTML = `<span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[k]}</svg></span><span class="t-body"><span class="t-title"></span><span class="t-value"><span class="t-num"></span><span class="t-unit"></span></span><span class="t-extra"></span><span class="t-sub"></span></span>`;
+      b.innerHTML = `<span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[k]}</svg></span><span class="t-body"><span class="t-title"></span><span class="t-value"><span class="t-num"></span><span class="t-unit"></span></span>${typeof options.tileDay === 'function' ? '<span class="t-day" hidden></span>' : ''}<span class="t-extra"></span><span class="t-sub"></span></span>`;
       tiles.appendChild(b);
-      T[k] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), num: b.querySelector('.t-num'), unit: b.querySelector('.t-unit'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
+      T[k] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), num: b.querySelector('.t-num'), unit: b.querySelector('.t-unit'), day: b.querySelector('.t-day'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
     }
     frame.append(stage, tiles);
 
@@ -1036,7 +1036,15 @@ const EhLiveCockpit=(function(){
       }
       const r = stage.getBoundingClientRect();
       sw = r.width; sh = r.height;
-      rootEl.dataset.density = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      const dens = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';
+      rootEl.dataset.density = dens;   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      // De dagregels hebben vier vormen (≥ 800, ≥ 560, ≥ 330 en kleiner): bij een andere vorm de kaartteksten opnieuw bepalen.
+      if (typeof options.tileDay === 'function') {
+        const form = String(sw >= 800 ? 3 : sw >= 560 ? 2 : sw >= 330 ? 1 : 0);
+        const formChanged = rootEl.dataset.dform !== form;
+        rootEl.dataset.dform = form;
+        if (formChanged && model) render();
+      }
       rootEl.style.setProperty('--u', (sw / (sceneOk ? S.image.natural.w : 1330)).toFixed(4));
       dpr = Math.min(2, win.devicePixelRatio || 1);
       particles.width = Math.max(1, Math.round(sw * dpr)); particles.height = Math.max(1, Math.round(sh * dpr));
@@ -1067,6 +1075,15 @@ const EhLiveCockpit=(function(){
         const [num, unit] = splitValue(shown); setText(N.num, num); setText(N.unit, unit);
         const sub = k === 'net' ? NP.sub : d.sub, dir = k === 'net' ? NP.direction : 'none';
         setText(N.sub, sub);
+        // Dagtotalen (immersive Home): korte tweede regel onder de livewaarde; leeg ⇒ verborgen. Alleen tekst, geen aannames.
+        const dr = N.day ? options.tileDay(k, m, layout === 'list' ? 1000 : sw) : null;              // {lines, aria} (of null)
+        const dl = dr && Array.isArray(dr.lines) ? dr.lines : [], da = dr && Array.isArray(dr.aria) ? dr.aria : dl;
+        const dayKey = dl.length ? dl.join('\n') : '';
+        if (N.day && (N.day.dataset.k || '') !== dayKey) {
+          N.day.dataset.k = dayKey;
+          N.day.replaceChildren(...dl.map(t => { const sp = doc.createElement('span'); sp.textContent = t; return sp; }));
+          N.day.hidden = !dayKey;
+        }
         let extra = k === 'cupra' ? 'Accu ' + d.soc : k === 'battery' ? 'Simulatie' : (d.tone === 'sim' ? 'Simulatie' : '');
         if (k === 'net') { const nd = netActive ? NET_DIR[d.direction] : null; extra = nd ? nd.arrow + ' ' + nd.text : (layout === 'compact' ? NP.badgeCompact : NP.badge) || ''; }
         setText(N.extra, extra); N.extra.hidden = !extra;
@@ -1074,7 +1091,8 @@ const EhLiveCockpit=(function(){
         if (k === 'net') { setData(N.b, 'direction', dir); setData(PL[k], 'direction', dir); }
         const nd = k === 'net' && netActive && NET_DIR[d.direction] ? ', ' + NET_DIR[d.direction].name + ' (' + NET_DIR[d.direction].text + ')' : '';
         const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. ${NAV ? 'Pagina openen.' : 'Details openen.'}` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. ${NAV ? 'Pagina openen.' : 'Details openen.'}`;
-        if (N.b.getAttribute('aria-label') !== al) N.b.setAttribute('aria-label', al);
+        const alDay = da.length ? al.replace(/ (Pagina openen|Details openen)\.$/, ' ' + da.join(' ') + ' $1.') : al;
+        if (N.b.getAttribute('aria-label') !== alDay) N.b.setAttribute('aria-label', alDay);
       }
       const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
       if (LIVE) {
@@ -1088,6 +1106,8 @@ const EhLiveCockpit=(function(){
         setText(pillText, m.connected ? 'alleen-lezen' : 'geen verbinding');
         setText(pillTime, m.connected ? hhmm(m.now) : 'sinds ' + hhmm(offlineSince));
       } else setText(pillTime, hhmm(m.now));
+      // Datum en buitentemperatuur naast de tijd (immersive Home; alleen met verbinding en alleen echte waarden).
+      if (pillExtra) { const t = m.connected ? options.pillExtra(m) : ''; setText(pillExtra, t || ''); pillExtra.hidden = !t; }
       for (const [sid, b] of Object.entries(SB)) if (b.getAttribute('aria-pressed') !== String(sid === scenario)) b.setAttribute('aria-pressed', String(sid === scenario));
       setData(rootEl, 'activeScenario', scenario);
       applyRoutes();
@@ -1197,7 +1217,9 @@ const EhLiveCockpit=(function(){
       get layout() { return layout; },
       get live() { return LIVE; },
       /** Weergave opnieuw bepalen (bijv. na een gewijzigde immersive portretstand); één rAF, geen volledige render. */
-      relayout() { scheduleGeo(); },
+      /** Kaartteksten opnieuw bepalen zonder nieuwe invoer (bijv. wanneer dagtotalen binnenkomen). */
+      rerender() { if (model && !destroyed) render(); },
+      relayout(now) { if (now && !destroyed && !suspended) { if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0; geometry(); } else scheduleGeo(); },
       setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
       setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
@@ -1469,29 +1491,59 @@ const EhLiveCockpit=(function(){
   '.ehc-brand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}' +
   '.ehc-head{justify-content:flex-start}' +
   // v1.28 immersive Home: schermvullend, master volledig zichtbaar (contain), achtergrondverlenging uit dezelfde master.
-  ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:104px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
+  ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:12px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
   // Lage, liggende schermen: alleen de statusregel boven de scène meetellen; legenda en samenvatting volgen eronder.
-  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:44px}}' +
+  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:10px}}' +
   ':host([data-immersive]) .ehc{max-width:none;margin:0;display:flex;flex-direction:column;justify-content:center;min-height:var(--eh-imm-total);isolation:isolate;border-radius:20px;overflow:hidden;padding:6px 8px 8px;background:radial-gradient(120% 90% at 50% 30%,#1b2a3c,#081320)}' +
   ':host([data-immersive]) .ehc[data-layout="list"]{min-height:0}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{width:min(100%,calc(var(--eh-imm-stage-h) * 1330 / 748));margin:0 auto}' +
   ':host([data-immersive]) .eh-imm-ambient{position:absolute;inset:-6%;width:112%;height:112%;z-index:-1;filter:blur(22px) saturate(1.15) brightness(.62);pointer-events:none}' +
   ':host([data-immersive]) .ehc-head{margin:0 2px 6px}' +
-  ':host([data-immersive]) .ehm-legend{margin:.45rem .2rem 0;font-size:.74rem}' +
-  ':host([data-immersive]) .ehc-summary{margin:.3rem .2rem 0;font-size:.86rem}' +
   ':host([data-immersive]) .ehm-stage{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}' +
+  // Home = scène + vakjes + kwartierprijs-overlay. Status, samenvatting en legenda blijven er voor schermlezers (sr-only)
+  // en staan niet meer als paneel naast of onder het beeld; de LIVE/OFFLINE-pil staat in de scène zelf.
+  ':host([data-immersive]) .ehc-head,:host([data-immersive]) .ehc-summary,:host([data-immersive]) .ehm-legend{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}' +
+  // Waarschuwing bij een tegenstrijdige meetketen blijft zichtbaar, als dunne balk bovenaan de scène.
+  ':host([data-immersive]) .ehc-warn:not([hidden]){position:absolute;z-index:6;left:50%;top:6px;transform:translateX(-50%);width:max-content;max-width:min(94%,680px);margin:0;padding:.3rem .7rem;border-radius:10px;font-size:.72rem;line-height:1.3;pointer-events:none;background:rgba(40,12,12,.86)}' +
+  // Dagtotalen in de vakjes: tweede, kleine regel(s) onder de livewaarde.
+  // Portret (kleine scène): de pil loopt naar links door in de lege lucht boven het huis, zodat datum en temperatuur passen.
+  ':host([data-immersive]) .ehc--master[data-layout="list"] .ehm-pill{left:50%;width:calc((var(--x) + var(--w) - .5) * 100%)}' +
+  // In de immersive Home vervangt datum + temperatuur de tekst "alleen-lezen" (die staat al in de appbalk); offline blijft zichtbaar.
+  ':host([data-immersive]) .ehm-pill:not([data-state="offline"]) .p-text{display:none}' +
+  '.ehm-pill .p-extra{margin-left:.55em;padding-left:.6em;border-left:1px solid rgba(255,255,255,.28);color:#d6e4ef;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.ehm-pill .p-extra[hidden]{display:none}' +
+  '.ehc--master[data-layout="compact"][data-density="xs"] .ehm-pill .p-extra{display:none}' +
+  '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+  '.ehc--master[data-layout="list"] .t-day span{white-space:normal;overflow:visible}' +
+  '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2;color:rgba(255,255,255,.86);letter-spacing:-.01em}' +
+  '.ehc--master[data-layout="compact"] .t-day{text-align:center;justify-items:center}' +
+  // Met een dagregel is de oude ondertitel overbodig (tenzij de meting afwijkt: dan blijft de reden zichtbaar); de batterij toont al "Simulatie".
+  ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile:not([data-tone="warn"]):not([data-tone="bad"]) .t-day:not([hidden]) ~ .t-sub,:host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile[data-key="battery"] .t-sub{display:none}' +
+  // Vakjes met dagtotalen krijgen iets meer hoogte (naar beneden), nog steeds over de afgedekte ingebakken kaart heen.
+  ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .ehm-tiles .tile{top:calc((var(--y) - .012) * 100%);height:calc((var(--h) + .046) * 100%)}' +
+  // Net-vakje (breedte van de scène 560–800 px, bijv. iPhone liggend): iets breder naar links voor "Af x · Terug y kWh".
+  ':host([data-immersive]) .ehc--master[data-dform="2"]:not([data-layout="list"]) .ehm-tiles .tile[data-key="net"]{left:calc((var(--x) - .07) * 100%);width:calc((var(--w) + .07) * 100%)}' +
+  // Kwartierprijs-overlay (subtiel, nooit een tikvlak): rechtsonder op de scène; in de lijstweergave (portret) een rij onderaan de vakjes.
+  '.eh-price{appearance:none;font-family:inherit;text-align:left;cursor:pointer;display:block;box-sizing:border-box;min-width:44px;min-height:44px;position:absolute;z-index:4;pointer-events:auto;left:62.5%;right:1.5%;bottom:2.2%;padding:calc(var(--u) * 8px) calc(var(--u) * 12px);border-radius:calc(var(--u) * 16px);background:rgba(8,16,28,.58);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.13);color:#e8f2fa;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2}' +
+  '.eh-price:hover{border-color:rgba(255,255,255,.3)}.eh-price:focus-visible{outline:2px solid #76c1ef;outline-offset:2px}' +
+  '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
+  '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
+  '.eh-price-bars line.daybreak{stroke:#fff;stroke-width:.65;stroke-dasharray:2 2;opacity:.7}.eh-price-period{display:block;margin-top:2px;font-size:.85em;opacity:.75;white-space:normal}' +
+  '.ehc--master:not([data-layout="list"]) .eh-price-period{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}' +
+  '.eh-price-bars rect.planned{fill:#4bd66d}.eh-price-bars rect.waiting{fill:#ffad32}.eh-price-bars rect.planned.now,.eh-price-bars rect.waiting.now{stroke:#fff;stroke-width:.5}.eh-price-bars line.limit{stroke:#ef6666;stroke-width:.6}' +
+  '.eh-price[data-state="none"] .eh-price-now{font-size:1em;font-weight:600;opacity:.8}' +
+  '.ehc--master[data-layout="list"] .eh-price{position:static;grid-column:1 / -1;padding:.55rem .8rem;border-radius:.95rem;font-size:.8rem;background:color-mix(in srgb,var(--bg-2) 80%,transparent)}' +
+  '.ehc--master[data-layout="list"] .eh-price-bars{height:34px;max-height:none}' +
+  '' +
   // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
   // eronder als glas over dezelfde vervaagde master; glasvlakken op de scène zijn tikvlakken (≥44 px).
   ':host([data-imm-portrait]){margin:0 -6px}' +
   ':host([data-imm-portrait]) .ehc,:host([data-imm-portrait]) .ehc[data-layout="list"]{justify-content:flex-start;min-height:var(--eh-imm-total);padding:4px 4px 10px;border-radius:18px}' +
-  ':host([data-imm-portrait]) .ehc-head{margin:2px 6px 6px}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-stage{border-radius:14px}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{margin-top:.5rem;gap:.45rem}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles .tile{background:color-mix(in srgb,var(--bg-2) 80%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}' +
   '@container (min-width:21rem){:host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-covers .ehm-plate{pointer-events:auto;cursor:pointer;overflow:visible}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-plate::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}' +
-  ':host([data-imm-portrait]) .ehm-legend{margin:.5rem .4rem 0}:host([data-imm-portrait]) .ehc-summary{margin:.3rem .4rem 0}' +
   '@media (prefers-reduced-motion:reduce){:host([data-immersive]) .eh-imm-ambient{filter:blur(22px) brightness(.62)}}' +
   // Zeer kleine scène: "Nog niet gekoppeld" past niet zonder woordafbreking ⇒ gedempt streepje (pagina legt het uit).
   '.ehc--master[data-layout="compact"][data-density="xs"] .tile[data-key="practice"][data-tone="muted"] .t-sub{display:none}' +
@@ -1548,6 +1600,8 @@ const EhLiveCockpit=(function(){
    mode: 'live', specs: adapter.specs,
    onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
    onImageLoad: immersive ? ambient : undefined,
+   pillExtra: immersive ? m => (typeof card._ehImmPillExtra === 'function' ? card._ehImmPillExtra(m) : '') : undefined,
+   tileDay: immersive ? (k, m, sw) => (typeof card._ehImmTileDay === 'function' ? card._ehImmTileDay(k, m, sw) : null) : undefined,
    preferList: immersive ? () => host.hasAttribute('data-imm-portrait') : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
    imageMissingText: norm.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd (live_cockpit_image) — alleen interface'
@@ -1560,6 +1614,7 @@ const EhLiveCockpit=(function(){
    if (conn && wasConnected === false) cockpit.retryImage();      // verbinding hersteld ⇒ mislukt beeld opnieuw
    wasConnected = conn;
    if (adapter.changed(hass) || force) { cockpit.setInput(adapter.input(hass, now)); updates++; }
+   if (immersive && typeof card._ehImmExtras === 'function') card._ehImmExtras();   // kwartierprijs + dagtotalen (alleen lezen)
    // Eén timer: opnieuw beoordelen op de eerstvolgende route-/toon-TTL-grens, zonder complete kaartrender.
    if (timer) clearTimeout(timer);
    timer = setTimeout(() => { timer = 0; update(card._hass, true); }, adapter.nextCheckMs(hass, now));
@@ -1572,20 +1627,24 @@ const EhLiveCockpit=(function(){
    if (!immersive || destroyed || suspended || !host.isConnected) return;
    const top = host.getBoundingClientRect().top + (win.scrollY || 0);
    const nav = card.shadowRoot && card.shadowRoot.querySelector('.shell > .nav');
-   const navH = nav ? nav.getBoundingClientRect().height : 0;
+   const nr = nav ? nav.getBoundingClientRect() : null;
+   const navH = nr && nr.width >= win.innerWidth * 0.5 ? nr.height : 0;   // liggend: rail links, geen balk onder de scène
    const total = Math.max(220, Math.round(win.innerHeight - Math.max(0, top) - navH - 8));
    if (host.style.getPropertyValue('--eh-imm-total') !== total + 'px') host.style.setProperty('--eh-imm-total', total + 'px');
    // Portret: een 16:9-master past op een smal, hoog scherm alleen klein (contain, nooit bijsnijden). Dan de scène over
    // de volle breedte bovenaan en de zes routes als leesbare kaarten eronder i.p.v. een klein beeld in veel waas.
    const w = host.getBoundingClientRect().width;
    const portrait = w > 0 && w < PORTRAIT_MAX_W && total >= w * PORTRAIT_MIN_RATIO;
-   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(); }
+   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(true); }   // direct: geen tussenframe met de oude laag
   }
+  // iOS meldt na het draaien soms nog de oude innerHeight: één extra meting op het volgende frame (geen nieuwe listeners).
+  function onViewport() { measure(); win.requestAnimationFrame(measure); }
   let listening = false;
   function listen(on) {
    if (!immersive || on === listening) return;
    listening = on;
-   if (on) win.addEventListener('resize', measure, { passive: true }); else win.removeEventListener('resize', measure);
+   if (on) { win.addEventListener('resize', onViewport, { passive: true }); win.addEventListener('orientationchange', onViewport, { passive: true }); }
+   else { win.removeEventListener('resize', onViewport); win.removeEventListener('orientationchange', onViewport); }
   }
   function suspend() {
    if (destroyed || suspended) return;
@@ -1607,6 +1666,7 @@ const EhLiveCockpit=(function(){
    cockpit.destroy(); host.remove();
   }
   suspended = false;
+  listen(true);   // ook de eerste keer: anders volgt de hoogte pas na een suspend/resume op een draai van het toestel
   return Object.freeze({
    host, cockpit, adapter, update, suspend, resume, destroy, immersive, measure,
    get debug() { return { updates, resolves, suspended, destroyed, timer: !!timer, pendingResolve: !!pending }; }
@@ -1646,7 +1706,7 @@ const EhLiveCockpit=(function(){
   if (metrics) metrics.insertAdjacentElement('beforebegin', ctl.host); else body.prepend(ctl.host);
   card._ehLiveShown = true;
   ctl.resume();
-  if (ctl.measure) ctl.measure();
+  if (ctl.measure) { ctl.measure(); const w = card.ownerDocument && card.ownerDocument.defaultView; if (w) w.requestAnimationFrame(ctl.measure); }   // na de stijlen van deze render nogmaals (nav-hoogte)
   ctl.update(card._hass, false);
   // Niet terugzetten terwijl het Inzicht-menu open staat: een focus buiten het menu sluit het meteen (iOS/Safari).
   if (focused && !card._eh26MenuOpen && focused.isConnected && typeof focused.focus === 'function') focused.focus({ preventScroll: true });

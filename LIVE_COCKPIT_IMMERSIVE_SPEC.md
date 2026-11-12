@@ -70,3 +70,86 @@ Maak codecommits op de featurebranch. Open een draft-PR met testresultaten en do
 - VoiceOver-uitspraak van de kaarten ("Pagina openen");
 - de echte Media Source-authenticatie;
 - gedrag met echte sensoren (stale Alfen, offline).
+
+## 8. Landscape first (branch `feature/live-cockpit-landscape-first`, PR #58)
+
+Alleen actief bij `live_cockpit_immersive: true`. Ontwerpbesluit: de bestaande goedgekeurde brede scène (woning, praktijkruimte, groene Cupra) is in liggende stand het dominante hoofdbeeld. Geen nieuw beeld of ontwerp, geen uitsnede, geen vervorming; de bestaande kaarten, klikroutes en energiestromen staan erover. Op een laag, liggend scherm (`max-height: 500px` en `orientation: landscape`) geldt:
+
+| Onderdeel | Uitvoering |
+|---|---|
+| Scène | De scène (contain-fit, verhouding 1330:748) krijgt bijna de volle hoogte en 70 % van de breedte. De vervaagde achtergrond uit dezelfde master vult de hele kaart. Op 844×390 en 932×430 was de scène op main (v1.28.0) 313×176 px; nu is ze 590×332 px (85 % van de hoogte, 70 % van de breedte) en 661×372 px (87 % van de hoogte, 71 % van de breedte). Door de grotere schaal staan de kaarten met titel op het beeld. |
+| Navigatie | Een slanke rail links (76 px + veilige zone; Home, Laden, Inzicht, Meer, elk ≥ 44 px) in plaats van een balk onder de scène. Dat levert de hoogte op. De appbalk is slank (±37 px). Alle pagina's (Slim laden, Cupra, Batterij, kosten, Zon, Huis, Net, Alle metingen) gebruiken dezelfde rail. Het Inzicht-menu opent rechts van de rail, in 2 kolommen, met een maximale hoogte en scrollen zo nodig. |
+| Tekst | Status, samenvatting en legenda staan als lichte tekst rechts naast de scène, op de vervaagde achtergrond (geen paneel). |
+| Veilige zones | `env(safe-area-inset-left/right/bottom)` als marge, alleen in deze liggende stand. De tests simuleren een notch via `--eh-safe-test-l/r/b`. |
+| Meting en rotatie | **Bugfix:** de resize-listener werd pas na een suspend/resume geplaatst, dus de hoogte volgde niet na een eerste draai. Nu wordt hij bij het aanmaken geplaatst (ook voor `orientationchange`), met één extra meting op het volgende frame na elke render. Een wissel van portret naar liggend past de laag direct toe (`relayout(true)`), zonder tussenframe. De navigatiehoogte telt niet mee als de navigatie een rail is. |
+| Gevolg buiten landscape | Door de herstelde meting vult de kaart op portret en tablet de beschikbare hoogte (navigatie onderaan). Inhoud en compositie zijn ongewijzigd; vergelijking met main toont alleen die extra hoogte. |
+| Niet gewijzigd | Hotspots/kaarten op de master (`covers`), routes, detailpagina's, het `live_cockpit_immersive: false`-gedrag en alle HA-gegevens (alleen lezen). Geen nieuwe servicecalls, geen wijziging aan de laadlogica of aan opslag. |
+
+Tests (`tests/browser/live-cockpit-immersive.cjs`, 32 controles): landscape 844×390, 932×430 en 667×375 (scène ≥ 80 % van de hoogte en ≥ 60 % van de breedte, 667×375 ≥ 60 % en ≥ 55 % vanwege de breedte; zes kaarten binnen de scène, rail links, tekst naast de scène, geen overflow of overlap); veilige zones; alle functies via echte touch-tikken in liggend (Laden → Slim laden, Inzicht-menu met alle items, Meer, Cupra, Batterij, historie, kosten/contracten, Alle metingen); rotatie portret ⇄ liggend (zelfde host en beeld, 0 nieuwe resolves, 0 extra listeners of observers, geen frame zonder scène of beeld, huidige pagina en meetdata blijven staan); landscape zonder meting, zonder beeld en offline; landscape met reduced motion.
+
+**Alleen te verifiëren op een echte iPhone:** werkelijke safe-areas en adresbalk in Safari en de Companion-app, het gedrag van `orientationchange` en `innerHeight` bij het draaien in iOS, de leesbaarheid van de kaarten en de rail op het scherm in de hand, en het gedrag van de rail binnen de Home Assistant-toolbar.
+
+## 9. Definitieve Home: scène + vakjes + kwartierprijs (PR #58)
+
+Alleen actief bij `live_cockpit_immersive: true`. De Home bestaat uit de bestaande goedgekeurde scène, de bestaande interactieve vakjes en een kleine kwartierprijs-overlay. Het live-paneel naast het beeld en het tekstblok eronder zijn weg.
+
+| Onderdeel | Uitvoering |
+|---|---|
+| Geen panelen | Status, samenvatting en legenda staan niet meer naast of onder het beeld. Ze blijven bestaan voor schermlezers (visueel verborgen, `aria-live` blijft); de LIVE/OFFLINE-pil staat in de scène. Een waarschuwing bij een tegenstrijdige meetketen blijft zichtbaar, als dunne balk bovenaan de scène. De decoratienotitie ("lichtlijnen in het beeld zijn decoratief") is niet meer zichtbaar op Home; die tekst staat nog in de toegankelijke beschrijving van het beeld. Dit is een bewuste keuze en moet door de eigenaar worden bevestigd. |
+| Vakjes | Per vakje de grote livewaarde met een kleine regel eronder. Op de scène zijn de vakjes iets hoger (naar beneden) zodat de regels passen; ze blijven over de afgedekte ingebakken kaart. In portret (lijst) staan ze onder de scène. |
+| Zonnepanelen | `Vandaag: x kWh`, rechtstreeks uit de dagsensor van de omvormer (`zonne_energie`): alleen kWh/Wh, ≥ 0 en vandaag bijgewerkt. Anders uit de statistieken (zie §10). |
+| Huis | `Vandaag: x kWh` (huis exclusief Cupra): de eigen kWh-teller (`huis_energie`), anders afname − teruglevering + opwek − laden, alleen als alle vier volledig zijn gemeten. Anders `onvolledig`; nooit een getal uit een deel van de bronnen (zie §10). |
+| Cupra | `Vandaag: x kWh` (Alfen-teller) en `Sessie: x kWh`. De sessie komt NIET meer uit `cupra_charged_energy` (de betekenis daarvan is niet bewezen), maar uit het verschil van de Alfen-teller sinds de gemeten sessiestart (zie §10). Onzeker ⇒ `Sessie: niet beschikbaar`. |
+| Net | Gescheiden `Afname: x kWh`, `Teruggeleverd: x kWh` en `Kosten: € x,xx` (kosten uit `cost_zonneplan_day`, alleen een bedrag in euro dat vandaag is bijgewerkt). Er is geen nettoformule meer. |
+| Praktijkruimte en batterij | Praktijkruimte: "Nog niet gekoppeld", geen cijfers. Virtuele batterij: het label "Simulatie" blijft. |
+| Dagtotalen | Eén gedeelde, read-only `recorder/statistics_during_period`-vraag (zie §10). |
+| Kwartierprijs | Knop (≥ 44×44 px) rechtsonder op de scène (in portret een rij onder de vakjes) met label, actuele prijs, kwartiertijd en één staafje per kwartier. Opent het bestaande prijsoverzicht (Slim laden). Zie §10. |
+| Beeldgrootte | Door het wegvallen van de tekstregels is de scène op tablet en desktop groter geworden. In landscape staat de navigatie als rail links (zie §8). |
+| Niet gewijzigd | Hotspots/covers, routes, detailpagina's, het `live_cockpit_immersive: false`-gedrag (DOM en pixels identiek aan v1.28.0), alle bestaande functies en HA-gegevens. |
+
+Tests (`tests/browser/live-cockpit-immersive.cjs`, 38 controles): vier schermmaten (844×390, 932×430, 390×844, 1280×800) op de definitieve samenstelling (dagregels, prijs, geen panelen, geen overlap met vakjes, hotspots); ontbrekende statistieken, kostensensor, sessie, kwartierdata, prijssensor en offline; één statistiekvraag per 60 hass-updates en geen servicecalls. Testdata is gesimuleerd.
+
+**Alleen te verifiëren op een echte HA/iPhone:** werkelijke statistieken (Alfen, P1, GoodWe), de betekenis van `cupra_charged_energy` en `cost_zonneplan_day`, de Zonneplan-kwartierattributen, de leesbaarheid van de kleine regels en de prijsoverlay op het scherm.
+
+### 9.1 Datum en temperatuur in de pil bovenaan
+
+Naast de tijd in de pil bovenaan de scène staan nu de datum en de buitentemperatuur (bijvoorbeeld `LIVE 09:41 | do 12 nov · 14°`). De datum komt uit de klok van het toestel. De temperatuur komt uit de optionele weer-entiteit (`weather`, attribuut `temperature`), anders uit de buitentemperatuur van de Cupra (`cupra_outside_temp`). Alleen °C en °F (omgerekend), niet ouder dan 3 uur en tussen −60 en 70 °; anders alleen de datum. Offline: geen extra tekst. De tekst "alleen-lezen" in de pil vervalt (die staat al in de appbalk). In portret loopt de pil naar links door in de lucht boven het huis. Op zeer kleine scènes (< 330 px breed) verdwijnt de extra tekst. Let op: de Cupra-temperatuur is een autosensor, geen weerstation. Voor een echte buitentemperatuur is een `weather.`-entiteit in de kaartconfiguratie beter.
+
+## 10. Kwaliteitsronde: betrouwbare dagtotalen, sessie, kwartierprijs (PR #58)
+
+**Dagtotalen (`ehImmCounterDay`).** Eén gedeelde vraag per 5 minuten (2 minuten na een mislukking): `recorder/statistics_during_period`, uurperiode, van de uurstand vóór lokale middernacht tot nu, types `change`, `sum` en `state`, eenheid kWh. Per teller (afname, teruglevering, Alfen, optioneel `huis_energie`):
+- *Dekking:* elk voltooid uur sinds lokale middernacht (einde ≥ 10 min geleden, vanwege de HA-compilatie) moet aanwezig zijn, met een geldige `change` (≥ 0 en ≤ 50 kWh per uur). Het lopende, onvolledige uur wordt gedekt met de live tellerstand min de eindstand van het laatste voltooide uur (maximaal 30 min oud, plausibel, geen reset).
+- *Status:* `complete` (alles aanwezig), `partial` (een ondergrens: er ontbreekt een uur, er is een reset of het live deel ontbreekt; getoond met `≥`) of `missing` (niets bruikbaars: geen regel). Huis wordt nooit uit een deel van de bronnen berekend (`onvolledig`).
+- *Zomer-/wintertijd:* uren zijn echte tijdstippen vanaf de echte lokale middernacht (23, 24 of 25 uur); het dubbele uur bij het terugklokken telt dus als twee uren.
+- *Eenheden:* kWh, Wh en MWh; een onbekende eenheid geeft geen live deel (dus `partial`).
+- *Schattingen:* de eerdere schatting uit gemiddeld vermogen is vervallen. Er wordt niets als geschat getoond.
+
+**Laadsessie (`ehImmCurrentSession`).** Uit de Alfen-tellerhistorie (`history/history_during_period`, laatste 36 uur, alleen tijdens het laden, hooguit één vraag per 150 s) plus de live stand. Een sessie is een aaneengesloten laadblok; pauzes tot 45 minuten horen bij dezelfde sessie (dezelfde grens als `eh17SessionsFromHistory`), langere pauzes starten een nieuwe sessie. Sessie-kWh = live stand − teller bij de sessiestart. Onbetrouwbaar ⇒ `Sessie: niet beschikbaar`: live stand ouder dan 10 minuten, onbekende eenheid, geen of te weinig historie, tellerreset of meetgat vlak voor of tijdens de sessie, onmogelijke sprong (> 12 kW), geschiedenis die midden in de sessie begint. De sessie loopt over middernacht door (er is geen dagrand in de berekening). Betekenis: één "sessie" kan korter zijn dan wat de auto als sessie rapporteert als een slimme pauze langer dan 45 minuten duurt.
+
+**Schaarse tellerhistorie (reviewfix PR #58).** Een stijgend interval langer dan 45 minuten maakt de sessiegrens onzeker, ook bij plausibel gemiddeld vermogen. Er verschijnt dan `Sessie: niet beschikbaar`; er wordt geen nieuwe startstand geschat. Na aantoonbare lange stilstand en een opnieuw gemeten start kan een nieuwe sessie weer beschikbaar worden. Regressietests dekken change-only historie met een gat van 90 minuten, de grens 45/46 minuten en herstel na stilstand.
+
+**Net.** Afname, teruglevering en kosten zijn gescheiden. `cost_zonneplan_day` wordt alleen getoond bij eenheid `EUR`/`€` (of leeg) en een bijwerking van vandaag; onbekend is nooit € 0. Of deze sensor de totale Zonneplan-stroomkosten van de dag is, volgt uit de bestaande kostenpagina (`Zonneplan vandaag`) maar is niet tegen een echte HA gevalideerd.
+
+**Kwartierprijs.** Het aantal kwartieren volgt de echte dag (92, 96 of 100), de positie van een kwartier volgt zijn echte tijdstempel, en de staven hebben een nulbasislijn zodat negatieve prijzen eronder hangen. Ontbrekende kwartieren blijven leeg (geen interpolatie, geen gekopieerde uurprijs). De handtekening van de grafiek is een hash over de echte prijsdata (inclusief toekomstige kwartieren), zodat een gewijzigde Zonneplan-forecast altijd opnieuw rendert. De knop opent via de bestaande route (`_view = 'charge'`, Slim laden, dat de kwartierprijzen toont); terug naar Home zet de focus terug op de knop.
+
+**Kleine liggende schermen.** De dagregels hebben vier vormen naar de breedte van de scène (≥ 800, ≥ 560, ≥ 330 px en kleiner; in de lijstweergave altijd de volledige vorm) met een minimum van 9 px en zonder afkappen. Op kleine schermen blijven de belangrijkste gegevens staan in een korte vorm (`Dag 21,8 kWh`, `Af 7,21 · € 0,31`, `Sessie 1,99 kWh`); de toegankelijke naam van het vakje bevat altijd de volledige zin. Niets wordt meer verborgen.
+
+**Screenshots in CI.** De workflow bewaart de Home-screenshots (844×390, 932×430, 390×844 en 1280×800, in Chromium en WebKit, plus extra maten) als artifact `home-screenshots-fictive-data`, controleert dat de vier verplichte bestanden bestaan en zet op elke PNG een rode balk dat de data fictief is (gesimuleerde HA-gegevens en een synthetisch beeld, niet de goedgekeurde master) met de commit-SHA.
+
+Tests: `tests/v128-immersive-day-session-price.test.cjs` (25 Node-tests, UTC en Europe/Amsterdam, DST via `process.env.TZ`) en `tests/browser/live-cockpit-immersive.cjs` (47 controles). De browsertests draaien met een vaste klok (`page.clock.setFixedTime`) en een consistente gesimuleerde HA (tellers, historie, sessies, gaten, resets).
+
+## 11. Praktijkfix: flikkeren bij meetupdates
+
+Op de iPhone is flikkeren gemeld zodra een meetwaarde verandert. De bestaande renderketen verving de buitenste shadow-DOM en plaatste dezelfde cockpit terug; behoud van alleen de cockpit/afbeeldingsidentiteit voorkwam die tijdelijke loskoppeling niet.
+
+Bij een bestaande, actieve immersive Home verversen meetupdates nu alleen het cockpitmodel en de extra gegevens. De shell blijft verbonden. Navigatie, configuratie, dichtheid, menu en verbindingstatus van de werkbalk gebruiken bij wijziging de volledige renderketen. Andere schermen en de uitgeschakelde opt-in behouden hun renderpad. De lifecycle-browsercontrole observeert expliciet verwijderingen en controleert de shell-identiteit tijdens 60 meetupdates; navigatie heen en terug blijft onderdeel van dezelfde controle. Dit moet opnieuw op een fysieke iPhone worden beoordeeld.
+
+## 12. Kwartierprijzen van morgen
+
+De Home-prijsgrafiek gebruikt dezelfde bestaande HA-forecast als Slim laden en toont vandaag plus morgen zodra er geldige kwartierprijzen voor morgen zijn. Een stippellijn markeert lokale middernacht. Een tekstregel onderscheidt vandaag, morgen en gedeeltelijk beschikbare morgenprijzen; zonder morgenprijzen blijft de grafiek op vandaag en vermeldt dit expliciet. Gaten worden niet aangevuld. Het aantal kwartieren volgt de echte kalenderduur bij zomer-/wintertijd. De actuele prijs blijft het huidige kwartier, niet de eerste prijs van morgen. De grafiek toont tarieven per kWh, geen berekende totale laadkosten.
+
+De eigenaar heeft zowel het HA-package als de ApexCharts-kaart-YAML aangeleverd. De optionele alleen-lezen weergave wordt geactiveerd met `live_cockpit_planning: true` en gebruikt `input_select.cupra_prijsstrategie`, `input_number.cupra_gewenste_soc`, `sensor.cupra_actuele_laadgrens`, `sensor.cupra_slim_effectieve_vertrektijd` en `sensor.cupra_slim_minimaal_bekende_kwartieren_nodig`. Prijsbron expliciet instellen met `kwartier_forecast: sensor.zonneplan_current_quarter_hourly_electricity_tariff`.
+
+De compacte grafiek rendert dezelfde selectieregels, zonder ApexCharts/Mushroom als extra afhankelijkheid. Periode: resterende kwartieren vanaf het huidige uur, maximaal 36 uur; met SOC-doel begrensd op de effectieve vertrektijd. Goedkoopste kwartieren met SOC-doel selecteert de bestaande helperwaarde N; zonder SOC-doel selecteert hij 25% (naar boven afgerond, minstens één) per lokale dag. De overige drie strategieën vergelijken met de bestaande actuele laadgrens. Groen = geselecteerd, oranje = wachten; de bestaande prijsgrens wordt als rode lijn getoond, behalve bij goedkoopste kwartieren met SOC-doel. Het huidige kwartier en negatieve prijzen blijven herkenbaar. Dit is plandisplay, geen bevestiging dat de auto daadwerkelijk laadt.
+
+Onbekende helpers, verlopen vertrek of ontbrekende prijsgrens geven een expliciete melding zonder verzonnen selectie of nulwaarden. De gewone prijsgrafiek blijft beschikbaar zonder deze opt-in; bij ontbrekende plangegevens zijn kleuren neutraal. Op zeer lage schermen staat de volledige periodemelding in het schermlezerlabel om overlap te voorkomen; de grafiektitel en daggrens blijven zichtbaar. Er worden geen bedieningsknoppen, scripts of servicecalls uit de aangeleverde kaart overgenomen; Alfen, helpers en opslag blijven ongewijzigd.

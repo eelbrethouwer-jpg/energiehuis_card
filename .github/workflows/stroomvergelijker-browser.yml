@@ -46,9 +46,30 @@ jobs:
       - name: Live Cockpit Home (WebKit / Safari-engine)
         run: node tests/browser/live-cockpit-home.cjs --browser=webkit
       - name: Immersive Live Cockpit Home + klikroutes (Chromium)
-        run: node tests/browser/live-cockpit-immersive.cjs
+        run: node tests/browser/live-cockpit-immersive.cjs --screenshots=home-screenshots
+        env:
+          EH_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Immersive Live Cockpit Home + klikroutes (WebKit / Safari-engine)
-        run: node tests/browser/live-cockpit-immersive.cjs --browser=webkit
+        run: node tests/browser/live-cockpit-immersive.cjs --browser=webkit --screenshots=home-screenshots
+        env:
+          EH_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify Home screenshots (fictive data) for review
+        run: |
+          set -e
+          for b in chromium webkit; do
+            for v in 844x390 932x430 390x844 1280x800; do
+              f="home-screenshots/home-final-$v-$b.png"
+              test -s "$f" || { echo "MISSING $f"; exit 1; }
+              echo "OK $f ($(stat -c%s "$f") bytes)"
+            done
+          done
+          printf 'Home screenshots of exact commit %s.\nALL DATA IS FICTIONAL: simulated Home Assistant data and a synthetic scene image (not the approved master). Every PNG carries a red banner saying so.\n' "${{ github.event.pull_request.head.sha || github.sha }}" > home-screenshots/README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: home-screenshots-fictive-data
+          path: home-screenshots/
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -5069,8 +5069,8 @@ const EhLiveCockpit=(function(){
     const img = el(doc, 'img', 'ehm-scene', { alt: 'Goedgekeurde avondscène: woning met zonnepanelen, houten praktijkruimte links en een groene Cupra bij de laadpaal rechts. De lichtlijnen in het beeld zijn decoratief; de ingebakken voorbeeldkaarten zijn afgedekt door ' + (LIVE ? 'live kaarten met actuele meetwaarden.' : 'live DEMO-kaarten.'), decoding: 'async', fetchpriority: 'high', draggable: 'false' });
     const particles = el(doc, 'canvas', 'ehm-particles', { 'aria-hidden': 'true' });
     const covers = el(doc, 'div', 'ehm-covers', { 'aria-hidden': 'true' });
-    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
-    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
+    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' + (typeof options.pillExtra === 'function' ? '<span class="p-extra" hidden></span>' : '') : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
+    const pillExtra = pill.querySelector('.p-extra'), pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
     covers.appendChild(pill);
     const PL = {};   // lege glasvlakken (alleen in de lijstweergave zichtbaar; de lijst eronder toont de waarden)
     for (const k of KEYS) { const p = el(doc, 'div', 'ehm-cover ehm-plate', { 'data-key': k }); p.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; covers.appendChild(p); PL[k] = p; }
@@ -5080,9 +5080,9 @@ const EhLiveCockpit=(function(){
     const T = {};
     for (const k of KEYS) {
       const b = el(doc, 'button', 'tile', NAV ? { type: 'button', 'data-key': k } : { type: 'button', 'data-key': k, 'aria-haspopup': 'dialog', 'aria-controls': id + '-detail', 'aria-expanded': 'false' });
-      b.innerHTML = `<span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[k]}</svg></span><span class="t-body"><span class="t-title"></span><span class="t-value"><span class="t-num"></span><span class="t-unit"></span></span><span class="t-extra"></span><span class="t-sub"></span></span>`;
+      b.innerHTML = `<span class="t-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICON[k]}</svg></span><span class="t-body"><span class="t-title"></span><span class="t-value"><span class="t-num"></span><span class="t-unit"></span></span>${typeof options.tileDay === 'function' ? '<span class="t-day" hidden></span>' : ''}<span class="t-extra"></span><span class="t-sub"></span></span>`;
       tiles.appendChild(b);
-      T[k] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), num: b.querySelector('.t-num'), unit: b.querySelector('.t-unit'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
+      T[k] = { b, title: b.querySelector('.t-title'), value: b.querySelector('.t-value'), num: b.querySelector('.t-num'), unit: b.querySelector('.t-unit'), day: b.querySelector('.t-day'), extra: b.querySelector('.t-extra'), sub: b.querySelector('.t-sub') };
     }
     frame.append(stage, tiles);
 
@@ -5226,7 +5226,15 @@ const EhLiveCockpit=(function(){
       }
       const r = stage.getBoundingClientRect();
       sw = r.width; sh = r.height;
-      rootEl.dataset.density = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      const dens = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';
+      rootEl.dataset.density = dens;   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      // De dagregels hebben vier vormen (≥ 800, ≥ 560, ≥ 330 en kleiner): bij een andere vorm de kaartteksten opnieuw bepalen.
+      if (typeof options.tileDay === 'function') {
+        const form = String(sw >= 800 ? 3 : sw >= 560 ? 2 : sw >= 330 ? 1 : 0);
+        const formChanged = rootEl.dataset.dform !== form;
+        rootEl.dataset.dform = form;
+        if (formChanged && model) render();
+      }
       rootEl.style.setProperty('--u', (sw / (sceneOk ? S.image.natural.w : 1330)).toFixed(4));
       dpr = Math.min(2, win.devicePixelRatio || 1);
       particles.width = Math.max(1, Math.round(sw * dpr)); particles.height = Math.max(1, Math.round(sh * dpr));
@@ -5257,6 +5265,15 @@ const EhLiveCockpit=(function(){
         const [num, unit] = splitValue(shown); setText(N.num, num); setText(N.unit, unit);
         const sub = k === 'net' ? NP.sub : d.sub, dir = k === 'net' ? NP.direction : 'none';
         setText(N.sub, sub);
+        // Dagtotalen (immersive Home): korte tweede regel onder de livewaarde; leeg ⇒ verborgen. Alleen tekst, geen aannames.
+        const dr = N.day ? options.tileDay(k, m, layout === 'list' ? 1000 : sw) : null;              // {lines, aria} (of null)
+        const dl = dr && Array.isArray(dr.lines) ? dr.lines : [], da = dr && Array.isArray(dr.aria) ? dr.aria : dl;
+        const dayKey = dl.length ? dl.join('\n') : '';
+        if (N.day && (N.day.dataset.k || '') !== dayKey) {
+          N.day.dataset.k = dayKey;
+          N.day.replaceChildren(...dl.map(t => { const sp = doc.createElement('span'); sp.textContent = t; return sp; }));
+          N.day.hidden = !dayKey;
+        }
         let extra = k === 'cupra' ? 'Accu ' + d.soc : k === 'battery' ? 'Simulatie' : (d.tone === 'sim' ? 'Simulatie' : '');
         if (k === 'net') { const nd = netActive ? NET_DIR[d.direction] : null; extra = nd ? nd.arrow + ' ' + nd.text : (layout === 'compact' ? NP.badgeCompact : NP.badge) || ''; }
         setText(N.extra, extra); N.extra.hidden = !extra;
@@ -5264,7 +5281,8 @@ const EhLiveCockpit=(function(){
         if (k === 'net') { setData(N.b, 'direction', dir); setData(PL[k], 'direction', dir); }
         const nd = k === 'net' && netActive && NET_DIR[d.direction] ? ', ' + NET_DIR[d.direction].name + ' (' + NET_DIR[d.direction].text + ')' : '';
         const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. ${NAV ? 'Pagina openen.' : 'Details openen.'}` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. ${NAV ? 'Pagina openen.' : 'Details openen.'}`;
-        if (N.b.getAttribute('aria-label') !== al) N.b.setAttribute('aria-label', al);
+        const alDay = da.length ? al.replace(/ (Pagina openen|Details openen)\.$/, ' ' + da.join(' ') + ' $1.') : al;
+        if (N.b.getAttribute('aria-label') !== alDay) N.b.setAttribute('aria-label', alDay);
       }
       const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
       if (LIVE) {
@@ -5278,6 +5296,8 @@ const EhLiveCockpit=(function(){
         setText(pillText, m.connected ? 'alleen-lezen' : 'geen verbinding');
         setText(pillTime, m.connected ? hhmm(m.now) : 'sinds ' + hhmm(offlineSince));
       } else setText(pillTime, hhmm(m.now));
+      // Datum en buitentemperatuur naast de tijd (immersive Home; alleen met verbinding en alleen echte waarden).
+      if (pillExtra) { const t = m.connected ? options.pillExtra(m) : ''; setText(pillExtra, t || ''); pillExtra.hidden = !t; }
       for (const [sid, b] of Object.entries(SB)) if (b.getAttribute('aria-pressed') !== String(sid === scenario)) b.setAttribute('aria-pressed', String(sid === scenario));
       setData(rootEl, 'activeScenario', scenario);
       applyRoutes();
@@ -5387,7 +5407,9 @@ const EhLiveCockpit=(function(){
       get layout() { return layout; },
       get live() { return LIVE; },
       /** Weergave opnieuw bepalen (bijv. na een gewijzigde immersive portretstand); één rAF, geen volledige render. */
-      relayout() { scheduleGeo(); },
+      /** Kaartteksten opnieuw bepalen zonder nieuwe invoer (bijv. wanneer dagtotalen binnenkomen). */
+      rerender() { if (model && !destroyed) render(); },
+      relayout(now) { if (now && !destroyed && !suspended) { if (geoRaf) win.cancelAnimationFrame(geoRaf); geoRaf = 0; geometry(); } else scheduleGeo(); },
       setScenario(s) { if (!LIVE && M.SCENARIO_IDS.includes(s)) { scenario = s; tick = 0; model = null; compute(); } },
       /** LIVE: nieuwe model-invoer van de HA-adapter (alleen bij gewijzigde data aanroepen). */
       setInput(input) { if (!LIVE || destroyed) return; liveInput = input; compute(); },
@@ -5659,29 +5681,59 @@ const EhLiveCockpit=(function(){
   '.ehc-brand{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}' +
   '.ehc-head{justify-content:flex-start}' +
   // v1.28 immersive Home: schermvullend, master volledig zichtbaar (contain), achtergrondverlenging uit dezelfde master.
-  ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:104px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
+  ':host([data-immersive]){margin:0;--eh-imm-total:max(300px,calc(100svh - var(--eh-imm-offset,190px)));--eh-imm-chrome:12px;--eh-imm-stage-h:max(120px,calc(var(--eh-imm-total) - var(--eh-imm-chrome)))}' +
   // Lage, liggende schermen: alleen de statusregel boven de scène meetellen; legenda en samenvatting volgen eronder.
-  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:44px}}' +
+  '@media (max-height:500px) and (orientation:landscape){:host([data-immersive]){--eh-imm-chrome:10px}}' +
   ':host([data-immersive]) .ehc{max-width:none;margin:0;display:flex;flex-direction:column;justify-content:center;min-height:var(--eh-imm-total);isolation:isolate;border-radius:20px;overflow:hidden;padding:6px 8px 8px;background:radial-gradient(120% 90% at 50% 30%,#1b2a3c,#081320)}' +
   ':host([data-immersive]) .ehc[data-layout="list"]{min-height:0}' +
   ':host([data-immersive]) .ehc:not([data-layout="list"]) .ehm-frame{width:min(100%,calc(var(--eh-imm-stage-h) * 1330 / 748));margin:0 auto}' +
   ':host([data-immersive]) .eh-imm-ambient{position:absolute;inset:-6%;width:112%;height:112%;z-index:-1;filter:blur(22px) saturate(1.15) brightness(.62);pointer-events:none}' +
   ':host([data-immersive]) .ehc-head{margin:0 2px 6px}' +
-  ':host([data-immersive]) .ehm-legend{margin:.45rem .2rem 0;font-size:.74rem}' +
-  ':host([data-immersive]) .ehc-summary{margin:.3rem .2rem 0;font-size:.86rem}' +
   ':host([data-immersive]) .ehm-stage{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08)}' +
+  // Home = scène + vakjes + kwartierprijs-overlay. Status, samenvatting en legenda blijven er voor schermlezers (sr-only)
+  // en staan niet meer als paneel naast of onder het beeld; de LIVE/OFFLINE-pil staat in de scène zelf.
+  ':host([data-immersive]) .ehc-head,:host([data-immersive]) .ehc-summary,:host([data-immersive]) .ehm-legend{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}' +
+  // Waarschuwing bij een tegenstrijdige meetketen blijft zichtbaar, als dunne balk bovenaan de scène.
+  ':host([data-immersive]) .ehc-warn:not([hidden]){position:absolute;z-index:6;left:50%;top:6px;transform:translateX(-50%);width:max-content;max-width:min(94%,680px);margin:0;padding:.3rem .7rem;border-radius:10px;font-size:.72rem;line-height:1.3;pointer-events:none;background:rgba(40,12,12,.86)}' +
+  // Dagtotalen in de vakjes: tweede, kleine regel(s) onder de livewaarde.
+  // Portret (kleine scène): de pil loopt naar links door in de lege lucht boven het huis, zodat datum en temperatuur passen.
+  ':host([data-immersive]) .ehc--master[data-layout="list"] .ehm-pill{left:50%;width:calc((var(--x) + var(--w) - .5) * 100%)}' +
+  // In de immersive Home vervangt datum + temperatuur de tekst "alleen-lezen" (die staat al in de appbalk); offline blijft zichtbaar.
+  ':host([data-immersive]) .ehm-pill:not([data-state="offline"]) .p-text{display:none}' +
+  '.ehm-pill .p-extra{margin-left:.55em;padding-left:.6em;border-left:1px solid rgba(255,255,255,.28);color:#d6e4ef;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.ehm-pill .p-extra[hidden]{display:none}' +
+  '.ehc--master[data-layout="compact"][data-density="xs"] .ehm-pill .p-extra{display:none}' +
+  '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+  '.ehc--master[data-layout="list"] .t-day span{white-space:normal;overflow:visible}' +
+  '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2;color:rgba(255,255,255,.86);letter-spacing:-.01em}' +
+  '.ehc--master[data-layout="compact"] .t-day{text-align:center;justify-items:center}' +
+  // Met een dagregel is de oude ondertitel overbodig (tenzij de meting afwijkt: dan blijft de reden zichtbaar); de batterij toont al "Simulatie".
+  ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile:not([data-tone="warn"]):not([data-tone="bad"]) .t-day:not([hidden]) ~ .t-sub,:host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile[data-key="battery"] .t-sub{display:none}' +
+  // Vakjes met dagtotalen krijgen iets meer hoogte (naar beneden), nog steeds over de afgedekte ingebakken kaart heen.
+  ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .ehm-tiles .tile{top:calc((var(--y) - .012) * 100%);height:calc((var(--h) + .046) * 100%)}' +
+  // Net-vakje (breedte van de scène 560–800 px, bijv. iPhone liggend): iets breder naar links voor "Af x · Terug y kWh".
+  ':host([data-immersive]) .ehc--master[data-dform="2"]:not([data-layout="list"]) .ehm-tiles .tile[data-key="net"]{left:calc((var(--x) - .07) * 100%);width:calc((var(--w) + .07) * 100%)}' +
+  // Kwartierprijs-overlay (subtiel, nooit een tikvlak): rechtsonder op de scène; in de lijstweergave (portret) een rij onderaan de vakjes.
+  '.eh-price{appearance:none;font-family:inherit;text-align:left;cursor:pointer;display:block;box-sizing:border-box;min-width:44px;min-height:44px;position:absolute;z-index:4;pointer-events:auto;left:62.5%;right:1.5%;bottom:2.2%;padding:calc(var(--u) * 8px) calc(var(--u) * 12px);border-radius:calc(var(--u) * 16px);background:rgba(8,16,28,.58);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.13);color:#e8f2fa;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2}' +
+  '.eh-price:hover{border-color:rgba(255,255,255,.3)}.eh-price:focus-visible{outline:2px solid #76c1ef;outline-offset:2px}' +
+  '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
+  '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
+  '.eh-price-bars line.daybreak{stroke:#fff;stroke-width:.65;stroke-dasharray:2 2;opacity:.7}.eh-price-period{display:block;margin-top:2px;font-size:.85em;opacity:.75;white-space:normal}' +
+  '.ehc--master:not([data-layout="list"]) .eh-price-period{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}' +
+  '.eh-price-bars rect.planned{fill:#4bd66d}.eh-price-bars rect.waiting{fill:#ffad32}.eh-price-bars rect.planned.now,.eh-price-bars rect.waiting.now{stroke:#fff;stroke-width:.5}.eh-price-bars line.limit{stroke:#ef6666;stroke-width:.6}' +
+  '.eh-price[data-state="none"] .eh-price-now{font-size:1em;font-weight:600;opacity:.8}' +
+  '.ehc--master[data-layout="list"] .eh-price{position:static;grid-column:1 / -1;padding:.55rem .8rem;border-radius:.95rem;font-size:.8rem;background:color-mix(in srgb,var(--bg-2) 80%,transparent)}' +
+  '.ehc--master[data-layout="list"] .eh-price-bars{height:34px;max-height:none}' +
+  '' +
   // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
   // eronder als glas over dezelfde vervaagde master; glasvlakken op de scène zijn tikvlakken (≥44 px).
   ':host([data-imm-portrait]){margin:0 -6px}' +
   ':host([data-imm-portrait]) .ehc,:host([data-imm-portrait]) .ehc[data-layout="list"]{justify-content:flex-start;min-height:var(--eh-imm-total);padding:4px 4px 10px;border-radius:18px}' +
-  ':host([data-imm-portrait]) .ehc-head{margin:2px 6px 6px}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-stage{border-radius:14px}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{margin-top:.5rem;gap:.45rem}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles .tile{background:color-mix(in srgb,var(--bg-2) 80%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}' +
   '@container (min-width:21rem){:host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-covers .ehm-plate{pointer-events:auto;cursor:pointer;overflow:visible}' +
   ':host([data-imm-portrait]) .ehc--master[data-layout="list"] .ehm-plate::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}' +
-  ':host([data-imm-portrait]) .ehm-legend{margin:.5rem .4rem 0}:host([data-imm-portrait]) .ehc-summary{margin:.3rem .4rem 0}' +
   '@media (prefers-reduced-motion:reduce){:host([data-immersive]) .eh-imm-ambient{filter:blur(22px) brightness(.62)}}' +
   // Zeer kleine scène: "Nog niet gekoppeld" past niet zonder woordafbreking ⇒ gedempt streepje (pagina legt het uit).
   '.ehc--master[data-layout="compact"][data-density="xs"] .tile[data-key="practice"][data-tone="muted"] .t-sub{display:none}' +
@@ -5738,6 +5790,8 @@ const EhLiveCockpit=(function(){
    mode: 'live', specs: adapter.specs,
    onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
    onImageLoad: immersive ? ambient : undefined,
+   pillExtra: immersive ? m => (typeof card._ehImmPillExtra === 'function' ? card._ehImmPillExtra(m) : '') : undefined,
+   tileDay: immersive ? (k, m, sw) => (typeof card._ehImmTileDay === 'function' ? card._ehImmTileDay(k, m, sw) : null) : undefined,
    preferList: immersive ? () => host.hasAttribute('data-imm-portrait') : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
    imageMissingText: norm.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd (live_cockpit_image) — alleen interface'
@@ -5750,6 +5804,7 @@ const EhLiveCockpit=(function(){
    if (conn && wasConnected === false) cockpit.retryImage();      // verbinding hersteld ⇒ mislukt beeld opnieuw
    wasConnected = conn;
    if (adapter.changed(hass) || force) { cockpit.setInput(adapter.input(hass, now)); updates++; }
+   if (immersive && typeof card._ehImmExtras === 'function') card._ehImmExtras();   // kwartierprijs + dagtotalen (alleen lezen)
    // Eén timer: opnieuw beoordelen op de eerstvolgende route-/toon-TTL-grens, zonder complete kaartrender.
    if (timer) clearTimeout(timer);
    timer = setTimeout(() => { timer = 0; update(card._hass, true); }, adapter.nextCheckMs(hass, now));
@@ -5762,20 +5817,24 @@ const EhLiveCockpit=(function(){
    if (!immersive || destroyed || suspended || !host.isConnected) return;
    const top = host.getBoundingClientRect().top + (win.scrollY || 0);
    const nav = card.shadowRoot && card.shadowRoot.querySelector('.shell > .nav');
-   const navH = nav ? nav.getBoundingClientRect().height : 0;
+   const nr = nav ? nav.getBoundingClientRect() : null;
+   const navH = nr && nr.width >= win.innerWidth * 0.5 ? nr.height : 0;   // liggend: rail links, geen balk onder de scène
    const total = Math.max(220, Math.round(win.innerHeight - Math.max(0, top) - navH - 8));
    if (host.style.getPropertyValue('--eh-imm-total') !== total + 'px') host.style.setProperty('--eh-imm-total', total + 'px');
    // Portret: een 16:9-master past op een smal, hoog scherm alleen klein (contain, nooit bijsnijden). Dan de scène over
    // de volle breedte bovenaan en de zes routes als leesbare kaarten eronder i.p.v. een klein beeld in veel waas.
    const w = host.getBoundingClientRect().width;
    const portrait = w > 0 && w < PORTRAIT_MAX_W && total >= w * PORTRAIT_MIN_RATIO;
-   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(); }
+   if (portrait !== host.hasAttribute('data-imm-portrait')) { host.toggleAttribute('data-imm-portrait', portrait); cockpit.relayout(true); }   // direct: geen tussenframe met de oude laag
   }
+  // iOS meldt na het draaien soms nog de oude innerHeight: één extra meting op het volgende frame (geen nieuwe listeners).
+  function onViewport() { measure(); win.requestAnimationFrame(measure); }
   let listening = false;
   function listen(on) {
    if (!immersive || on === listening) return;
    listening = on;
-   if (on) win.addEventListener('resize', measure, { passive: true }); else win.removeEventListener('resize', measure);
+   if (on) { win.addEventListener('resize', onViewport, { passive: true }); win.addEventListener('orientationchange', onViewport, { passive: true }); }
+   else { win.removeEventListener('resize', onViewport); win.removeEventListener('orientationchange', onViewport); }
   }
   function suspend() {
    if (destroyed || suspended) return;
@@ -5797,6 +5856,7 @@ const EhLiveCockpit=(function(){
    cockpit.destroy(); host.remove();
   }
   suspended = false;
+  listen(true);   // ook de eerste keer: anders volgt de hoogte pas na een suspend/resume op een draai van het toestel
   return Object.freeze({
    host, cockpit, adapter, update, suspend, resume, destroy, immersive, measure,
    get debug() { return { updates, resolves, suspended, destroyed, timer: !!timer, pendingResolve: !!pending }; }
@@ -5836,7 +5896,7 @@ const EhLiveCockpit=(function(){
   if (metrics) metrics.insertAdjacentElement('beforebegin', ctl.host); else body.prepend(ctl.host);
   card._ehLiveShown = true;
   ctl.resume();
-  if (ctl.measure) ctl.measure();
+  if (ctl.measure) { ctl.measure(); const w = card.ownerDocument && card.ownerDocument.defaultView; if (w) w.requestAnimationFrame(ctl.measure); }   // na de stijlen van deze render nogmaals (nav-hoogte)
   ctl.update(card._hass, false);
   // Niet terugzetten terwijl het Inzicht-menu open staat: een focus buiten het menu sluit het meteen (iOS/Safari).
   if (focused && !card._eh26MenuOpen && focused.isConnected && typeof focused.focus === 'function') focused.focus({ preventScroll: true });
@@ -6293,6 +6353,7 @@ const EH_IMM_ROUTES=Object.freeze({
  pv:Object.freeze({view:'sun',detail:'sun'}),
  house:Object.freeze({view:'home',detail:'home'}),
  net:Object.freeze({view:'grid',detail:'grid'}),
+ price:Object.freeze({view:'charge',detail:null}),
  battery:Object.freeze({view:'battery',detail:null}),
  cupra:Object.freeze({view:'cupra',detail:null}),
  practice:Object.freeze({view:'practice',detail:null})
@@ -6351,7 +6412,25 @@ function ehImmCss(){
   '.eh-imm-follow{appearance:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:9px 14px;border-radius:12px;border:1px solid #38dfa3aa;background:#0d3d34;color:#eafff8;font:inherit;font-size:13px;font-weight:750;cursor:pointer}',
   '.eh-imm-headback{margin:0 0 8px}',
   '.eh-imm-allhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:6px 2px 12px}.eh-imm-allhead h2{margin:0;font-size:22px}',
-  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}'
+  '@media(max-width:720px){.eh-imm-page{padding:12px 10px 82px}.eh-imm-page .subpage-head h2{font-size:24px}.eh-imm-now strong{font-size:26px}}',
+  // Landscape first (telefoon liggend, lage schermen): slanke app- en ondernavigatie zodat de scène de hoogte krijgt,
+  // veilige zones (notch links/rechts, home-indicator onder) en een Inzicht-menu dat binnen het scherm blijft.
+  // De testvariabelen --eh-safe-test-* laten de tests een notch simuleren; echte waarden komen uit env().
+  '.shell{--eh-sl:var(--eh-safe-test-l,env(safe-area-inset-left,0px));--eh-sr:var(--eh-safe-test-r,env(safe-area-inset-right,0px));--eh-sb:var(--eh-safe-test-b,env(safe-area-inset-bottom,0px))}',
+  '@media (max-height:500px) and (orientation:landscape){',
+  // Navigatie als slanke rail links (geen balk onder de scène): de scène krijgt bijna de volle hoogte en breedte.
+  ' .shell{display:grid;grid-template-columns:calc(76px + var(--eh-sl)) minmax(0,1fr);grid-auto-rows:auto;padding:0 var(--eh-sr) 0 0}',
+  ' .shell>*{grid-column:2;min-width:0}',
+  ' .shell>.eh19-appbar{padding:2px 12px;gap:8px;min-height:0;border-radius:0 20px 0 0}',
+  ' .shell>.eh19-appbar button{min-height:32px;position:relative}',
+  ' .shell>.eh19-appbar button::before{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}',
+  ' .shell>.nav{grid-column:1;grid-row:1 / span 8;position:sticky;top:0;bottom:auto;align-self:start;height:min(100svh,100%);flex-direction:column;justify-content:center;align-items:stretch;gap:6px;padding:6px 6px calc(6px + var(--eh-sb)) calc(6px + var(--eh-sl));border-radius:20px 0 0 20px;box-sizing:border-box;overflow:visible}',
+  ' .shell>.nav .eh26-navitem{flex:none;flex-direction:column;min-height:52px;width:100%;gap:3px;padding:5px 2px;justify-content:center}',
+  ' .shell>.nav .eh26-navitem>span{font-size:10px!important}',
+  ' .shell>.nav .eh26-insight-menu{grid-template-columns:repeat(2,minmax(0,1fr));left:calc(100% + 10px);right:auto;bottom:calc(10px + var(--eh-sb));width:min(560px,calc(100vw - 76px - var(--eh-sl) - var(--eh-sr) - 28px));max-height:calc(100svh - 20px - var(--eh-sb));overflow:auto;overscroll-behavior:contain}',
+  ' .shell>.nav .eh26-insight-menu button{min-height:48px;padding:6px 10px}',
+  ' .shell.eh-imm-home>.body{padding:2px 6px 4px}',
+  '}'
  ].join('\n');
 }
 function ehImmPageHtml(card,view){
@@ -6376,6 +6455,230 @@ function ehImmPageHtml(card,view){
  return '<main class="subpage eh-imm-page" data-eh-imm-page="'+ehEsc(view)+'" aria-labelledby="eh-imm-title">'+
   '<div class="subpage-head"><div>'+back+'<h2 id="eh-imm-title" tabindex="-1">'+ehEsc(v.title)+'</h2><p>'+ehEsc(v.intro)+'</p></div></div>'+now+'</main>';
 }
+/* ===== Home-extra's: betrouwbare dagtotalen, laadsessie en kwartierprijzen (pure functies, testbaar zonder browser) =====
+ * Alleen lezen. Geen aannames: ontbrekende of onvolledige data wordt als zodanig getoond (≥, "onvolledig", "niet beschikbaar"),
+ * nooit als volledig gemeten feit. Lokale daggrens = lokale middernacht van het toestel (Europe/Amsterdam, DST-veilig: een dag duurt
+ * 23, 24 of 25 uur; uren worden als echte tijdstippen geteld). */
+const EH_IMM_HOUR=3600000,EH_IMM_COMPILE_LAG=10*60000,EH_IMM_IDLE_MAX=45*60000;
+const ehImmUnitKwh=(n,unit)=>{const u=String(unit||'').trim().toLowerCase();return n===null||n===undefined?null:u==='kwh'?n:u==='wh'?n/1000:u==='mwh'?n*1000:null;};
+/** Huidige stand van een cumulatieve teller als {kwh,t}, of null bij een onbekende eenheid, ontbrekende waarde of tijdstempel. */
+function ehImmLiveCounter(h,id){
+ const e=id&&h?.states?.[id];if(!e)return null;
+ const kwh=ehImmUnitKwh(ehNum(e.state),e.attributes?.unit_of_measurement),t=Date.parse(e.last_updated||e.last_changed||'');
+ return kwh===null||!Number.isFinite(t)?null:{kwh,t};
+}
+/** Uurraster van lokale middernacht tot nu. `full` = voltooide uren die al in de HA-statistieken horen te staan
+ *  (einde ≥ 10 min geleden: HA compileert het vorige uur kort na het hele uur); de rest wordt met de live tellerstand gedekt. */
+function ehImmDayPlan(now){
+ const from=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),n=now.getTime();
+ return {from,now:n,full:Math.max(0,Math.floor((n-from-EH_IMM_COMPILE_LAG)/EH_IMM_HOUR)),nextMidnight:new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime()};
+}
+/** Dagtotaal (kWh) van een cumulatieve teller uit HA-uurstatistieken (`change`, `sum`, `state`) plus het live deel sinds het laatste
+ *  voltooide uur. status: 'complete' (elk uur sinds middernacht aanwezig, geen reset of afwijking, live deel geldig),
+ *  'partial' (ondergrens: er ontbreken uren, een reset of het live deel) of 'missing' (niets bruikbaars). */
+function ehImmCounterDay(rows,plan,live){
+ const H=EH_IMM_HOUR,by=new Map();
+ for(const r of rows||[]){const t=ehStatTime(r.start);if(Number.isFinite(t))by.set(Math.floor(t/H)*H,r);}
+ let sum=0,have=0,missing=0,bad=0,prevSum=null;
+ const base=by.get(plan.from-H);if(base)prevSum=ehNum(base.sum);
+ for(let i=0;i<plan.full;i++){
+  const r=by.get(plan.from+i*H);
+  if(!r){missing++;prevSum=null;continue;}
+  let ch=ehNum(r.change);const s=ehNum(r.sum);
+  if(ch===null&&s!==null&&prevSum!==null)ch=s-prevSum;
+  prevSum=s;
+  if(ch===null){missing++;continue;}
+  if(ch<-0.00001||ch>50){bad++;continue;}   // tellerreset of onmogelijke uurwaarde: niet meetellen en niet als volledig tonen
+  sum+=Math.max(0,ch);have++;
+ }
+ const anchorRow=plan.full===0?base:by.get(plan.from+(plan.full-1)*H),anchor=anchorRow?ehNum(anchorRow.state):null;
+ const anchorEnd=plan.from+plan.full*H;
+ let liveKwh=null;
+ if(live&&anchor!==null&&plan.now-live.t<=30*60000){
+  const d=live.kwh-anchor,limit=Math.max(0,(plan.now-anchorEnd)/H)*30+0.5;
+  if(d>=-0.000001&&d<=limit)liveKwh=Math.max(0,d);
+ }
+ const total=sum+(liveKwh||0);
+ const status=missing===0&&bad===0&&liveKwh!==null?'complete':(have>0||liveKwh!==null)?'partial':'missing';
+ return {kwh:status==='missing'?null:total,status,hours:plan.full,have,missing,bad,live:liveKwh!==null};
+}
+/** Dagopbrengst rechtstreeks uit de dagsensor van de omvormer: alleen kWh/Wh, ≥ 0 en vandaag bijgewerkt. */
+function ehImmPvSensorDay(h,c,now){
+ const e=c.zonne_energie&&h?.states?.[c.zonne_energie];if(!e)return null;
+ const v=ehImmUnitKwh(ehNum(e.state),e.attributes?.unit_of_measurement),t=Date.parse(e.last_updated||e.last_changed||'');
+ if(v===null||v<0||!Number.isFinite(t)||ehDayKey(new Date(t))!==ehDayKey(now))return null;
+ return {kwh:v,status:'complete',sensor:true};
+}
+/** Alle dagtotalen in één keer (één gedeelde gegevensaanvraag). Huis = bestaande definitie: eigen kWh-teller, anders
+ *  afname − teruglevering + opwek − laden, alleen als alle vier volledig zijn. */
+function ehImmDayMetrics(c,h,rowsById,now){
+ const plan=ehImmDayPlan(now),ctr=id=>id?ehImmCounterDay(rowsById?.[id]||[],plan,ehImmLiveCounter(h,id)):{kwh:null,status:'missing'};
+ const imp=ctr(c.import),exp=ctr(c.export),ev=ctr(c.laad_energie),pv=ehImmPvSensorDay(h,c,now)||ctr(c.zonne_energie);
+ let home;
+ if(c.huis_energie)home={...ctr(c.huis_energie),direct:true};
+ else if([imp,exp,pv,ev].every(x=>x.status==='complete')){
+  const v=imp.kwh-exp.kwh+pv.kwh-ev.kwh;
+  home=v<-0.3?{kwh:null,status:'incomplete',why:'inconsistent'}:{kwh:Math.max(0,v),status:'complete',derived:true};
+ }else home={kwh:null,status:[imp,exp,pv,ev].some(x=>x.status!=='missing')?'incomplete':'missing',why:'onvolledige bronnen'};
+ return {plan,imp,exp,ev,pv,home};
+}
+/** Kosten van vandaag uit de bestaande Zonneplan-kostensensor: alleen een bedrag in euro dat vandaag is bijgewerkt. */
+function ehImmCostToday(h,c,now){
+ const e=c.cost_zonneplan_day&&h?.states?.[c.cost_zonneplan_day];if(!e)return null;
+ const n=ehNum(e.state),u=String(e.attributes?.unit_of_measurement||'').trim().toLowerCase(),t=Date.parse(e.last_updated||e.last_changed||'');
+ if(n===null||!['','€','eur'].includes(u)||!Number.isFinite(t)||ehDayKey(new Date(t))!==ehDayKey(now))return null;
+ return n;
+}
+/** Huidige laadsessie uit de Alfen-teller (kWh): het aaneengesloten laadblok waarin pauzes ≤ 45 min nog bij dezelfde sessie horen.
+ *  points = geschiedenis van de teller [{t,v,unit}], live = {kwh,t}. Geeft {ok:true,kwh,start} of {ok:false,reason}; een
+ *  onzekere sessiestart (meetgat, reset, geschiedenis begint midden in de sessie) is nooit een geschatte waarde. */
+function ehImmCurrentSession(points,live,nowMs){
+ const no=reason=>({ok:false,reason});
+ if(!live||nowMs-live.t>10*60000)return no('verouderd');
+ const pts=[];
+ for(const p of points||[]){const k=ehImmUnitKwh(p.v,p.unit);if(k===null||!Number.isFinite(p.t))return no('eenheid');pts.push({t:p.t,k});}
+ pts.sort((a,b)=>a.t-b.t);
+ if(pts.length<2)return no('geen historie');
+ if(live.t>pts[pts.length-1].t)pts.push({t:live.t,k:live.kwh});
+ let cur=null,breakT=null;
+ for(let i=1;i<pts.length;i++){
+  const prev=pts[i-1],next=pts[i],dt=next.t-prev.t;if(dt<=0)continue;
+  const d=next.k-prev.k;
+  if(d<-0.01){cur=null;breakT=next.t;continue;}                      // tellerreset of bronwissel
+  if(d<=0.001)continue;                                              // pauze of stilstand
+  // Bij change-only historie ontbreken vlakke punten tijdens stilstand. Een stijging na >45 min kan dus
+  // een nieuwe sessie verbergen; zonder gemeten startstand geen bevestigd totaal, ook bij plausibel vermogen.
+  if(d>dt/EH_IMM_HOUR*12+0.1||dt>EH_IMM_IDLE_MAX){cur=null;breakT=next.t;continue;}   // onzekere sessiegrens of onmogelijke sprong
+  if(!cur||prev.t-cur.last>EH_IMM_IDLE_MAX){
+   cur={start:prev.t,startK:prev.k,last:next.t,uncertain:breakT!==null&&prev.t-breakT<=EH_IMM_IDLE_MAX,first:i===1};
+  }
+  cur.last=next.t;
+ }
+ if(!cur)return no('geen sessie');
+ if(nowMs-cur.last>EH_IMM_IDLE_MAX)return no('geen actieve sessie');
+ if(cur.uncertain)return no('onderbroken meting');
+ if(cur.first)return no('sessiestart buiten bereik');
+ const kwh=live.kwh-cur.startK;
+ if(!(kwh>=0&&kwh<=150))return no('inconsistent');
+ return {ok:true,kwh,start:cur.start};
+}
+/** Kwartieren van vandaag en, zodra beschikbaar, morgen. Kalendergrenzen blijven DST-veilig. */
+function ehImmQuarterModel(quarters,now){
+ const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),tomorrowStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime(),tomorrowEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+2).getTime();
+ const valid=[];
+ for(const q of quarters||[]){
+  const t=Date.parse(q.t),p=ehNum(q.p);
+  if(!Number.isFinite(t)||p===null||t<dayStart||t>=tomorrowEnd)continue;
+  valid.push({t,p});
+ }
+ const hasTomorrow=valid.some(q=>q.t>=tomorrowStart),dayEnd=hasTomorrow?tomorrowEnd:tomorrowStart;
+ const slots=Math.round((dayEnd-dayStart)/900000),todaySlots=Math.round((tomorrowStart-dayStart)/900000),by=new Map();
+ for(const {t,p} of valid){
+  const i=Math.floor((t-dayStart)/900000);by.set(i,{i,t,p});
+ }
+ const items=[...by.values()].sort((a,b)=>a.i-b.i),nowIdx=Math.floor((now.getTime()-dayStart)/900000),cur=by.get(nowIdx)||null;
+ const ps=items.map(x=>x.p);
+ return {dayStart,dayEnd,slots,todaySlots,hasTomorrow,tomorrowKnown:items.filter(x=>x.t>=tomorrowStart).length,items,nowIdx,cur,known:items.length,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null};
+}
+/** Alleen-lezen weergave van de aangeleverde ApexCharts-planner. Geen laadopdrachten of nieuwe helpers.
+ *  Zelfde selectie: 36 uur vooruit; met SOC-doel tot vertrek en N goedkoopste of prijsgrens;
+ *  zonder SOC-doel per lokale dag 25% goedkoopste of prijsgrens. Onbekende invoer is geen nul. */
+function ehImmPlanningModel(quarters,now,h){
+ const val=id=>ehNum(h?.states?.[id]?.state),no=reason=>({available:false,reason});
+ const strategy=h?.states?.['input_select.cupra_prijsstrategie']?.state,target=val('input_number.cupra_gewenste_soc');
+ if(!['Vast','Onder daggemiddelde','Gemiddeld - marge','Goedkoopste kwartieren'].includes(strategy)||target===null||target<0||target>100)return no('plangegevens ontbreken');
+ const cheap=strategy==='Goedkoopste kwartieren',threshold=val('sensor.cupra_actuele_laadgrens');
+ if(!cheap&&threshold===null)return no('laadgrens ontbreekt');
+ let end=now.getTime()+36*3600000,needed=null;
+ if(target>0){
+  const departure=Date.parse(h?.states?.['sensor.cupra_slim_effectieve_vertrektijd']?.state||'');
+  if(!Number.isFinite(departure))return no('vertrektijd ontbreekt');
+  if(departure<=now.getTime())return no('vertrektijd verstreken');
+  end=Math.min(end,departure);
+  if(cheap){needed=val('sensor.cupra_slim_minimaal_bekende_kwartieren_nodig');if(needed===null||needed<0||!Number.isInteger(needed))return no('benodigde kwartieren ontbreken');}
+ }
+ const start=Math.floor(now.getTime()/3600000)*3600000,by=new Map();
+ for(const q of quarters||[]){const t=Date.parse(q.t),p=ehNum(q.p);if(!Number.isFinite(t)||p===null||t+900000<=now.getTime()||t>=end)continue;by.set(t,{t,p});}
+ const points=[...by.values()].sort((a,b)=>a.t-b.t),selected=new Set();
+ const select=(slots,n)=>[...slots].sort((a,b)=>a.p-b.p).slice(0,n).forEach(s=>selected.add(s.t));
+ if(cheap&&target>0)select(points,needed);
+ else if(cheap){const days=new Map();for(const q of points){const key=ehDayKey(new Date(q.t));if(!days.has(key))days.set(key,[]);days.get(key).push(q);}for(const slots of days.values())select(slots,Math.max(1,Math.ceil(slots.length*.25)));}
+ else for(const q of points)if(q.p<=threshold)selected.add(q.t);
+ const items=points.map(q=>({...q,i:Math.floor((q.t-start)/900000),planned:selected.has(q.t)})),ps=items.map(q=>q.p),nowIdx=Math.floor((now.getTime()-start)/900000);
+ const midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
+ return {available:true,dayStart:start,dayEnd:end,slots:Math.ceil((end-start)/900000),todaySlots:Math.round((midnight-start)/900000),hasTomorrow:end>midnight,
+  items,known:items.length,nowIdx,cur:items.find(q=>q.t<=now.getTime()&&now.getTime()<q.t+900000)||null,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null,
+  limit:cheap&&target>0?null:threshold,selected:selected.size,strategy,departure:target>0?end:null};
+}
+/** SVG-staafjes met nulbasislijn (negatieve prijzen hangen eronder); geen interpolatie voor ontbrekende kwartieren. */
+function ehImmQuarterBars(model){
+ const {slots,items,nowIdx,min,max}=model,top=Math.max(0,max,model.limit??0),bot=Math.min(0,min,model.limit??0),range=Math.max(0.001,top-bot),H=22,y0=1+top/range*H;
+ const span=Math.max(0.0001,max-min);
+ let out=bot<0?'<line class="zero" x1="0" x2="'+slots+'" y1="'+y0.toFixed(2)+'" y2="'+y0.toFixed(2)+'"/>':'';
+ if(model.hasTomorrow)out+='<line class="daybreak" x1="'+model.todaySlots+'" x2="'+model.todaySlots+'" y1="0" y2="24"/>';
+ if(Number.isFinite(model.limit)){const y=(1+(top-model.limit)/range*H).toFixed(2);out+='<line class="limit" x1="0" x2="'+slots+'" y1="'+y+'" y2="'+y+'"/>';}
+ if(nowIdx>=0&&nowIdx<slots)out+='<line class="nowline" x1="'+(nowIdx+.5)+'" x2="'+(nowIdx+.5)+'" y1="0" y2="24"/>';
+ for(const it of items){
+  const hh=Math.max(0.8,Math.abs(it.p)/range*H),y=it.p>=0?y0-hh:y0;
+  const cls=it.unplanned?(it.i===nowIdx?'now':''):typeof it.planned==='boolean'?(it.planned?'planned':'waiting')+(it.i===nowIdx?' now':''):it.i===nowIdx?'now':(it.p-min)<=span*.25?'cheap':it.i<nowIdx?'past':'';
+  out+='<rect class="'+cls+'" x="'+(it.i+.08).toFixed(2)+'" y="'+y.toFixed(2)+'" width=".84" height="'+hh.toFixed(2)+'"/>';
+ }
+ return out;
+}
+function ehImmHash(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(16);}
+const ehImmKwhTxt=n=>ehFmt(n,Math.abs(n)>=100?0:Math.abs(n)>=10?1:2);
+/** Tekstregels per vakje, afhankelijk van de breedte van de scène (px): full ≥ 800, mid ≥ 560, small ≥ 330, tiny daaronder.
+ *  Altijd ≥ 9 px in de CSS; op kleine schermen blijven de belangrijkste gegevens (korte vorm) staan in plaats van te verdwijnen.
+ *  Geeft {lines, aria}: aria bevat altijd de volledige zin. */
+function ehImmDayLines(key,d,extra,sw){
+ const form=sw>=800?'full':sw>=560?'mid':sw>=330?'small':'tiny',L=[],A=[];
+ const num=x=>ehImmKwhTxt(x.kwh);
+ // Eén totaal: status ⇒ tekst. complete: "Vandaag: x kWh"; partial: ondergrens "≥"; incomplete: "onvolledig"; missing: niets.
+ const one=(x,lab,what)=>{
+  if(!x||x.status==='missing')return null;
+  const ar=what+': '+(x.status==='complete'?num(x)+' kWh':x.status==='partial'?'gedeeltelijk gemeten, minstens '+num(x)+' kWh':'onvolledig, bronnen niet volledig beschikbaar')+'.';
+  let t;
+  if(x.status==='complete')t=form==='tiny'?num(x)+' kWh':lab[form]+' '+num(x)+' kWh';
+  else if(x.status==='partial')t=form==='tiny'?'≥ '+num(x)+' kWh':lab[form]+' ≥ '+num(x)+' kWh'+(form==='full'?' (deels)':'');
+  else t=form==='tiny'?'onvolledig':lab[form]+' onvolledig';
+  return {t,ar};
+ };
+ const day={full:'Vandaag:',mid:'Vandaag:',small:'Dag'};
+ if(key==='pv'||key==='house'){
+  const r=one(d[key==='pv'?'pv':'home'],day,key==='pv'?'Zonnepanelen vandaag opgewekt':'Huis vandaag verbruikt (exclusief Cupra)');
+  if(r){L.push(r.t);A.push(r.ar);}
+ }else if(key==='cupra'){
+  const r=one(d.ev,day,'Cupra vandaag geladen (Alfen)');
+  const s=extra.session;   // {state:'ok'|'unavailable'|'loading'|'idle', kwh}
+  let st=null,sa=null;
+  if(s&&s.state==='ok'){st=(form==='tiny'?'':(form==='small'?'Sessie ':'Sessie: '))+ehImmKwhTxt(s.kwh)+' kWh';sa='Huidige laadsessie: '+ehImmKwhTxt(s.kwh)+' kWh.';}
+  else if(s&&s.state==='unavailable'){st=form==='small'?'Sessie n.b.':form==='tiny'?null:'Sessie: niet beschikbaar';sa='Huidige laadsessie: niet beschikbaar, de sessiestart kan niet betrouwbaar worden vastgesteld.';}
+  if(form==='small'||form==='tiny'){          // klein scherm: de sessie heeft voorrang, anders het dagtotaal
+   if(st&&s.state==='ok'){L.push(st);A.push(sa);if(r)A.push(r.ar);}
+   else{if(r){L.push(r.t);A.push(r.ar);}if(sa)A.push(sa);if(st)L.push(st);}
+  }else{if(r){L.push(r.t);A.push(r.ar);}if(st){L.push(st);A.push(sa);}}
+ }else if(key==='net'){
+  const imp=d.imp,exp=d.exp,cost=extra.cost,mark=x=>x.status==='partial'?'≥ ':'';
+  const ok=x=>x&&x.status!=='missing'&&x.kwh!==null;
+  const costT=cost===null||cost===undefined?null:(cost<0?'−':'')+'€ '+ehFmt(Math.abs(cost),2);
+  if(ok(imp))A.push('Afname vandaag: '+(imp.status==='partial'?'gedeeltelijk gemeten, minstens ':'')+num(imp)+' kWh.');
+  if(ok(exp))A.push('Teruggeleverd vandaag: '+(exp.status==='partial'?'gedeeltelijk gemeten, minstens ':'')+num(exp)+' kWh.');
+  if(costT)A.push('Kosten vandaag: '+costT+'.');
+  if(form==='full'){
+   if(ok(imp))L.push('Afname: '+mark(imp)+num(imp)+' kWh');
+   if(ok(exp))L.push('Teruggeleverd: '+mark(exp)+num(exp)+' kWh');
+   if(costT)L.push('Kosten: '+costT);
+  }else if(form==='mid'){
+   if(ok(imp)&&ok(exp))L.push('Af '+mark(imp)+num(imp)+' · Terug '+mark(exp)+num(exp)+' kWh');
+   else if(ok(imp))L.push('Afname: '+mark(imp)+num(imp)+' kWh');else if(ok(exp))L.push('Terug: '+mark(exp)+num(exp)+' kWh');
+   if(costT)L.push('Kosten: '+costT);
+  }else if(form==='small'){
+   const p=[];if(ok(imp))p.push('Af '+mark(imp)+num(imp));if(costT)p.push(costT);
+   if(p.length)L.push(p.join(' · '));
+  }else if(ok(imp))L.push(mark(imp)+num(imp)+' kWh');else if(costT)L.push(costT);
+ }
+ return {lines:L,aria:A};
+}
 (function ehImmInstall(){
  const P=EnergiehuisCard.prototype,previous=P._render;
  /** Enige ingang vanuit de Live Cockpit (onTileNavigate). Alleen bestemmingen uit de whitelist. */
@@ -6390,8 +6693,156 @@ function ehImmPageHtml(card,view){
   requestAnimationFrame(()=>{if(this.isConnected&&typeof this.scrollIntoView==='function')this.scrollIntoView({block:'start'});});
   return true;
  };
+ // ===== Home-extra's: gegevens laden (alleen lezen) =====
+ // Dagtotalen: één gedeelde, gecachete recorder-statistiekvraag (uurperiode, vandaag) voor alle vakjes; per 5 minuten hooguit één
+ // (2 minuten na een mislukking). De laadsessie komt uit de Alfen-tellerhistorie en wordt alleen tijdens het laden ververst (150 s).
+ // Geen servicecalls, geen opslag, geen schrijfacties.
+ const DAY_TTL_MS=5*60*1000,DAY_RETRY_MS=2*60*1000,SESSION_TTL_MS=150*1000;
+ P._ehImmRefresh=function(){
+  const ctl=this._ehLive?.ctl;
+  if(ctl&&!ctl.debug.suspended&&ehImmOn(this)&&this._view==='overview'&&!this._ehImmAll){ctl.cockpit.rerender();this._ehImmPrice();}
+ };
+ P._ehImmLoadDay=async function(){
+  const c=this.config,h=this._hass,st=this._ehImmDay||(this._ehImmDay={at:0,key:'',rows:null,error:false,loading:false});
+  if(!h||typeof h.callWS!=='function'||!c||st.loading)return;
+  const now=new Date(),key=ehDayKey(now);
+  if(st.key===key&&Date.now()-st.at<(st.error?DAY_RETRY_MS:DAY_TTL_MS))return;
+  st.loading=true;st.at=Date.now();
+  try{
+   const plan=ehImmDayPlan(now),ids=[...new Set([c.import,c.export,c.laad_energie,c.zonne_energie,c.huis_energie].filter(Boolean))];
+   if(ids.length){
+    const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:new Date(plan.from-EH_IMM_HOUR).toISOString(),end_time:now.toISOString(),statistic_ids:ids,period:'hour',types:['change','sum','state'],units:{energy:'kWh'}});
+    st.rows=stats&&typeof stats==='object'?stats:{};
+   }else st.rows={};
+   st.error=false;
+  }catch(_){st.rows=null;st.error=true;}
+  finally{st.loading=false;st.key=key;st.ver=(st.ver||0)+1;}
+  this._ehImmRefresh();
+ };
+ /** Alle dagtotalen (per minuut en per wijziging van de bronnen gememoriseerd). */
+ P._ehImmMetrics=function(){
+  const st=this._ehImmDay,c=this.config,h=this._hass,now=new Date();
+  const rows=st&&st.rows&&st.key===ehDayKey(now)?st.rows:{};
+  const src=[c.import,c.export,c.laad_energie,c.zonne_energie,c.huis_energie].filter(Boolean).map(id=>(h?.states?.[id]?.state)+'@'+(h?.states?.[id]?.last_updated)).join('|');
+  const key=(st?st.ver||0:0)+'|'+Math.floor(now.getTime()/60000)+'|'+src;
+  if(this._ehImmMemo&&this._ehImmMemo.key===key)return this._ehImmMemo.v;
+  const v=ehImmDayMetrics(c,h,rows,now);this._ehImmMemo={key,v};return v;
+ };
+ P._ehImmLoadSession=async function(){
+  const c=this.config,h=this._hass,ss=this._ehImmSess;
+  if(!ss||ss.loading||!h||typeof h.callWS!=='function'||!c?.laad_energie)return;
+  if(ss.at&&Date.now()-ss.at<SESSION_TTL_MS)return;
+  ss.loading=true;ss.at=Date.now();
+  try{
+   const now=Date.now();
+   const data=await h.callWS({type:'history/history_during_period',start_time:new Date(now-36*EH_IMM_HOUR).toISOString(),end_time:new Date(now).toISOString(),entity_ids:[c.laad_energie],minimal_response:true,no_attributes:false,significant_changes_only:false});
+   ss.points=ehNumericHistory(data,c.laad_energie,h);ss.error=false;
+  }catch(_){ss.points=null;ss.error=true;}
+  finally{ss.loading=false;}
+  this._ehImmRefresh();
+ };
+ /** Huidige sessie: alleen tijdens het laden; onzeker ⇒ "niet beschikbaar", nooit een schatting. */
+ P._ehImmSession=function(m){
+  const c=this.config,h=this._hass,ss=this._ehImmSess||(this._ehImmSess={at:0,loading:false,points:null,error:false,was:false});
+  if(!m?.tiles?.cupra?.charging){ss.was=false;return {state:'idle'};}
+  if(!ss.was){ss.was=true;ss.at=0;ss.points=null;ss.error=false;}        // nieuwe laadperiode: historie opnieuw ophalen
+  if(ss.error&&Date.now()-ss.at>DAY_RETRY_MS){ss.error=false;ss.at=0;}
+  this._ehImmLoadSession();
+  if(ss.error)return {state:'unavailable',reason:'historie'};
+  if(!ss.points)return {state:'loading'};
+  const r=ehImmCurrentSession(ss.points,ehImmLiveCounter(h,c.laad_energie),Date.now());
+  return r.ok?{state:'ok',kwh:r.kwh}:{state:'unavailable',reason:r.reason};
+ };
+ /** Tekstregels onder de livewaarde van een vakje; breedte van de scène bepaalt de vorm (zie ehImmDayLines). */
+ P._ehImmTileDay=function(key,m,sw){
+  const c=this.config,h=this._hass,now=new Date();
+  if(!c||!m||!m.connected||!['pv','house','cupra','net'].includes(key))return null;
+  return ehImmDayLines(key,this._ehImmMetrics(),{cost:key==='net'?ehImmCostToday(h,c,now):null,session:key==='cupra'?this._ehImmSession(m):null},sw||0);
+ };
+ /** Kwartierprijs-knop (Zonneplan, bestaande prijssensoren; echte tijdstempels, 92/96/100 kwartieren; opent Slim laden). */
+ P._ehImmPrice=function(){
+  const ctl=this._ehLive?.ctl;if(!ctl||ctl.debug.suspended)return;
+  const tiles=ctl.cockpit.el.querySelector('.ehm-tiles');if(!tiles)return;
+  const doc=tiles.ownerDocument;
+  let el=tiles.querySelector(':scope > .eh-price');
+  if(!el){
+   el=doc.createElement('button');el.type='button';el.className='eh-price';
+   el.addEventListener('click',()=>this._ehImmNavigate('price'));      // één listener per element; het element leeft zolang de cockpit
+   tiles.appendChild(el);
+  }
+  const now=new Date(),c=this.config,h=this._hass;
+  let info=null;try{info=ehPricesForDay(h,c,now);}catch(_){}
+  const plan=c.live_cockpit_planning===true?ehImmPlanningModel(info?.quarters||[],now,h):null;
+  const model=plan?.available?plan:ehImmQuarterModel(info?.quarters||[],now),cur=model.cur;
+  if(plan&&!plan.available)for(const it of model.items)it.unplanned=true;
+  let state='none',label='Kwartierprijs',nowTxt='geen data',at='',aria='Kwartierprijs: geen kwartierdata beschikbaar.',bars='';
+  const eur=p=>(p<0?'−':'')+'€ '+ehFmt(Math.abs(p),3);
+  if(model.known>=8||(plan?.available&&model.known>0)){
+   state='quarter';bars=ehImmQuarterBars(model);
+   if(plan)label=plan.available?'Laadplanning':'Planning n.b.';else if(model.hasTomorrow)label='Vandaag/morgen';
+   const range=(plan?.available?'Laadplanning, '+model.selected+' geselecteerde kwartieren;':model.hasTomorrow?'Vandaag en morgen':'Vandaag')+' laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
+   if(cur){nowTxt=eur(cur.p);at=ehClock(cur.t);aria='Kwartierprijs: nu '+eur(cur.p)+' per kWh (kwartier '+ehClock(cur.t)+' tot '+ehClock(cur.t+900000)+'). '+range;}
+   else{nowTxt='nu onbekend';aria='Kwartierprijs: het huidige kwartier is niet beschikbaar. '+range;}
+  }else if(info&&Number.isFinite(info.currentHour)){
+   state='hour';label='Uurprijs';nowTxt=eur(info.currentHour);aria='Uurprijs: nu '+eur(info.currentHour)+' per kWh. Geen kwartierdata beschikbaar.';
+  }
+  // Handtekening over de ECHTE prijsdata (niet over de tekenlengte): elke gewijzigde prijs of tijdstip rendert opnieuw.
+  const periodText=plan?.available?'Groen: laden · oranje: wachten'+(model.departure?' · tot '+ehClock(model.departure):' · 36 uur'):plan?'Planning niet beschikbaar: '+plan.reason:model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar';
+  const sig=ehImmHash(state+'|'+label+'|'+periodText+'|'+model.limit+'|'+nowTxt+'|'+at+'|'+model.slots+'|'+model.nowIdx+'|'+model.items.map(x=>x.i+':'+Math.round(x.p*10000)+':'+x.planned).join(','));
+  if(el.dataset.sig===sig)return;
+  el.dataset.sig=sig;el.dataset.state=state;el.dataset.slots=String(model.slots);
+  el.setAttribute('aria-label',aria+' Tik voor het prijsoverzicht.');
+  const top=doc.createElement('span');top.className='eh-price-top';
+  for(const [cls,txt,tag] of [['eh-price-label',label,'span'],['eh-price-now',nowTxt,'strong'],['eh-price-at',at,'span']]){if(!txt)continue;const n=doc.createElement(tag);n.className=cls;n.textContent=txt;top.appendChild(n);}
+  el.replaceChildren(top);
+  if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 '+model.slots+' 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
+  if(state==='quarter'){
+   const period=doc.createElement('span');period.className='eh-price-period';
+   period.textContent=periodText;
+   el.appendChild(period);el.setAttribute('aria-label',aria+' '+period.textContent+'. Tik voor het prijsoverzicht.');
+  }
+ };
+ /** Datum en buitentemperatuur voor de pil bovenaan de scène. Temperatuur: de optionele weer-entiteit (`weather`), anders de
+  *  buitentemperatuur van de Cupra; alleen °C of °F en niet ouder dan 3 uur. Zonder bron: alleen de datum. */
+ P._ehImmPillExtra=function(m){
+  const c=this.config,h=this._hass,now=new Date();
+  let date=now.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const fresh=e=>{const t=Date.parse(e?.last_updated||e?.last_changed||'');return Number.isFinite(t)&&Date.now()-t<=3*3600000;};
+  const fromUnit=(n,u)=>{u=String(u||'').trim().toLowerCase();return n===null?null:u==='°c'||u==='c'?n:u==='°f'||u==='f'?(n-32)*5/9:null;};
+  let temp=null;
+  const w=c?.weather&&h?.states?.[c.weather];
+  if(w&&fresh(w)){
+   if(String(c.weather).startsWith('weather.'))temp=fromUnit(ehNum(w.attributes?.temperature),w.attributes?.temperature_unit||'°C');
+   else temp=fromUnit(ehNum(w.state),w.attributes?.unit_of_measurement);
+  }
+  if(temp===null){const e=c?.cupra_outside_temp&&h?.states?.[c.cupra_outside_temp];if(e&&fresh(e))temp=fromUnit(ehNum(e.state),e.attributes?.unit_of_measurement);}
+  return date+(temp!==null&&temp>-60&&temp<70?' · '+Math.round(temp)+'°':'');
+ };
+ P._ehImmExtras=function(){
+  if(!ehImmOn(this)||this._view!=='overview'||this._ehImmAll)return;
+  this._ehImmPrice();this._ehImmLoadDay();
+  // Dagregels bijwerken als een niet door de cockpit bewaakte bron (dagsensor, kosten, sessie, dagtotalen) is gewijzigd.
+  const ctl=this._ehLive?.ctl,m=ctl&&!ctl.debug.suspended?ctl.cockpit.model:null;
+  if(m){
+   const stage=ctl.cockpit.el.querySelector('.ehm-stage'),sw=stage?stage.getBoundingClientRect().width:0;
+   const sig=['pv','house','cupra','net'].map(k=>{const r=this._ehImmTileDay(k,m,sw);return r?r.lines.join('|')+'~'+r.aria.join('|'):'';}).join('#')+'#'+this._ehImmPillExtra(m);
+   if(sig!==this._ehImmSig){this._ehImmSig=sig;ctl.cockpit.rerender();}
+  }
+ };
  P._render=function(){
   const on=ehImmOn(this);
+  // Meetupdates op de zichtbare Home mogen de shell (en daarmee de compositorlaag van de scène)
+  // niet loskoppelen. Alleen gewijzigde UI/configuratie vraagt de bestaande volledige renderketen.
+  const homeKey=()=>JSON.stringify([this.config,this._eh19Density,!!this._eh26MenuOpen,eh19ConnectionState(this._hass,window)]);
+  const ctl=this._ehLive?.ctl;
+  if(on&&this._hass&&this._view==='overview'&&!this._ehImmAll&&!this._detail&&
+     !this._ehImmFocus&&!this._eh26RestoreFocus&&ctl&&!ctl.debug.suspended&&!ctl.debug.destroyed&&
+     ctl.host.isConnected&&this.shadowRoot?.querySelector('.shell.eh-imm-home')&&
+     this._ehImmHomeKey===homeKey()){
+   ctl.update(this._hass,false);
+   return;
+  }
+  this._ehImmHomeKey=null;
   // Opt-in uitgezet terwijl een immersive pagina open stond: veilig terug naar Home.
   if(!on&&EH_IMM_VIEWS[this._view]){this._view='overview';this._detail=null;}
   if(!on)this._ehImmAll=false;
@@ -6420,6 +6871,7 @@ function ehImmPageHtml(card,view){
   const view=this._view,live=!!this._ehLiveShown;
   if(view==='overview'&&live&&!this._ehImmAll){
    shell.classList.add('eh-imm-home');
+   this._ehImmExtras();
   }else if(view==='overview'&&this._ehImmAll){
    // "Alle metingen": de oude Home-inhoud (metingen, grafiek, energiecoach) met een eigen kop; cockpit gepauzeerd.
    shell.classList.add('eh-imm-all');
@@ -6467,8 +6919,9 @@ function ehImmPageHtml(card,view){
    const h=root.querySelector('#eh-imm-title')||root.querySelector('.cupra-page h2, .subpage-head h2');
    if(h){if(!h.hasAttribute('tabindex'))h.setAttribute('tabindex','-1');h.focus({preventScroll:true});}
   }else if(focus==='tile'&&view==='overview'&&live){
-   const tile=this._ehLive?.ctl?.cockpit?.el?.querySelector('.tile[data-key="'+this._ehImmFrom+'"]');
+   const tile=this._ehLive?.ctl?.cockpit?.el?.querySelector(this._ehImmFrom==='price'?'.eh-price':'.tile[data-key="'+this._ehImmFrom+'"]');
    if(tile)tile.focus({preventScroll:true});
   }
+  if(view==='overview'&&live&&!this._ehImmAll)this._ehImmHomeKey=homeKey();
  };
 })();
