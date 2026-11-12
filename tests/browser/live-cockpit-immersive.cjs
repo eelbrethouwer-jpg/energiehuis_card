@@ -735,9 +735,18 @@ const PAGE=()=>{
   const {ctx,page}=await open(IMM,{width:932,height:430});await settle(page);
   const before=await page.evaluate(EXTRA);
   await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states},e=s[c.prijs],fc=e.attributes.forecast.map((q,i)=>i===85?{...q,price_tax_included:+(q.price_tax_included+0.05).toFixed(4)}:q);s[c.prijs]={...e,attributes:{...e.attributes,forecast:fc}};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
-  const after=await page.evaluate(EXTRA);await ctx.close();
+  const after=await page.evaluate(EXTRA);
   assert.notEqual(before.price.svg,after.price.svg,'gewijzigde toekomstige prijs ⇒ grafiek opnieuw gerenderd');assert.equal(after.price.bars,after.sim.quarters);
-  out.update=true;return out;
+  await page.evaluate(()=>{
+   const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states},e=s[c.prijs];
+   const tomorrow=new Date();tomorrow.setHours(0,0,0,0);tomorrow.setDate(tomorrow.getDate()+1);
+   const fc=e.attributes.forecast.concat(Array.from({length:96},(_,i)=>({start_date:new Date(+tomorrow+i*900000).toISOString(),price_tax_included:i===20?-.05:.25})));
+   s[c.prijs]={...e,attributes:{...e.attributes,forecast:fc}};window.__hass={...window.__hass,states:s};card.hass=window.__hass;
+  });await frames(page,6);
+  const twoDays=await page.evaluate(EXTRA);await ctx.close();
+  assert.equal(twoDays.price.slots,192);assert.equal(twoDays.price.bars,192);assert.equal(twoDays.price.now,1);
+  assert.ok(twoDays.price.svg.includes('class="daybreak"'));assert.match(twoDays.price.aria,/Vandaag en morgen/);assert.match(twoDays.price.text,/Vandaag · morgen/);
+  out.update=true;out.tomorrow=twoDays.price.bars;return out;
  });
  await check('kwartierprijs-knop: tik, klik en toetsenbord (Enter/Space) openen het bestaande prijsoverzicht (Slim laden); ≥ 44×44, bereikbaar en onbedekt op 320/390/430/844/932; terug naar Home met focus op de knop',async()=>{
   const out={};

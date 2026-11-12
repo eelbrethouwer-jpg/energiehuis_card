@@ -5717,6 +5717,7 @@ const EhLiveCockpit=(function(){
   '.eh-price:hover{border-color:rgba(255,255,255,.3)}.eh-price:focus-visible{outline:2px solid #76c1ef;outline-offset:2px}' +
   '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
   '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
+  '.eh-price-bars line.daybreak{stroke:#fff;stroke-width:.65;stroke-dasharray:2 2;opacity:.7}.eh-price-period{display:block;margin-top:2px;font-size:.85em;opacity:.75;white-space:normal}' +
   '.eh-price[data-state="none"] .eh-price-now{font-size:1em;font-weight:600;opacity:.8}' +
   '.ehc--master[data-layout="list"] .eh-price{position:static;grid-column:1 / -1;padding:.55rem .8rem;border-radius:.95rem;font-size:.8rem;background:color-mix(in srgb,var(--bg-2) 80%,transparent)}' +
   '.ehc--master[data-layout="list"] .eh-price-bars{height:34px;max-height:none}' +
@@ -6559,24 +6560,30 @@ function ehImmCurrentSession(points,live,nowMs){
  if(!(kwh>=0&&kwh<=150))return no('inconsistent');
  return {ok:true,kwh,start:cur.start};
 }
-/** Kwartieren van vandaag op echte tijdstippen (92/96/100 per dag, bij zomer-/wintertijd). */
+/** Kwartieren van vandaag en, zodra beschikbaar, morgen. Kalendergrenzen blijven DST-veilig. */
 function ehImmQuarterModel(quarters,now){
- const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),dayEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
- const slots=Math.round((dayEnd-dayStart)/900000),by=new Map();
+ const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),tomorrowStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime(),tomorrowEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+2).getTime();
+ const valid=[];
  for(const q of quarters||[]){
-  const t=Date.parse(q.t),p=Number(q.p);
-  if(!Number.isFinite(t)||!Number.isFinite(p)||t<dayStart||t>=dayEnd)continue;
+  const t=Date.parse(q.t),p=ehNum(q.p);
+  if(!Number.isFinite(t)||p===null||t<dayStart||t>=tomorrowEnd)continue;
+  valid.push({t,p});
+ }
+ const hasTomorrow=valid.some(q=>q.t>=tomorrowStart),dayEnd=hasTomorrow?tomorrowEnd:tomorrowStart;
+ const slots=Math.round((dayEnd-dayStart)/900000),todaySlots=Math.round((tomorrowStart-dayStart)/900000),by=new Map();
+ for(const {t,p} of valid){
   const i=Math.floor((t-dayStart)/900000);by.set(i,{i,t,p});
  }
  const items=[...by.values()].sort((a,b)=>a.i-b.i),nowIdx=Math.floor((now.getTime()-dayStart)/900000),cur=by.get(nowIdx)||null;
  const ps=items.map(x=>x.p);
- return {dayStart,dayEnd,slots,items,nowIdx,cur,known:items.length,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null};
+ return {dayStart,dayEnd,slots,todaySlots,hasTomorrow,tomorrowKnown:items.filter(x=>x.t>=tomorrowStart).length,items,nowIdx,cur,known:items.length,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null};
 }
 /** SVG-staafjes met nulbasislijn (negatieve prijzen hangen eronder); geen interpolatie voor ontbrekende kwartieren. */
 function ehImmQuarterBars(model){
  const {slots,items,nowIdx,min,max}=model,top=Math.max(0,max),bot=Math.min(0,min),range=Math.max(0.001,top-bot),H=22,y0=1+top/range*H;
  const span=Math.max(0.0001,max-min);
  let out=bot<0?'<line class="zero" x1="0" x2="'+slots+'" y1="'+y0.toFixed(2)+'" y2="'+y0.toFixed(2)+'"/>':'';
+ if(model.hasTomorrow)out+='<line class="daybreak" x1="'+model.todaySlots+'" x2="'+model.todaySlots+'" y1="0" y2="24"/>';
  if(nowIdx>=0&&nowIdx<slots)out+='<line class="nowline" x1="'+(nowIdx+.5)+'" x2="'+(nowIdx+.5)+'" y1="0" y2="24"/>';
  for(const it of items){
   const hh=Math.max(0.8,Math.abs(it.p)/range*H),y=it.p>=0?y0-hh:y0;
@@ -6737,7 +6744,7 @@ function ehImmDayLines(key,d,extra,sw){
   const eur=p=>(p<0?'−':'')+'€ '+ehFmt(Math.abs(p),3);
   if(model.known>=8){
    state='quarter';bars=ehImmQuarterBars(model);
-   const range='Vandaag laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
+   const range=(model.hasTomorrow?'Vandaag en morgen':'Vandaag')+' laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
    if(cur){nowTxt=eur(cur.p);at=ehClock(cur.t);aria='Kwartierprijs: nu '+eur(cur.p)+' per kWh (kwartier '+ehClock(cur.t)+' tot '+ehClock(cur.t+900000)+'). '+range;}
    else{nowTxt='nu onbekend';aria='Kwartierprijs: het huidige kwartier is niet beschikbaar. '+range;}
   }else if(info&&Number.isFinite(info.currentHour)){
@@ -6752,6 +6759,11 @@ function ehImmDayLines(key,d,extra,sw){
   for(const [cls,txt,tag] of [['eh-price-label',label,'span'],['eh-price-now',nowTxt,'strong'],['eh-price-at',at,'span']]){if(!txt)continue;const n=doc.createElement(tag);n.className=cls;n.textContent=txt;top.appendChild(n);}
   el.replaceChildren(top);
   if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 '+model.slots+' 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
+  if(state==='quarter'){
+   const period=doc.createElement('span');period.className='eh-price-period';
+   period.textContent=model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar';
+   el.appendChild(period);el.setAttribute('aria-label',aria+' '+period.textContent+'. Tik voor het prijsoverzicht.');
+  }
  };
  /** Datum en buitentemperatuur voor de pil bovenaan de scène. Temperatuur: de optionele weer-entiteit (`weather`), anders de
   *  buitentemperatuur van de Cupra; alleen °C of °F en niet ouder dan 3 uur. Zonder bron: alleen de datum. */

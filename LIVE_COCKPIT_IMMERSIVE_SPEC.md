@@ -143,3 +143,9 @@ Tests: `tests/v128-immersive-day-session-price.test.cjs` (25 Node-tests, UTC en 
 Op de iPhone is flikkeren gemeld zodra een meetwaarde verandert. De bestaande renderketen verving de buitenste shadow-DOM en plaatste dezelfde cockpit terug; behoud van alleen de cockpit/afbeeldingsidentiteit voorkwam die tijdelijke loskoppeling niet.
 
 Bij een bestaande, actieve immersive Home verversen meetupdates nu alleen het cockpitmodel en de extra gegevens. De shell blijft verbonden. Navigatie, configuratie, dichtheid, menu en verbindingstatus van de werkbalk gebruiken bij wijziging de volledige renderketen. Andere schermen en de uitgeschakelde opt-in behouden hun renderpad. De lifecycle-browsercontrole observeert expliciet verwijderingen en controleert de shell-identiteit tijdens 60 meetupdates; navigatie heen en terug blijft onderdeel van dezelfde controle. Dit moet opnieuw op een fysieke iPhone worden beoordeeld.
+
+## 12. Kwartierprijzen van morgen
+
+De Home-prijsgrafiek gebruikt dezelfde bestaande HA-forecast als Slim laden en toont vandaag plus morgen zodra er geldige kwartierprijzen voor morgen zijn. Een stippellijn markeert lokale middernacht. Een tekstregel onderscheidt vandaag, morgen en gedeeltelijk beschikbare morgenprijzen; zonder morgenprijzen blijft de grafiek op vandaag en vermeldt dit expliciet. Gaten worden niet aangevuld. Het aantal kwartieren volgt de echte kalenderduur bij zomer-/wintertijd. De actuele prijs blijft het huidige kwartier, niet de eerste prijs van morgen. De grafiek toont tarieven per kWh, geen berekende totale laadkosten.
+
+Overname van de externe grafiek “Slimme laadplanning tot vertrek” vereist de werkelijke kaart-YAML en bronentiteiten. Er zijn geen groene laadmomenten of minimale laadvermogens afgeleid uit de aangeleverde afbeelding. Geen nieuwe HA-servicecalls of schrijfacties.

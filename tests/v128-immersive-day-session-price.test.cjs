@@ -231,13 +231,28 @@ test('kwartieren: 96 op een normale dag, 92 bij zomertijd en 100 bij wintertijd 
 test('kwartieren: ontbrekende kwartieren blijven leeg, andere dagen en ongeldige waarden worden genegeerd, dubbele/ongesorteerde invoer is veilig',()=>withTZ(AMS,()=>{
  const d=new Date(2026,10,12,14,37),start=new Date(2026,10,12).getTime();
  const q=quarters(start,96,undefined,i=>i%7===3);
- q.push({t:new Date(start-900000).toISOString(),p:.5},{t:new Date(start+96*900000).toISOString(),p:.5},{t:'kapot',p:.3},{t:new Date(start).toISOString(),p:'x'});
+ q.push({t:new Date(start-900000).toISOString(),p:.5},{t:new Date(start+192*900000).toISOString(),p:.5},{t:'kapot',p:.3},{t:new Date(start).toISOString(),p:'x'});
  q.reverse();q.push({...q[0]});
  const m=T.q(q,d);
  assert.equal(m.known,96-Math.ceil(96/7)+0,'alleen kwartieren van vandaag, zonder gaten: '+m.known);
  assert.ok(m.items.every((x,i,a)=>i===0||a[i-1].i<x.i),'oplopend en uniek');
  assert.equal(m.cur&&m.cur.i,58,'14:37 ⇒ kwartier 58 (14:30)');
  const gapNow=T.q(quarters(start,96,undefined,i=>i===58),d);assert.equal(gapNow.cur,null,'huidig kwartier ontbreekt ⇒ geen waarde verzinnen');
+}));
+test('kwartieren: morgen wordt toegevoegd zodra echte prijzen beschikbaar zijn, gaten blijven leeg',()=>withTZ(AMS,()=>{
+ const now=new Date(2026,10,12,21),start=new Date(2026,10,12).getTime(),tomorrow=new Date(2026,10,13).getTime();
+ const today=quarters(start,96),q=[...today,...quarters(tomorrow,96,i=>i===10?-.1:.3,i=>i===5)];
+ const m=T.q(q,now);assert.equal(m.slots,192);assert.equal(m.known,191);assert.equal(m.hasTomorrow,true);assert.equal(m.tomorrowKnown,95);assert.equal(m.todaySlots,96);
+ assert.equal(m.cur.i,84);assert.equal(m.min,-.1);assert.match(T.bars(m),/class="daybreak" x1="96"/);
+ assert.equal(m.items.some(x=>x.i===101),false,'geen gekopieerde prijs voor ontbrekend kwartier');
+ const absent=T.q([...today,{t:new Date(tomorrow).toISOString(),p:null},{t:new Date(tomorrow+900000).toISOString(),p:'unavailable'}],now);
+ assert.equal(absent.hasTomorrow,false);assert.equal(absent.slots,96);
+}));
+test('kwartieren: vandaag plus morgen telt echte DST-kwartieren en sluit overmorgen uit',()=>withTZ(AMS,()=>{
+ for(const [now,expected] of [[new Date(2026,2,28,21),188],[new Date(2026,9,24,21),196],[new Date(2026,2,29,21),188],[new Date(2026,9,25,21),196]]){
+  const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+2).getTime();
+  const m=T.q(quarters(start,expected+1),now);assert.equal(m.slots,expected);assert.equal(m.known,expected);assert.ok(m.items.every(q=>q.t<end));
+ }
 }));
 test('kwartieren: negatieve prijzen krijgen een nulbasislijn en hangen eronder; het huidige kwartier is gemarkeerd',()=>withTZ(AMS,()=>{
  const d=new Date(2026,10,12,14,37),start=new Date(2026,10,12).getTime();
