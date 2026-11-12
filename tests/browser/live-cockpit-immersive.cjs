@@ -190,7 +190,7 @@ const PAGE=()=>{
  async function shot(page,name){
   const buf=await page.screenshot(),vp=page.viewportSize(),bar=34;
   const stamp=await browser.newPage({viewport:{width:vp.width,height:vp.height+bar}});
-  const text='FICTIEVE TESTDATA — gesimuleerde HA-gegevens en synthetisch beeld (niet de goedgekeurde master) · '+browserType.name()+' · '+SHA.slice(0,12);
+  const text='FICTIEVE TESTDATA — gesimuleerde HA-gegevens en '+(process.env.EH_LIVE_MASTER?'lokaal beeld (privé)':'synthetisch beeld (niet de goedgekeurde master)')+' · '+browserType.name()+' · '+SHA.slice(0,12);
   const url=await stamp.evaluate(async([b64,w,h,bar,text])=>{
    const img=new Image();await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src='data:image/png;base64,'+b64;});
    const c=document.createElement('canvas');c.width=w;c.height=h+bar;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,w,h+bar);g.drawImage(img,0,0,w,h);
