@@ -70,7 +70,7 @@ const SETUP=([config,mode])=>{
   const cur=fc.find(q=>{const t=Date.parse(q.start_date);return now>=t&&now<t+900000;});
   states[c.prijs]={entity_id:c.prijs,state:String(cur?cur.price_tax_included:0.22),attributes:{unit_of_measurement:'EUR/kWh',forecast:fc},last_updated:iso(2),last_changed:iso(2),last_reported:iso(2)};
   states[c.zonne_energie]=st(c.zonne_energie,12.4,'kWh');states[c.cost_zonneplan_day]=st(c.cost_zonneplan_day,0.31,'EUR',30);
-  states[c.cupra_charged_energy]=st(c.cupra_charged_energy,5.1,'kWh',60);}
+  states[c.cupra_charged_energy]=st(c.cupra_charged_energy,5.1,'kWh',60);states[c.cupra_outside_temp]=st(c.cupra_outside_temp,14.4,'°C',600);}
   card.hass=window.__hass;
  window.__push=(patch,extra={})=>{const s={...window.__hass.states};for(const [k,v,u] of patch)s[c[k]]=st(c[k],v,u||'W',0);window.__hass={...window.__hass,...extra,states:s};card.hass=window.__hass;};
 };
@@ -627,6 +627,31 @@ const PAGE=()=>{
   {const {ctx,page}=await open(IMM,{width:844,height:390});await settle(page);
    await page.evaluate(()=>window.__push([],{connected:false}));await frames(page,6);const o=await page.evaluate(EXTRA);await ctx.close();
    assert.ok(Object.values(o.tiles).every(t=>t.lines.length===0),'offline: geen dagtotalen');out.offline=true;}
+  return out;
+ });
+ await check('pil bovenaan: datum en buitentemperatuur naast de tijd (weer-entiteit, anders Cupra-buitentemperatuur; verouderd/onbekend ⇒ alleen datum; offline ⇒ niets extra)',async()=>{
+  const PILL=()=>{const sr=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot,p=sr.querySelector('.ehm-pill'),x=p.querySelector('.p-extra'),r=p.getBoundingClientRect(),xr=x?x.getBoundingClientRect():null;
+   return {text:p.textContent.replace(/\s+/g,' ').trim(),extra:x&&!x.hidden?x.textContent:null,fits:!!xr&&xr.right<=r.right+0.5&&xr.left>=r.left-0.5&&p.scrollWidth<=p.clientWidth+1,time:p.querySelector('.p-time').textContent};};
+  const date=new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const out={};
+  for(const [w,h] of [[844,390],[390,844],[1280,800]]){
+   const {ctx,page,errors}=await open(IMM,{width:w,height:h});await settle(page);const a=await page.evaluate(PILL);await ctx.close();
+   assert.equal(a.extra,date+' · 14°','datum en temperatuur '+w);assert.ok(a.fits,'past in de pil '+JSON.stringify(a));assert.match(a.time,/^\d\d:\d\d$/);assert.deepEqual(errors,[]);out[w]=a.text;
+  }
+  {const {ctx,page}=await open(IMM,{width:844,height:390});await settle(page);
+   // weer-entiteit heeft voorrang (°F wordt omgerekend)
+   await page.evaluate(()=>{const card=document.querySelector('energiehuis-card');card.config.weather='weather.thuis';const s={...window.__hass.states};const t=new Date().toISOString();s['weather.thuis']={entity_id:'weather.thuis',state:'sunny',attributes:{temperature:50,temperature_unit:'°F'},last_updated:t,last_changed:t};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+   const w=await page.evaluate(PILL);
+   // verouderde bron (4 uur) ⇒ alleen datum
+   await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,old=new Date(Date.now()-4*3600000).toISOString(),s={...window.__hass.states};s['weather.thuis']={...s['weather.thuis'],last_updated:old,last_changed:old};s[c.cupra_outside_temp]={...s[c.cupra_outside_temp],last_updated:old,last_changed:old};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+   const old=await page.evaluate(PILL);
+   // onbekende eenheid ⇒ geen temperatuur
+   await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,t=new Date().toISOString(),s={...window.__hass.states};delete s['weather.thuis'];s[c.cupra_outside_temp]={...s[c.cupra_outside_temp],state:'288',attributes:{unit_of_measurement:'K'},last_updated:t,last_changed:t};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+   const unit=await page.evaluate(PILL);
+   await page.evaluate(()=>window.__push([],{connected:false}));await frames(page,6);const off=await page.evaluate(PILL);await ctx.close();
+   assert.equal(w.extra,date+' · 10°','50 °F = 10 °C');assert.equal(old.extra,date,'verouderde bronnen: alleen datum');assert.equal(unit.extra,date,'onbekende eenheid: alleen datum');
+   assert.equal(off.extra,null,'offline: geen datum of temperatuur');
+   out.fallbacks={weerF:w.extra,oud:old.extra,eenheid:unit.extra};}
   return out;
  });
  await check('alleen-lezen: één statistiekvraag per 5 minuten (60 hass-updates ⇒ 1), geen service- of schrijfaanroepen; Net-pagina en navigatie ongewijzigd bereikbaar',async()=>{

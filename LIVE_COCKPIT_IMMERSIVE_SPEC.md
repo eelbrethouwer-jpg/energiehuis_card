@@ -110,3 +110,8 @@ Alleen actief bij `live_cockpit_immersive: true`. De Home bestaat uit de bestaan
 Tests (`tests/browser/live-cockpit-immersive.cjs`, 38 controles): vier schermmaten (844×390, 932×430, 390×844, 1280×800) op de definitieve samenstelling (dagregels, prijs, geen panelen, geen overlap met vakjes, hotspots); ontbrekende statistieken, kostensensor, sessie, kwartierdata, prijssensor en offline; één statistiekvraag per 60 hass-updates en geen servicecalls. Testdata is gesimuleerd.
 
 **Alleen te verifiëren op een echte HA/iPhone:** werkelijke statistieken (Alfen, P1, GoodWe), de betekenis van `cupra_charged_energy` en `cost_zonneplan_day`, de Zonneplan-kwartierattributen, de leesbaarheid van de kleine regels en de prijsoverlay op het scherm.
+
+### 9.1 Datum en temperatuur in de pil bovenaan
+
+Naast de tijd in de pil bovenaan de scène staan nu de datum en de buitentemperatuur (bijvoorbeeld `LIVE 09:41 | do 12 nov · 14°`). De datum komt uit de klok van het toestel. De temperatuur komt uit de optionele weer-entiteit (`weather`, attribuut `temperature`), anders uit de buitentemperatuur van de Cupra (`cupra_outside_temp`). Alleen °C en °F (omgerekend), niet ouder dan 3 uur en tussen −60 en 70 °; anders alleen de datum. Offline: geen extra tekst. De tekst "alleen-lezen" in de pil vervalt (die staat al in de appbalk). In portret loopt de pil naar links door in de lucht boven het huis. Op zeer kleine scènes (< 330 px breed) verdwijnt de extra tekst. Let op: de Cupra-temperatuur is een autosensor, geen weerstation. Voor een echte buitentemperatuur is een `weather.`-entiteit in de kaartconfiguratie beter.
+

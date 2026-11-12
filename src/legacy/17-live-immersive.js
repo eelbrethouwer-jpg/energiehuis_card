@@ -219,13 +219,29 @@ function ehImmPageHtml(card,view){
   el.replaceChildren(top);
   if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 96 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
  };
+ /** Datum en buitentemperatuur voor de pil bovenaan de scène. Temperatuur: de optionele weer-entiteit (`weather`), anders de
+  *  buitentemperatuur van de Cupra; alleen °C of °F en niet ouder dan 3 uur. Zonder bron: alleen de datum. */
+ P._ehImmPillExtra=function(m){
+  const c=this.config,h=this._hass,now=new Date();
+  let date=now.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const fresh=e=>{const t=Date.parse(e?.last_updated||e?.last_changed||'');return Number.isFinite(t)&&Date.now()-t<=3*3600000;};
+  const fromUnit=(n,u)=>{u=String(u||'').trim().toLowerCase();return n===null?null:u==='°c'||u==='c'?n:u==='°f'||u==='f'?(n-32)*5/9:null;};
+  let temp=null;
+  const w=c?.weather&&h?.states?.[c.weather];
+  if(w&&fresh(w)){
+   if(String(c.weather).startsWith('weather.'))temp=fromUnit(ehNum(w.attributes?.temperature),w.attributes?.temperature_unit||'°C');
+   else temp=fromUnit(ehNum(w.state),w.attributes?.unit_of_measurement);
+  }
+  if(temp===null){const e=c?.cupra_outside_temp&&h?.states?.[c.cupra_outside_temp];if(e&&fresh(e))temp=fromUnit(ehNum(e.state),e.attributes?.unit_of_measurement);}
+  return date+(temp!==null&&temp>-60&&temp<70?' · '+Math.round(temp)+'°':'');
+ };
  P._ehImmExtras=function(){
   if(!ehImmOn(this)||this._view!=='overview'||this._ehImmAll)return;
   this._ehImmPrice();this._ehImmLoadDay();
   // Dagregels bijwerken als een niet door de cockpit bewaakte bron (dagsensor, kosten, sessie) is gewijzigd.
   const ctl=this._ehLive?.ctl,m=ctl&&!ctl.debug.suspended?ctl.cockpit.model:null;
   if(m){
-   const sig=['pv','house','cupra','net'].map(k=>(this._ehImmTileDay(k,m)||[]).join('|')).join('#');
+   const sig=['pv','house','cupra','net'].map(k=>(this._ehImmTileDay(k,m)||[]).join('|')).join('#')+'#'+this._ehImmPillExtra(m);
    if(sig!==this._ehImmSig){this._ehImmSig=sig;ctl.cockpit.rerender();}
   }
  };

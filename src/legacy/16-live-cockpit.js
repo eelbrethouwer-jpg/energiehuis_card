@@ -879,8 +879,8 @@ const EhLiveCockpit=(function(){
     const img = el(doc, 'img', 'ehm-scene', { alt: 'Goedgekeurde avondscène: woning met zonnepanelen, houten praktijkruimte links en een groene Cupra bij de laadpaal rechts. De lichtlijnen in het beeld zijn decoratief; de ingebakken voorbeeldkaarten zijn afgedekt door ' + (LIVE ? 'live kaarten met actuele meetwaarden.' : 'live DEMO-kaarten.'), decoding: 'async', fetchpriority: 'high', draggable: 'false' });
     const particles = el(doc, 'canvas', 'ehm-particles', { 'aria-hidden': 'true' });
     const covers = el(doc, 'div', 'ehm-covers', { 'aria-hidden': 'true' });
-    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
-    const pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
+    const pill = el(doc, 'div', 'ehm-cover ehm-pill', { 'data-key': 'pill' }); pill.innerHTML = LIVE ? '<span class="p-demo p-live">LIVE</span><span class="p-text">alleen-lezen</span><span class="p-time"></span>' + (typeof options.pillExtra === 'function' ? '<span class="p-extra" hidden></span>' : '') : '<span class="p-demo">DEMO</span><span class="p-text">fictieve meetwaarden</span><span class="p-time"></span>';
+    const pillExtra = pill.querySelector('.p-extra'), pillTime = pill.querySelector('.p-time'), pillLabel = pill.querySelector('.p-demo'), pillText = pill.querySelector('.p-text');
     covers.appendChild(pill);
     const PL = {};   // lege glasvlakken (alleen in de lijstweergave zichtbaar; de lijst eronder toont de waarden)
     for (const k of KEYS) { const p = el(doc, 'div', 'ehm-cover ehm-plate', { 'data-key': k }); p.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; covers.appendChild(p); PL[k] = p; }
@@ -1097,6 +1097,8 @@ const EhLiveCockpit=(function(){
         setText(pillText, m.connected ? 'alleen-lezen' : 'geen verbinding');
         setText(pillTime, m.connected ? hhmm(m.now) : 'sinds ' + hhmm(offlineSince));
       } else setText(pillTime, hhmm(m.now));
+      // Datum en buitentemperatuur naast de tijd (immersive Home; alleen met verbinding en alleen echte waarden).
+      if (pillExtra) { const t = m.connected ? options.pillExtra(m) : ''; setText(pillExtra, t || ''); pillExtra.hidden = !t; }
       for (const [sid, b] of Object.entries(SB)) if (b.getAttribute('aria-pressed') !== String(sid === scenario)) b.setAttribute('aria-pressed', String(sid === scenario));
       setData(rootEl, 'activeScenario', scenario);
       applyRoutes();
@@ -1495,6 +1497,12 @@ const EhLiveCockpit=(function(){
   // Waarschuwing bij een tegenstrijdige meetketen blijft zichtbaar, als dunne balk bovenaan de scène.
   ':host([data-immersive]) .ehc-warn:not([hidden]){position:absolute;z-index:6;left:50%;top:6px;transform:translateX(-50%);width:max-content;max-width:min(94%,680px);margin:0;padding:.3rem .7rem;border-radius:10px;font-size:.72rem;line-height:1.3;pointer-events:none;background:rgba(40,12,12,.86)}' +
   // Dagtotalen in de vakjes: tweede, kleine regel(s) onder de livewaarde.
+  // Portret (kleine scène): de pil loopt naar links door in de lege lucht boven het huis, zodat datum en temperatuur passen.
+  ':host([data-immersive]) .ehc--master[data-layout="list"] .ehm-pill{left:50%;width:calc((var(--x) + var(--w) - .5) * 100%)}' +
+  // In de immersive Home vervangt datum + temperatuur de tekst "alleen-lezen" (die staat al in de appbalk); offline blijft zichtbaar.
+  ':host([data-immersive]) .ehm-pill:not([data-state="offline"]) .p-text{display:none}' +
+  '.ehm-pill .p-extra{margin-left:.55em;padding-left:.6em;border-left:1px solid rgba(255,255,255,.28);color:#d6e4ef;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.ehm-pill .p-extra[hidden]{display:none}' +
+  '.ehc--master[data-layout="compact"][data-density="xs"] .ehm-pill .p-extra{display:none}' +
   '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
   '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(8px,calc(var(--u) * 13px),11px);line-height:1.22;color:rgba(255,255,255,.8)}' +
   '.ehc--master[data-layout="compact"] .t-day{text-align:center;justify-items:center}' +
@@ -1577,6 +1585,7 @@ const EhLiveCockpit=(function(){
    mode: 'live', specs: adapter.specs,
    onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
    onImageLoad: immersive ? ambient : undefined,
+   pillExtra: immersive ? m => (typeof card._ehImmPillExtra === 'function' ? card._ehImmPillExtra(m) : '') : undefined,
    tileDay: immersive ? (k, m) => (typeof card._ehImmTileDay === 'function' ? card._ehImmTileDay(k, m) : null) : undefined,
    preferList: immersive ? () => host.hasAttribute('data-imm-portrait') : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
