@@ -56,21 +56,64 @@ const SETUP=([config,mode])=>{
     const m=/^media-source:\/\/media_source\/local\/(.+)$/.exec(msg.media_content_id);
     return (await fetch('/__sign?path='+encodeURIComponent('/media/local/'+m[1]))).json();
    }
-   if(msg.type==='recorder/statistics_during_period'&&window.__stats!==false){
-    // GESIMULEERDE dagstatistieken (testdata): uurbuckets vandaag; alleen aangevraagde ids.
-    const out={},start=new Date();start.setHours(0,0,0,0);
-    const per={[c.import]:.25,[c.export]:.18,[c.zonne_energie]:.6,[c.laad_energie]:.3,[c.huis_energie]:null,[c.huis]:null};
-    for(const id of msg.statistic_ids){const k=per[id];if(k==null)continue;out[id]=[];for(let i=0;i<=new Date().getHours();i++)out[id].push({start:start.getTime()+i*3600000,end:start.getTime()+(i+1)*3600000,change:k*(i%3+1)});}
+   // GESIMULEERDE HA-gegevens (testdata): consistente tellers, vaste klok, instelbare sessies, gaten en resets (window.__simCfg).
+   if(msg.type==='recorder/statistics_during_period'){
+    if(window.__stats==='throw')throw new Error('recorder niet beschikbaar');
+    if(window.__stats===false)return {};
+    const out={};
+    for(const id of msg.statistic_ids)if(window.__sim.rows[id])out[id]=window.__sim.rows[id].map(r=>({...r}));
+    return out;
+   }
+   if(msg.type==='history/history_during_period'){
+    if(window.__histFail)throw new Error('historie niet beschikbaar');
+    const out={};for(const id of msg.entity_ids)if(window.__sim.history[id])out[id]=window.__sim.history[id].map(r=>({...r}));
     return out;
    }
    return {};
   },callApi:async()=>[],callService:()=>{throw Error('Ongewenste servicecall')},hassUrl:p=>new URL(p,location.origin).toString()};
- // Gesimuleerde kwartierprijzen (Zonneplan-vorm: forecast met start_date en price) en dagsensoren.
- {const d0=new Date();d0.setHours(0,0,0,0);const fc=[];for(let i=0;i<96;i++)fc.push({start_date:new Date(d0.getTime()+i*900000).toISOString(),price_tax_included:+(0.2+0.08*Math.sin(i/9)+(i>=68&&i<80?0.07:0)).toFixed(4)});
+ // ---- gesimuleerde, onderling consistente gegevens ----
+ {
+  const cfg=window.__simCfg||{},H=3600000,t0=(()=>{const d=new Date(now);d.setHours(0,0,0,0);return d.getTime();})();
+  const full=Math.max(0,Math.floor((now-t0-600000)/H)),mH=i=>i%3+1;
+  // Tellers met een vast uurpatroon: kWh-stand F(t) = basis + k × Σ patroon.
+  const F=(meter,t)=>{const rel=Math.max(0,t-t0);const i=Math.floor(rel/H),fr=(rel-i*H)/H;let sum=0;for(let r=0;r<i;r++)sum+=mH(r);return meter.base+meter.k*(sum+mH(i)*fr);};
+  const meters={[c.import]:{base:1200,k:.25},[c.export]:{base:800,k:.18}};
+  // Alfen: segmenten [van,tot,kW] (ms); standaard een eerdere sessie vanochtend en een lopende sessie van 40 minuten.
+  const segs=cfg.alfenMin?cfg.alfenMin.map(([a,b,kw])=>[now-a*60000,now-b*60000,kw]):[...(now>t0+4*H+3600000?[[t0+2*H,t0+4*H,7.4]]:[]),[now-40*60000,now,2.98]];
+  const rawA=t=>5000+segs.reduce((a,[f,e,kw])=>a+kw*Math.max(0,Math.min(t,e)-f)/H*(t>f?1:0),0);
+  const resetT=cfg.resetMinAgo!=null?now-cfg.resetMinAgo*60000:null;
+  const A=t=>resetT!==null&&t>=resetT?rawA(t)-rawA(resetT):rawA(t);
+  const val=(id,t)=>id===c.laad_energie?A(t):F(meters[id],t);
+  const rows={};
+  for(const id of [c.import,c.export,c.laad_energie]){
+   rows[id]=[];
+   for(let j=-1;j<full;j++){
+    const st0=t0+j*H,en=st0+H,state=val(id,en),ch=j<0?0:val(id,en)-val(id,st0);
+    // HA corrigeert een tellerreset in `change`/`sum`; de `state` zakt wel.
+    rows[id].push({start:st0,end:en,state,sum:state-1000,change:Math.max(0,ch)});
+   }
+   if(cfg.gapHour!=null)rows[id]=rows[id].filter(r=>r.start!==t0+cfg.gapHour*H);
+   if(cfg.negativeHour!=null)rows[id].forEach(r=>{if(r.start===t0+cfg.negativeHour*H)r.change=-5;});
+  }
+  // Alfen-historie (compact): elke 5 minuten over 36 uur + de knikpunten van de segmenten; eerste punt met eenheid.
+  const pts=new Set();for(let t=now-36*H;t<=now;t+=5*60000)pts.add(Math.round(t));
+  for(const [f,e] of segs){pts.add(f);pts.add(e);} if(resetT!==null){pts.add(resetT-1);pts.add(resetT);} pts.add(now);
+  const hist=[...pts].filter(t=>t<=now&&t>=now-36*H).sort((x,y)=>x-y).map((t,i)=>({s:String(+A(t).toFixed(4)),lu:t/1000,...(i===0?{a:{unit_of_measurement:'kWh'}}:{})}));
+  window.__sim={rows,history:cfg.noHistory?{}:{[c.laad_energie]:hist},t0,full,
+   expected:{imp:F(meters[c.import],now)-F(meters[c.import],t0),exp:F(meters[c.export],now)-F(meters[c.export],t0),ev:A(now)-A(t0)}};
+  states[c.import]=st(c.import,+F(meters[c.import],now).toFixed(4),'kWh');states[c.export]=st(c.export,+F(meters[c.export],now).toFixed(4),'kWh');
+  states[c.laad_energie]=st(c.laad_energie,+A(now).toFixed(4),'kWh',cfg.alfenStaleMin!=null?cfg.alfenStaleMin*60:2);
+  // Zonneplan-kwartierprijzen: echte tijdstempels (92/96/100 per dag), optioneel negatief of met gaten.
+  const dayEnd=new Date(t0);dayEnd.setDate(dayEnd.getDate()+1);const nq=Math.round((dayEnd.getTime()-t0)/900000);
+  const fc=[];for(let i=0;i<nq;i++){if(cfg.quarterGaps&&i%7===3)continue;fc.push({start_date:new Date(t0+i*900000).toISOString(),price_tax_included:+((cfg.negative?-0.05:0.2)+0.08*Math.sin(i/9)+(i>=68&&i<80?0.07:0)).toFixed(4)});}
+  window.__sim.quarters=nq;window.__sim.forecast=fc;
   const cur=fc.find(q=>{const t=Date.parse(q.start_date);return now>=t&&now<t+900000;});
   states[c.prijs]={entity_id:c.prijs,state:String(cur?cur.price_tax_included:0.22),attributes:{unit_of_measurement:'EUR/kWh',forecast:fc},last_updated:iso(2),last_changed:iso(2),last_reported:iso(2)};
-  states[c.zonne_energie]=st(c.zonne_energie,12.4,'kWh');states[c.cost_zonneplan_day]=st(c.cost_zonneplan_day,0.31,'EUR',30);
-  states[c.cupra_charged_energy]=st(c.cupra_charged_energy,5.1,'kWh',60);states[c.cupra_outside_temp]=st(c.cupra_outside_temp,14.4,'°C',600);}
+  // Dagopbrengst zo dat het huis (afname − teruglevering + opwek − laden) 7,03 kWh is.
+  window.__sim.pv=+(window.__sim.expected.ev-window.__sim.expected.imp+window.__sim.expected.exp+7.03).toFixed(2);window.__sim.expected.pv=window.__sim.pv;window.__sim.expected.home=window.__sim.expected.imp-window.__sim.expected.exp+window.__sim.pv-window.__sim.expected.ev;
+  states[c.zonne_energie]=st(c.zonne_energie,window.__sim.pv,'kWh');states[c.cost_zonneplan_day]=st(c.cost_zonneplan_day,0.31,'EUR',30);
+  states[c.cupra_outside_temp]=st(c.cupra_outside_temp,14.4,'°C',600);
+ }
   card.hass=window.__hass;
  window.__push=(patch,extra={})=>{const s={...window.__hass.states};for(const [k,v,u] of patch)s[c[k]]=st(c[k],v,u||'W',0);window.__hass={...window.__hass,...extra,states:s};card.hass=window.__hass;};
 };
@@ -141,12 +184,30 @@ const PAGE=()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const base='http://127.0.0.1:'+server.address().port;
  const browser=await browserType.launch({headless:true});
+ if(SHOTS)fs.mkdirSync(SHOTS,{recursive:true});
+ // Screenshot met een duidelijke vermelding onderaan dat de data fictief is (de render zelf blijft pixel-exact).
+ const SHA=process.env.EH_SHA||(()=>{try{return require('node:child_process').execSync('git rev-parse HEAD',{cwd:path.join(__dirname,'..','..')}).toString().trim();}catch(_){return 'onbekend';}})();
+ async function shot(page,name){
+  const buf=await page.screenshot(),vp=page.viewportSize(),bar=34;
+  const stamp=await browser.newPage({viewport:{width:vp.width,height:vp.height+bar}});
+  const text='FICTIEVE TESTDATA — gesimuleerde HA-gegevens en synthetisch beeld (niet de goedgekeurde master) · '+browserType.name()+' · '+SHA.slice(0,12);
+  const url=await stamp.evaluate(async([b64,w,h,bar,text])=>{
+   const img=new Image();await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src='data:image/png;base64,'+b64;});
+   const c=document.createElement('canvas');c.width=w;c.height=h+bar;const g=c.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,w,h+bar);g.drawImage(img,0,0,w,h);
+   g.fillStyle='#b00020';g.fillRect(0,h,w,bar);g.fillStyle='#fff';g.font='bold '+Math.max(9,Math.min(13,w/52))+'px Arial,sans-serif';g.textBaseline='middle';g.fillText(text,8,h+bar/2);
+   return c.toDataURL('image/png');
+  },[buf.toString('base64'),vp.width,vp.height,bar,text]);
+  await stamp.close();
+  fs.writeFileSync(path.join(SHOTS,name),Buffer.from(url.split(',')[1],'base64'));
+ }
  console.log(browserType.name(),browser.version());
- async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null}={}){
-  const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:'Europe/Amsterdam',reducedMotion,hasTouch});
+ async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null,sim=null,time='2026-11-12T14:37:00+01:00',tz='Europe/Amsterdam'}={}){
+  const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:tz,reducedMotion,hasTouch});
   const page=await ctx.newPage();const errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/40[134]|Failed to load resource/.test(m.text()))errors.push(m.text());});
+  if(sim)await page.addInitScript(c=>{window.__simCfg=c;},sim);
   if(init)await page.addInitScript(init);
+  if(time)await page.clock.setFixedTime(new Date(time));
   await page.addInitScript(()=>{const RO=window.ResizeObserver;window.__ro=0;window.ResizeObserver=class extends RO{constructor(cb){super(cb);window.__ro++;}};});
   await page.goto(base);if(fontScale!==1)await page.addStyleTag({content:'html{font-size:'+(fontScale*100)+'%}'});await page.evaluate(SETUP,[config,mode]);
   if(wait&&config.live_cockpit===true)await page.waitForFunction(()=>{const h=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home');const e=h&&h.shadowRoot.querySelector('.ehc');return e&&e.dataset.scene!=='loading';},null,{timeout:15000});
@@ -475,7 +536,14 @@ const PAGE=()=>{
   });
   const seq=[[844,390],[390,844],[932,430],[430,932],[844,390]];
   const landed=[];
-  for(const [w,h] of seq){await page.setViewportSize({width:w,height:h});await frames(page,6);landed.push(await page.evaluate(LAND));}
+  for(const [w,h] of seq){
+   await page.setViewportSize({width:w,height:h});await frames(page,6);
+   // WebKit past de lay-out iets later toe: wachten tot de navigatie de verwachte vorm heeft (rail liggend, balk in portret).
+   let m=await page.evaluate(LAND);
+   const want=w>h&&h<=500;for(let i=0;i<60&&(m.rail!==want||m.layout!==(want?'compact':'list'));i++){await frames(page,4);m=await page.evaluate(LAND);}
+   assert.equal(m.layout,want?'compact':'list','laag na draaien naar '+w+'×'+h+' (binnen ± 4 s)');
+   landed.push(m);
+  }
   const homeEnd=await page.evaluate(()=>({view:document.querySelector('energiehuis-card')._view,dbg:document.querySelector('energiehuis-card')._ehLive.ctl.debug,ro:window.__ro-window.__ro0,net:window.__net,res:window.__resolves-window.__res0,bad:window.__bad.slice(),lay:window.__lay.slice(),same:window.__h===document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home')}));
   assert.deepEqual(homeEnd.bad,[],'flikkering/verlies');assert.equal(homeEnd.same,true);assert.equal(homeEnd.res,0,'geen nieuwe beeldaanvraag');
   assert.deepEqual(homeEnd.net,{resize:0,orient:0},'geen extra listeners');assert.equal(homeEnd.ro,0,'geen extra ResizeObservers');
@@ -549,84 +617,171 @@ const PAGE=()=>{
   return {anim,layout:m.layout};
  });
 
- // ===== Definitieve Home: scène + vakjes + kwartierprijs; dagtotalen =====
+ // ===== Definitieve Home: scène + vakjes + kwartierprijs; betrouwbare dagtotalen =====
  const EXTRA=()=>{
   const card=document.querySelector('energiehuis-card'),host=card.shadowRoot.querySelector('.eh-live-home'),sr=host.shadowRoot;
   const R=e=>{const r=e.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom,w:r.width,h:r.height};};
-  const tiles={};
-  for(const b of sr.querySelectorAll('.ehm-tiles .tile')){const d=b.querySelector('.t-day');tiles[b.dataset.key]={lines:d&&!d.hidden?[...d.querySelectorAll('span')].map(x=>x.textContent):[],shown:!!d&&!d.hidden&&d.getClientRects().length>0,aria:b.getAttribute('aria-label'),rect:R(b)};}
-  const p=sr.querySelector('.eh-price'),ehc=sr.querySelector('.ehc');
-  const H=new Date().getHours(),f=k=>{let t=0;for(let i=0;i<=H;i++)t+=k*(i%3+1);return t;};
-  return {tiles,layout:ehc.dataset.layout,
-   price:p?{state:p.dataset.state,text:p.textContent,aria:p.getAttribute('aria-label'),bars:p.querySelectorAll('rect').length,now:p.querySelectorAll('rect.now').length,rect:R(p),pe:getComputedStyle(p).pointerEvents,shown:p.getClientRects().length>0}:null,
+  const ehc=sr.querySelector('.ehc'),tiles={};
+  for(const b of sr.querySelectorAll('.ehm-tiles .tile')){
+   const d=b.querySelector('.t-day'),shown=!!d&&!d.hidden&&d.getClientRects().length>0,spans=shown?[...d.querySelectorAll('span')]:[];
+   tiles[b.dataset.key]={lines:d&&!d.hidden?[...d.querySelectorAll('span')].map(x=>x.textContent):[],shown,aria:b.getAttribute('aria-label'),rect:R(b),
+    font:shown?parseFloat(getComputedStyle(d).fontSize):null,clip:spans.some(x=>x.scrollWidth>x.clientWidth+1),inside:shown?(r=>{const t=R(b);return r.l>=t.l-.5&&r.r<=t.r+.5&&r.t>=t.t-.5&&r.b<=t.b+.5;})(R(d)):null};
+  }
+  const p=sr.querySelector('.eh-price');
+  return {tiles,layout:ehc.dataset.layout,form:ehc.dataset.layout==='list'?3:+ehc.dataset.dform,density:ehc.dataset.density,
+   price:p?{tag:p.tagName,state:p.dataset.state,slots:+p.dataset.slots,text:p.textContent,aria:p.getAttribute('aria-label'),bars:p.querySelectorAll('rect').length,now:p.querySelectorAll('rect.now').length,zero:!!p.querySelector('line.zero'),svg:p.querySelector('svg')?.innerHTML||'',rect:R(p),pe:getComputedStyle(p).pointerEvents,shown:p.getClientRects().length>0}:null,
    panels:['.ehc-head','.ehc-summary','.ehm-legend'].map(q=>{const r=sr.querySelector(q).getBoundingClientRect();return [Math.round(r.width),Math.round(r.height)];}),
-   stage:R(sr.querySelector('.ehm-stage')),ehcR:R(ehc),
-   expected:{ev:f(.3),home:f(.25)-f(.18)+f(.6)-f(.3),net:f(.25)-f(.18)},
-   statsCalls:window.__calls.filter(t=>t==='recorder/statistics_during_period').length,calls:window.__calls.slice()};
+   stage:R(sr.querySelector('.ehm-stage')),ehcR:R(ehc),sim:window.__sim&&{expected:window.__sim.expected,pv:window.__sim.pv,quarters:window.__sim.quarters},
+   calls:window.__calls.slice()};
  };
  const fmtK=n=>Math.abs(n)>=100?n.toFixed(0).replace('.',','):Math.abs(n)>=10?n.toFixed(1).replace('.',','):n.toFixed(2).replace('.',',');
- const settle=async page=>{await page.waitForFunction(()=>window.__calls.includes('recorder/statistics_during_period'),null,{timeout:10000});await frames(page,6);};
- for(const [w,h] of [[844,390],[932,430],[390,844],[1280,800]]){
-  await check(`definitieve Home ${w}×${h}: alleen scène + vakjes + kwartierprijs-overlay (geen paneel naast of onder het beeld); dagtotalen in de vakjes; kwartierprijs subtiel en zonder tikvlakken te blokkeren`,async()=>{
-   const {ctx,page,errors}=await open(IMM,{width:w,height:h});await settle(page);
+ const settle=async page=>{await page.waitForFunction(()=>window.__calls.includes('recorder/statistics_during_period'),null,{timeout:10000});await frames(page,8);};
+ /** Verwachte dagregels per vorm (3 = breed/lijst, 2 = iPhone liggend, 1 = klein, 0 = zeer klein), uit de gesimuleerde bronnen. */
+ const WANT=(e,form,sess)=>{
+  const day=['','Dag ','Vandaag: ','Vandaag: '][form],K=n=>fmtK(n)+' kWh',cost='€ 0,31';
+  const net=form>=3?['Afname: '+K(e.imp),'Teruggeleverd: '+K(e.exp),'Kosten: '+cost]:form===2?['Af '+K(e.imp).replace(' kWh','')+' · Terug '+K(e.exp),'Kosten: '+cost]:form===1?['Af '+fmtK(e.imp)+' · '+cost]:[K(e.imp)];
+  const cup=[];
+  if(form>=2){cup.push('Vandaag: '+K(e.ev));if(sess)cup.push(sess);}else if(sess)cup.push(form===1?sess.replace(': ',' '):sess.replace(/^Sessie: /,''));else cup.push(day+K(e.ev));
+  return {pv:[day+K(e.pv)],house:[day+K(e.home)],cupra:cup,net,battery:[],practice:[]};
+ };
+ const VPS2=[[844,390,2],[932,430,2],[667,375,1],[568,320,1],[420,300,0],[390,844,3],[768,1024,2],[1280,800,3]];
+ for(const [w,h,form] of VPS2){
+  await check(`definitieve Home ${w}×${h}: alleen scène + vakjes + kwartierprijs-knop; dagtotalen uit gevalideerde bronnen in de vorm voor deze breedte; ≥ 9 px, niets afgekapt, geen overlap, geen horizontale scroll`,async()=>{
+   const {ctx,page,errors}=await open(IMM,{width:w,height:h,hasTouch:true});await settle(page);
    const x=await page.evaluate(EXTRA),home=await page.evaluate(HOME);
-   if(SHOTS)await page.screenshot({path:path.join(SHOTS,`home-final-${w}x${h}-${browserType.name()}.png`)});
+   if(SHOTS)await shot(page,`home-final-${w}x${h}-${browserType.name()}.png`);
    await ctx.close();
-   const T=x.tiles;
+   const T=x.tiles,want=WANT(x.sim.expected,x.form,'Sessie: 1,99 kWh'.replace(/^Sessie: /,x.form>=2?'Sessie: ':'Sessie: '));
+   if(x.layout!=='list')assert.equal(x.form,form,'vorm voor deze breedte (stage '+Math.round(x.stage.w)+' px)');
    assert.deepEqual(x.panels.map(p=>p[0]<=1&&p[1]<=1),[true,true,true],'status/samenvatting/legenda alleen voor schermlezers');
-   assert.deepEqual(T.pv.lines,['Vandaag: 12,4 kWh']);
-   assert.deepEqual(T.house.lines,['Vandaag: '+fmtK(x.expected.home)+' kWh']);
-   assert.deepEqual(T.cupra.lines,['Vandaag: '+fmtK(x.expected.ev)+' kWh','Sessie: 5,10 kWh']);
-   assert.equal(T.net.lines.length,2);assert.equal(T.net.lines[0],'Vandaag: '+fmtK(x.expected.net)+' kWh');assert.equal(T.net.lines[1],'Kosten: € 0,31');
-   assert.deepEqual(T.practice.lines,[],'praktijkruimte: geen fictieve data');assert.deepEqual(T.battery.lines,[],'virtuele batterij: geen dagtotaal');
-   assert.match(T.battery.aria,/simulatie/i,'batterij als simulatie gelabeld');
-   assert.match(T.cupra.aria,/Vandaag: .* kWh\. Sessie: 5,10 kWh\. (Pagina openen)/,'dagtotalen in de toegankelijke naam');
-   if(w>=390)for(const k of ['pv','house','cupra','net'])assert.equal(T[k].shown,true,k+' dagregel zichtbaar');
-   assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');
-   assert.equal(x.price.state,'quarter');assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);
-   assert.ok(x.price.bars>=90&&x.price.now===1,'staafjes met precies één gemarkeerd kwartier: '+x.price.bars+'/'+x.price.now);
-   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh/);
-   assert.equal(x.price.pe,'none','overlay vangt geen aanrakingen op');
+   for(const k of ['pv','house','cupra','net','battery','practice'])assert.deepEqual(T[k].lines,want[k],k+' dagregels');
+   assert.match(T.battery.aria,/simulatie/i);assert.doesNotMatch(T.practice.aria,/\d\s?kWh/,'praktijkruimte: geen fictieve getallen');
+   for(const k of ['pv','house','cupra','net']){assert.equal(T[k].shown,true,k+' dagregel zichtbaar');assert.ok(T[k].font>=8.99,k+' tekst ≥ 9 px: '+T[k].font);assert.equal(T[k].clip,false,k+' niets afgekapt');assert.equal(T[k].inside,true,k+' dagregel binnen het vakje');}
+   assert.match(T.net.aria,/Afname vandaag: .* kWh\. Teruggeleverd vandaag: .* kWh\. Kosten vandaag: € 0,31\./,'volledige toegankelijke naam');
+   assert.match(T.cupra.aria,/Huidige laadsessie: 1,99 kWh\./);
+   assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,96);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
+   assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,96);assert.equal(x.price.pe,'auto');
+   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \(96 van 96 kwartieren bekend\)\. Tik voor het prijsoverzicht\.$/);
    if(x.layout!=='list'){
-    const p=x.price.rect;
-    for(const [k,t] of Object.entries(T)){const r=t.rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
-    assert.ok(p.l>=x.stage.l&&p.r<=x.stage.r+1&&p.b<=x.stage.b+1,'overlay binnen de scène');
-    // Geen blok onder of naast de scène: de kaart bestaat uit het beeld (de scène vult de hoogte of de breedte).
-    assert.ok(x.stage.h>=x.ehcR.h*0.8||x.stage.w>=x.ehcR.w*0.8,'scène is de enige inhoud '+JSON.stringify([x.stage,x.ehcR]));
+    const p=x.price.rect,ks=Object.keys(T);
+    for(const k of ks){const r=T[k].rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
+    for(let i=0;i<ks.length;i++)for(let j=i+1;j<ks.length;j++){const a=T[ks[i]].rect,b=T[ks[j]].rect;assert.ok(a.r<=b.l+.5||a.l>=b.r-.5||a.b<=b.t+.5||a.t>=b.b-.5,'vakjes '+ks[i]+' en '+ks[j]+' overlappen');}
+    const st=x.stage,u=(v,k)=>st[k==='x'?'l':'t']+v*(k==='x'?st.w:st.h);
+    assert.ok(p.t>=u(.8,'y'),'knop onder de auto en de kaarten (y ≥ 80 %)');assert.ok(p.l>=st.l&&p.r<=st.r+1&&p.b<=st.b+1,'knop binnen de scène');
+    assert.ok(!(p.l<u(.93,'x')&&p.r>u(.64,'x')&&p.t<u(.8,'y')&&p.b>u(.52,'y')),'knop dekt de auto niet af');
    }else assert.ok(x.price.rect.t>=x.stage.b,'portret: prijs als rij onder de vakjes');
-   assert.deepEqual(home.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlakken');assert.deepEqual(home.tiles.filter(t=>!t.covers).map(t=>t.key),[],'dekking');
+   assert.equal(home.overflow,false);assert.deepEqual(home.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlakken');assert.deepEqual(home.tiles.filter(t=>!t.covers).map(t=>t.key),[],'dekking');
    assert.deepEqual(errors,[]);
-   return {lines:Object.fromEntries(Object.entries(T).map(([k,t])=>[k,t.lines])),price:x.price.text};
+   return {form:x.form,lines:Object.fromEntries(Object.entries(T).map(([k,t])=>[k,t.lines])),font:T.net.font,price:x.price.text};
   });
  }
- await check('dagtotalen en prijs: ontbrekende data ⇒ nette fallback, geen fictieve getallen (geen statistieken, geen kostensensor, geen sessie, geen kwartierdata, geen prijssensor)',async()=>{
+ const sessLine=async(sim,time,opts={})=>{
+  const {ctx,page}=await open(IMM,{width:932,height:430,sim,time,...opts});await settle(page);
+  if(opts.afterOpen)await opts.afterOpen(page);
+  const x=await page.evaluate(EXTRA);await ctx.close();return x;
+ };
+ await check('Cupra-laadsessie uit de Alfen-teller: actief, pauze en hervatten, nieuwe sessie, over middernacht; verouderd, ontbrekend of meterreset ⇒ "niet beschikbaar" (geen schatting)',async()=>{
+  const out={},SESS=x=>x.tiles.cupra.lines.find(l=>/^Sessie/.test(l))||null,DAY=x=>x.tiles.cupra.lines.find(l=>/^Vandaag/.test(l))||null;
+  const a=await sessLine(null);assert.equal(SESS(a),'Sessie: 1,99 kWh','actieve sessie 40 min × 2,98 kW');out.actief=SESS(a);
+  assert.equal(DAY(a),'Vandaag: '+fmtK(a.sim.expected.ev)+' kWh','dagtotaal is niet de sessie (eerdere sessie vanochtend telt in het dagtotaal)');assert.notEqual(fmtK(a.sim.expected.ev),'1,99');
+  const pa=await sessLine({alfenMin:[[90,50,2.98],[20,0,2.98]]});assert.equal(SESS(pa),'Sessie: 2,98 kWh','pauze van 30 min: dezelfde sessie (40 + 20 min)');out.pauze=SESS(pa);
+  const nw=await sessLine({alfenMin:[[100,70,2.98],[20,0,2.98]]});assert.equal(SESS(nw),'Sessie: 0,99 kWh','pauze van 50 min: nieuwe sessie van 20 min');out.nieuw=SESS(nw);
+  const mid=await sessLine({alfenMin:[[55,0,2.98]]},'2026-11-13T00:25:00+01:00');
+  assert.equal(SESS(mid),'Sessie: 2,73 kWh','sessie begon 23:30, nu 00:25');assert.equal(DAY(mid),'Vandaag: 1,24 kWh','dagtotaal telt alleen vanaf middernacht (25 min)');out.middernacht=[SESS(mid),DAY(mid)];
+  const rs=await sessLine({alfenMin:[[60,0,2.98]],resetMinAgo:20});assert.equal(SESS(rs),'Sessie: niet beschikbaar','meterreset tijdens de sessie');out.reset=SESS(rs);
+  assert.match(rs.tiles.cupra.aria,/Huidige laadsessie: niet beschikbaar/);
+  const st=await sessLine({alfenStaleMin:20});assert.equal(SESS(st),'Sessie: niet beschikbaar','verouderde Alfen-stand');out.verouderd=SESS(st);
+  const nh=await sessLine({noHistory:true});assert.equal(SESS(nh),'Sessie: niet beschikbaar','ontbrekende historie');out.geenHistorie=SESS(nh);
+  const hf=await sessLine(null,undefined,{init:()=>{window.__histFail=true;}});assert.equal(SESS(hf),'Sessie: niet beschikbaar','historie niet op te halen');
+  const idle=await sessLine(null,undefined,{afterOpen:async p=>{await p.evaluate(()=>window.__push([['laden',0,'W']]));await frames(p,6);}});assert.equal(SESS(idle),null,'geen actieve laadsessie: geen sessieregel');
+  return out;
+ });
+ await check('dagtotalen met onvolledige historie: ontbrekend uur ⇒ "≥" (deels), huis "onvolledig"; tellerreset, ontbrekende of falende statistieken ⇒ geen volledig getal; offline ⇒ geen dagtotalen',async()=>{
   const out={};
-  // 1. geen recorder-statistieken
-  {const {ctx,page,errors}=await open(IMM,{width:844,height:390,init:()=>{window.__stats=false;}});await settle(page);
-   const x=await page.evaluate(EXTRA);await ctx.close();
-   assert.deepEqual(x.tiles.house.lines,[]);assert.deepEqual(x.tiles.cupra.lines,['Sessie: 5,10 kWh']);assert.deepEqual(x.tiles.net.lines,['Kosten: € 0,31']);assert.deepEqual(x.tiles.pv.lines,['Vandaag: 12,4 kWh'],'omvormer-dagsensor blijft');
-   assert.deepEqual(errors,[]);out.geenStats=Object.fromEntries(Object.entries(x.tiles).map(([k,t])=>[k,t.lines]));}
-  // 2. geen kostensensor, sessie verouderd, Cupra laadt niet
-  {const {ctx,page}=await open(IMM,{width:844,height:390});await settle(page);
-   await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states};delete s[c.cost_zonneplan_day];const o=s[c.cupra_charged_energy];const old=new Date(Date.now()-3600000).toISOString();s[c.cupra_charged_energy]={...o,last_updated:old,last_changed:old,last_reported:old};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
-   const a=await page.evaluate(EXTRA);
-   await page.evaluate(()=>window.__push([['laden',0,'W']]));await frames(page,6);const b=await page.evaluate(EXTRA);await ctx.close();
-   assert.ok(!a.tiles.net.lines.some(l=>/^Kosten/.test(l)),'geen kosten zonder sensor');assert.ok(!a.tiles.cupra.lines.some(l=>/^Sessie/.test(l)),'verouderde sessiewaarde niet tonen');
-   assert.ok(!b.tiles.cupra.lines.some(l=>/^Sessie/.test(l)),'geen sessie als er niet wordt geladen');
-   out.zonderKostenSessie={net:a.tiles.net.lines,cupra:a.tiles.cupra.lines};}
-  // 3. geen kwartierdata ⇒ uurprijs; geen prijssensor ⇒ "geen data"
-  {const {ctx,page}=await open(IMM,{width:844,height:390});await settle(page);
-   await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states};s[c.prijs]={...s[c.prijs],state:'0.21',attributes:{unit_of_measurement:'EUR/kWh'}};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
-   const h1=await page.evaluate(EXTRA);
-   await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states};delete s[c.prijs];window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
-   const n=await page.evaluate(EXTRA);await ctx.close();
-   assert.equal(h1.price.state,'hour');assert.match(h1.price.text,/Uurprijs/);assert.match(h1.price.text,/€ 0,210/);assert.equal(h1.price.bars,0,'geen staafjes zonder kwartierdata');assert.match(h1.price.aria,/Geen kwartierdata/);
-   assert.equal(n.price.state,'none');assert.match(n.price.text,/Kwartierprijs.*geen data/);assert.equal(n.price.bars,0);
-   out.prijs={uur:h1.price.text,geen:n.price.text};}
-  // 4. offline: geen dagtotalen (geen verouderde getallen als actueel)
-  {const {ctx,page}=await open(IMM,{width:844,height:390});await settle(page);
-   await page.evaluate(()=>window.__push([],{connected:false}));await frames(page,6);const o=await page.evaluate(EXTRA);await ctx.close();
-   assert.ok(Object.values(o.tiles).every(t=>t.lines.length===0),'offline: geen dagtotalen');out.offline=true;}
+  const g=await sessLine({gapHour:5});
+  assert.match(g.tiles.net.lines[0],/^Af ≥ [\d,]+ · Terug ≥ [\d,]+ kWh$/);assert.match(g.tiles.cupra.lines[0],/^Vandaag: ≥ [\d,]+ kWh$/);assert.deepEqual(g.tiles.house.lines,['Vandaag: onvolledig']);assert.deepEqual(g.tiles.pv.lines,['Vandaag: '+fmtK(g.sim.pv)+' kWh'],'dagsensor omvormer blijft volledig');
+  assert.match(g.tiles.net.aria,/gedeeltelijk gemeten, minstens/);out.gat=[g.tiles.net.lines[0],g.tiles.house.lines[0]];
+  const wide=await sessLine({gapHour:5},undefined,{width:1280,height:800});
+  const n=await sessLine({negativeHour:6});assert.match(n.tiles.net.lines[0],/≥/,'tellerreset/negatieve uurwaarde: ondergrens');assert.deepEqual(n.tiles.house.lines,['Vandaag: onvolledig']);
+  const hasEv=a=>a.tiles.cupra.lines.some(l=>/^Vandaag/.test(l));
+  for(const [name,init] of [['statistieken leeg',()=>{window.__stats=false;}],['statistieken falen',()=>{window.__stats='throw';}]]){
+   const x=await sessLine(null,undefined,{init});
+   assert.equal(hasEv(x),false,name);assert.deepEqual(x.tiles.house.lines,['Vandaag: onvolledig'],name+': huis kan niet worden bepaald');assert.ok(!x.tiles.net.lines.some(l=>/^Af|Afname/.test(l)),name+': geen afname');assert.deepEqual(x.tiles.pv.lines,['Vandaag: '+fmtK(x.sim.pv)+' kWh'],name+': dagsensor');assert.deepEqual(x.tiles.net.lines,['Kosten: € 0,31']);out[name]=true;
+  }
+  const off=await sessLine(null,undefined,{afterOpen:async p=>{await p.evaluate(()=>window.__push([],{connected:false}));await frames(p,6);}});
+  assert.ok(Object.values(off.tiles).every(t=>t.lines.length===0),'offline: geen dagtotalen');out.offline=true;
+  return out;
+ });
+ await check('kwartierprijs: 92/96/100 kwartieren (zomer-/wintertijd) op echte tijdstempels, negatieve prijzen met nulbasislijn, ontbrekende kwartieren blijven leeg, uurprijs- en geen-data-fallback; gewijzigde forecast rendert opnieuw',async()=>{
+  const out={};
+  for(const [time,n] of [['2026-03-29T14:37:00+02:00',92],['2026-11-12T14:37:00+01:00',96],['2026-10-25T14:37:00+01:00',100]]){
+   const x=await sessLine(null,time);
+   assert.equal(x.price.slots,n,time);assert.equal(x.sim.quarters,n);assert.equal(x.price.bars,n,'één staaf per kwartier');assert.equal(x.price.now,1);assert.match(x.price.aria,new RegExp('\\('+n+' van '+n+' kwartieren bekend\\)'));
+   assert.ok(x.price.svg.includes('class="nowline"'));out[n]=x.price.bars;
+  }
+  const neg=await sessLine({negative:true});assert.equal(neg.price.zero,true,'nulbasislijn bij negatieve prijzen');assert.match(neg.price.text,/€ 0,\d{3}|−€ 0,\d{3}/);assert.match(neg.price.aria,/laagste −€ 0,/);
+  const gaps=await sessLine({quarterGaps:true});assert.equal(gaps.price.bars,96-Math.ceil((96-3)/7),'ontbrekende kwartieren blijven leeg (geen interpolatie)');assert.match(gaps.price.aria,/kwartieren bekend/);
+  // gewijzigde forecast (zelfde aantal kwartieren, één toekomstige prijs anders) ⇒ nieuwe render
+  const {ctx,page}=await open(IMM,{width:932,height:430});await settle(page);
+  const before=await page.evaluate(EXTRA);
+  await page.evaluate(()=>{const c=document.querySelector('energiehuis-card').config,s={...window.__hass.states},e=s[c.prijs],fc=e.attributes.forecast.map((q,i)=>i===85?{...q,price_tax_included:+(q.price_tax_included+0.05).toFixed(4)}:q);s[c.prijs]={...e,attributes:{...e.attributes,forecast:fc}};window.__hass={...window.__hass,states:s};document.querySelector('energiehuis-card').hass=window.__hass;});await frames(page,6);
+  const after=await page.evaluate(EXTRA);await ctx.close();
+  assert.notEqual(before.price.svg,after.price.svg,'gewijzigde toekomstige prijs ⇒ grafiek opnieuw gerenderd');assert.equal(after.price.bars,96);
+  out.update=true;return out;
+ });
+ await check('kwartierprijs-knop: tik, klik en toetsenbord (Enter/Space) openen het bestaande prijsoverzicht (Slim laden); ≥ 44×44, bereikbaar en onbedekt op 320/390/430/844/932; terug naar Home met focus op de knop',async()=>{
+  const out={};
+  for(const [w,h] of [[320,568],[390,844],[430,932],[844,390],[932,430]]){
+   for(const input of ['pointer','touch','keys']){
+    const {ctx,page,errors}=await open(IMM,{width:w,height:h,hasTouch:input==='touch'});await settle(page);
+    const t=await page.evaluate(()=>{
+     const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,host=root.querySelector('.eh-live-home'),sr=host.shadowRoot,el=sr.querySelector('.eh-price');
+     const nb=root.querySelector('.shell > .nav').getBoundingClientRect(),limit=Math.min(innerHeight,nb.width<innerWidth*.5?innerHeight:nb.top);
+     let r=el.getBoundingClientRect();if(r.top<0||r.bottom>limit){window.scrollBy({top:r.top+r.height/2-limit/2,behavior:'instant'});r=el.getBoundingClientRect();}
+     const deep=(x,y)=>{let e=document.elementFromPoint(x,y);for(let i=0;i<4&&e&&e.shadowRoot;i++){const n=e.shadowRoot.elementFromPoint(x,y);if(!n||n===e)break;e=n;}return e;};
+     const cx=r.left+r.width/2,cy=r.top+r.height/2,pts=[[cx,cy],[cx-20,cy-20],[cx+20,cy-20],[cx-20,cy+20],[cx+20,cy+20]];
+     return {x:cx,y:cy,w:r.width,h:r.height,inView:r.top>=0&&r.bottom<=limit+.5&&r.left>=0&&r.right<=innerWidth,hit:pts.every(([a,b])=>{const e=deep(a,b);return !!e&&(e===el||el.contains(e));})};
+    });
+    assert.ok(t.w>=44&&t.h>=44,`tikvlak ${Math.round(t.w)}×${Math.round(t.h)} op ${w}×${h}`);assert.ok(t.inView,'zichtbaar op '+w+'×'+h);assert.ok(t.hit,'niet bedekt door nav/hotspots op '+w+'×'+h);
+    if(input==='pointer')await page.mouse.click(t.x,t.y);
+    else if(input==='touch')await page.touchscreen.tap(t.x,t.y);
+    else{await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.eh-price').focus());await page.keyboard.press(w===390?'Space':'Enter');}
+    await frames(page,5);
+    const v=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;return {view:c._view,price:!!r.querySelector('.cupra-price-bars'),title:r.querySelector('h2')?.textContent,back:r.querySelector('.back-button[data-eh-page="overview"]')?.getAttribute('aria-label'),from:c._ehImmFrom};});
+    assert.equal(v.view,'charge',`${input} ${w}×${h}`);assert.equal(v.price,true,'bestaand prijsoverzicht (kwartierprijzen) zichtbaar');assert.equal(v.title,'Slim laden');assert.equal(v.from,'price');
+    await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-navitem[data-eh-page="overview"]').click());await frames(page,6);
+    const back=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),sr=c.shadowRoot.querySelector('.eh-live-home')?.shadowRoot;return {view:c._view,focus:sr?.activeElement?.className||null,suspended:c._ehLive.ctl.debug.suspended};});
+    assert.equal(back.view,'overview');assert.equal(back.focus,'eh-price','focus terug op de prijsknop');assert.equal(back.suspended,false);
+    await ctx.close();assert.deepEqual(errors,[]);
+   }
+   out[w+'x'+h]=true;
+  }
+  return out;
+ });
+ await check('alleen-lezen: één statistiekvraag en één historievraag (laden) per 150 s–5 min (60 hass-updates ⇒ 1 + 1), geen service- of schrijfaanroepen; Net-pagina en navigatie ongewijzigd bereikbaar',async()=>{
+  const {ctx,page,errors}=await open(IMM,{width:844,height:390});await settle(page);
+  for(let i=0;i<60;i++){await page.evaluate(i=>window.__push([['net',-380-i,'W'],['zonnepanelen',4820+i,'W']]),i);}
+  await frames(page,6);await clickTile(page,'net');await frames(page,4);const v=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);
+  const x=await page.evaluate(()=>({stats:window.__calls.filter(t=>t==='recorder/statistics_during_period').length,hist:window.__calls.filter(t=>t==='history/history_during_period').length,other:window.__calls.filter(t=>!['media_source/resolve_media','recorder/statistics_during_period','history/history_during_period'].includes(t))}));
+  await ctx.close();
+  assert.equal(v,'grid');assert.equal(x.stats,1,'één gedeelde statistiekvraag');assert.equal(x.hist,1,'één historievraag voor de sessie');assert.deepEqual(x.other,[],'geen servicecalls of andere aanroepen');assert.deepEqual(errors,[]);
+  return x;
+ });
+ await check('prijs- en kostenfallbacks: geen kwartierdata ⇒ uurprijs, geen prijssensor ⇒ "geen data", kostensensor ontbreekt/verouderd/onbekende eenheid ⇒ geen kostenregel (nooit € 0)',async()=>{
+  const out={};
+  const mutate=async(fn,time)=>{const {ctx,page}=await open(IMM,{width:932,height:430,time});await settle(page);await page.evaluate(fn);await frames(page,8);const x=await page.evaluate(EXTRA);await ctx.close();return x;};
+  const hour=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states};s[c.prijs]={...s[c.prijs],state:'0.21',attributes:{unit_of_measurement:'EUR/kWh'}};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  assert.equal(hour.price.state,'hour');assert.match(hour.price.text,/Uurprijs/);assert.match(hour.price.text,/€ 0,210/);assert.equal(hour.price.bars,0,'geen staafjes zonder kwartierdata (geen 4 gekopieerde kwartieren)');assert.match(hour.price.aria,/Geen kwartierdata/);
+  const none=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states};delete s[c.prijs];window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  assert.equal(none.price.state,'none');assert.match(none.price.text,/Kwartierprijs.*geen data/);assert.equal(none.price.bars,0);
+  const few=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states},e=s[c.prijs];s[c.prijs]={...e,attributes:{...e.attributes,forecast:e.attributes.forecast.slice(40,45)}};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  assert.equal(few.price.state,'hour','te weinig kwartieren (5) ⇒ geen grafiek');
+  const costOf=x=>x.tiles.net.lines.some(l=>/Kosten/.test(l));
+  const noCost=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states};delete s[c.cost_zonneplan_day];window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  const stale=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states},old=new Date(Date.now()-30*3600000).toISOString();s[c.cost_zonneplan_day]={...s[c.cost_zonneplan_day],last_updated:old,last_changed:old};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  const cents=await mutate(()=>{const card=document.querySelector('energiehuis-card'),c=card.config,s={...window.__hass.states};s[c.cost_zonneplan_day]={...s[c.cost_zonneplan_day],attributes:{unit_of_measurement:'ct'}};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});
+  assert.deepEqual([costOf(noCost),costOf(stale),costOf(cents)],[false,false,false]);
+  out.prijs={uur:hour.price.text,geen:none.price.text};out.kosten='verborgen bij ontbrekend, verouderd en onbekende eenheid';
   return out;
  });
  await check('pil bovenaan: datum en buitentemperatuur naast de tijd (weer-entiteit, anders Cupra-buitentemperatuur; verouderd/onbekend ⇒ alleen datum; offline ⇒ niets extra)',async()=>{
@@ -654,16 +809,6 @@ const PAGE=()=>{
    out.fallbacks={weerF:w.extra,oud:old.extra,eenheid:unit.extra};}
   return out;
  });
- await check('alleen-lezen: één statistiekvraag per 5 minuten (60 hass-updates ⇒ 1), geen service- of schrijfaanroepen; Net-pagina en navigatie ongewijzigd bereikbaar',async()=>{
-  const {ctx,page,errors}=await open(IMM,{width:844,height:390});await settle(page);
-  for(let i=0;i<60;i++){await page.evaluate(i=>window.__push([['net',-380-i,'W'],['zonnepanelen',4820+i,'W']]),i);}
-  await frames(page,6);await clickTile(page,'net');await frames(page,4);const v=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);
-  const x=await page.evaluate(()=>({stats:window.__calls.filter(t=>t==='recorder/statistics_during_period').length,other:window.__calls.filter(t=>!['media_source/resolve_media','recorder/statistics_during_period','history/history_during_period'].includes(t))}));
-  await ctx.close();
-  assert.equal(v,'grid');assert.equal(x.stats,1,'één statistiekvraag');assert.deepEqual(x.other,[],'geen servicecalls of andere aanroepen');assert.deepEqual(errors,[]);
-  return x;
- });
-
  await check('toetsenbord en VoiceOver-semantiek: Tab naar kaart, Enter ⇒ pagina met focus op de kop; Enter op "Terug naar Home" ⇒ focus terug op de kaart',async()=>{
   const {ctx,page,errors}=await open(IMM,{width:1280,height:800});
   let key=null;

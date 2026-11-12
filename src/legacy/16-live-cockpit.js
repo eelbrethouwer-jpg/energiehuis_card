@@ -1036,7 +1036,15 @@ const EhLiveCockpit=(function(){
       }
       const r = stage.getBoundingClientRect();
       sw = r.width; sh = r.height;
-      rootEl.dataset.density = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      const dens = sw >= 560 ? 'mid' : sw >= 330 ? 'small' : 'xs';
+      rootEl.dataset.density = dens;   // xs: zeer kleine scène (bijv. liggend in de immersive Home)
+      // De dagregels hebben vier vormen (≥ 800, ≥ 560, ≥ 330 en kleiner): bij een andere vorm de kaartteksten opnieuw bepalen.
+      if (typeof options.tileDay === 'function') {
+        const form = String(sw >= 800 ? 3 : sw >= 560 ? 2 : sw >= 330 ? 1 : 0);
+        const formChanged = rootEl.dataset.dform !== form;
+        rootEl.dataset.dform = form;
+        if (formChanged && model) render();
+      }
       rootEl.style.setProperty('--u', (sw / (sceneOk ? S.image.natural.w : 1330)).toFixed(4));
       dpr = Math.min(2, win.devicePixelRatio || 1);
       particles.width = Math.max(1, Math.round(sw * dpr)); particles.height = Math.max(1, Math.round(sh * dpr));
@@ -1068,11 +1076,12 @@ const EhLiveCockpit=(function(){
         const sub = k === 'net' ? NP.sub : d.sub, dir = k === 'net' ? NP.direction : 'none';
         setText(N.sub, sub);
         // Dagtotalen (immersive Home): korte tweede regel onder de livewaarde; leeg ⇒ verborgen. Alleen tekst, geen aannames.
-        const dl = N.day ? options.tileDay(k, m) : null;
-        const dayKey = dl && dl.length ? dl.join('\n') : '';
+        const dr = N.day ? options.tileDay(k, m, layout === 'list' ? 1000 : sw) : null;              // {lines, aria} (of null)
+        const dl = dr && Array.isArray(dr.lines) ? dr.lines : [], da = dr && Array.isArray(dr.aria) ? dr.aria : dl;
+        const dayKey = dl.length ? dl.join('\n') : '';
         if (N.day && (N.day.dataset.k || '') !== dayKey) {
           N.day.dataset.k = dayKey;
-          N.day.replaceChildren(...(dl || []).map(t => { const sp = doc.createElement('span'); sp.textContent = t; return sp; }));
+          N.day.replaceChildren(...dl.map(t => { const sp = doc.createElement('span'); sp.textContent = t; return sp; }));
           N.day.hidden = !dayKey;
         }
         let extra = k === 'cupra' ? 'Accu ' + d.soc : k === 'battery' ? 'Simulatie' : (d.tone === 'sim' ? 'Simulatie' : '');
@@ -1082,7 +1091,7 @@ const EhLiveCockpit=(function(){
         if (k === 'net') { setData(N.b, 'direction', dir); setData(PL[k], 'direction', dir); }
         const nd = k === 'net' && netActive && NET_DIR[d.direction] ? ', ' + NET_DIR[d.direction].name + ' (' + NET_DIR[d.direction].text + ')' : '';
         const al = k === 'net' && NP.unconfirmed ? `${d.title}: ${shown}, ${NP.label}. ${NAV ? 'Pagina openen.' : 'Details openen.'}` : `${d.title}: ${shown}${nd}${k === 'cupra' ? ', accu ' + d.soc : ''}${k === 'battery' ? ', simulatie' : ''}. ${sub}. ${NAV ? 'Pagina openen.' : 'Details openen.'}`;
-        const alDay = dayKey ? al.replace(/ (Pagina openen|Details openen)\.$/, ' ' + dl.join('. ') + '. $1.') : al;
+        const alDay = da.length ? al.replace(/ (Pagina openen|Details openen)\.$/, ' ' + da.join(' ') + ' $1.') : al;
         if (N.b.getAttribute('aria-label') !== alDay) N.b.setAttribute('aria-label', alDay);
       }
       const hhmm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
@@ -1504,21 +1513,24 @@ const EhLiveCockpit=(function(){
   '.ehm-pill .p-extra{margin-left:.55em;padding-left:.6em;border-left:1px solid rgba(255,255,255,.28);color:#d6e4ef;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.ehm-pill .p-extra[hidden]{display:none}' +
   '.ehc--master[data-layout="compact"][data-density="xs"] .ehm-pill .p-extra{display:none}' +
   '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-  '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(8px,calc(var(--u) * 13px),11px);line-height:1.22;color:rgba(255,255,255,.8)}' +
+  '.ehc--master[data-layout="list"] .t-day span{white-space:normal;overflow:visible}' +
+  '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2;color:rgba(255,255,255,.86);letter-spacing:-.01em}' +
   '.ehc--master[data-layout="compact"] .t-day{text-align:center;justify-items:center}' +
   // Met een dagregel is de oude ondertitel overbodig (tenzij de meting afwijkt: dan blijft de reden zichtbaar); de batterij toont al "Simulatie".
   ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile:not([data-tone="warn"]):not([data-tone="bad"]) .t-day:not([hidden]) ~ .t-sub,:host([data-immersive]) .ehc--master:not([data-layout="list"]) .tile[data-key="battery"] .t-sub{display:none}' +
-  '.ehc--master[data-layout="compact"][data-density="xs"] .t-day{display:none}' +
   // Vakjes met dagtotalen krijgen iets meer hoogte (naar beneden), nog steeds over de afgedekte ingebakken kaart heen.
   ':host([data-immersive]) .ehc--master:not([data-layout="list"]) .ehm-tiles .tile{top:calc((var(--y) - .012) * 100%);height:calc((var(--h) + .046) * 100%)}' +
+  // Net-vakje (breedte van de scène 560–800 px, bijv. iPhone liggend): iets breder naar links voor "Af x · Terug y kWh".
+  ':host([data-immersive]) .ehc--master[data-dform="2"]:not([data-layout="list"]) .ehm-tiles .tile[data-key="net"]{left:calc((var(--x) - .07) * 100%);width:calc((var(--w) + .07) * 100%)}' +
   // Kwartierprijs-overlay (subtiel, nooit een tikvlak): rechtsonder op de scène; in de lijstweergave (portret) een rij onderaan de vakjes.
-  '.eh-price{position:absolute;z-index:4;pointer-events:none;left:62.5%;right:1.5%;bottom:2.2%;padding:calc(var(--u) * 8px) calc(var(--u) * 12px);border-radius:calc(var(--u) * 16px);background:rgba(8,16,28,.58);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.13);color:#e8f2fa;font-size:clamp(8px,calc(var(--u) * 13px),11px);line-height:1.2}' +
+  '.eh-price{appearance:none;font-family:inherit;text-align:left;cursor:pointer;display:block;box-sizing:border-box;min-width:44px;min-height:44px;position:absolute;z-index:4;pointer-events:auto;left:62.5%;right:1.5%;bottom:2.2%;padding:calc(var(--u) * 8px) calc(var(--u) * 12px);border-radius:calc(var(--u) * 16px);background:rgba(8,16,28,.58);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.13);color:#e8f2fa;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2}' +
+  '.eh-price:hover{border-color:rgba(255,255,255,.3)}.eh-price:focus-visible{outline:2px solid #76c1ef;outline-offset:2px}' +
   '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
-  '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line{stroke:#5fe7a0;stroke-width:.5;opacity:.9}' +
+  '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
   '.eh-price[data-state="none"] .eh-price-now{font-size:1em;font-weight:600;opacity:.8}' +
   '.ehc--master[data-layout="list"] .eh-price{position:static;grid-column:1 / -1;padding:.55rem .8rem;border-radius:.95rem;font-size:.8rem;background:color-mix(in srgb,var(--bg-2) 80%,transparent)}' +
   '.ehc--master[data-layout="list"] .eh-price-bars{height:34px;max-height:none}' +
-  '.ehc--master[data-layout="compact"][data-density="xs"] .eh-price-bars{display:none}' +
+  '' +
   // Portret (data-imm-portrait, gezet door measure()): volle-breedte scène bovenaan, routekaarten (2 kolommen vanaf 21rem)
   // eronder als glas over dezelfde vervaagde master; glasvlakken op de scène zijn tikvlakken (≥44 px).
   ':host([data-imm-portrait]){margin:0 -6px}' +
@@ -1586,7 +1598,7 @@ const EhLiveCockpit=(function(){
    onTileNavigate: immersive ? key => { if (typeof card._ehImmNavigate === 'function') card._ehImmNavigate(key); } : undefined,
    onImageLoad: immersive ? ambient : undefined,
    pillExtra: immersive ? m => (typeof card._ehImmPillExtra === 'function' ? card._ehImmPillExtra(m) : '') : undefined,
-   tileDay: immersive ? (k, m) => (typeof card._ehImmTileDay === 'function' ? card._ehImmTileDay(k, m) : null) : undefined,
+   tileDay: immersive ? (k, m, sw) => (typeof card._ehImmTileDay === 'function' ? card._ehImmTileDay(k, m, sw) : null) : undefined,
    preferList: immersive ? () => host.hasAttribute('data-imm-portrait') : undefined,
    resolveImage: norm.image ? () => resolveImage(norm.image) : () => null,
    imageMissingText: norm.image ? 'Beeld niet beschikbaar — alleen interface' : 'Geen beeld geconfigureerd (live_cockpit_image) — alleen interface'
