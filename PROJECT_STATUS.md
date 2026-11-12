@@ -2,17 +2,19 @@
 
 ## Actuele status — 12 november 2026
 
-Releasevoorbereiding v1.29.0: integratie van PR #58–#61 (feature-HEAD `1cef137a3cdc333339804696bd7270c4349f3d54`), eigenaar heeft expliciet opdracht tot merge en release gegeven na positieve beoordeling van de eigen HA-testvariant. Gebouwd: ja op releasebranch. Automatisch getest: feature 417/417 per tijdzone en 48/48 Chromium; release-HEAD moet eigen CI doorlopen. Praktisch getest: gerichte eigenaarstest, met eerder gemeld flikkeren nu volgens eigenaar verdwenen; geen volledige fysieke acceptatie geclaimd. Gepubliceerd: nog niet voor v1.29.0. De bestaande v1.28.0 blijft beschikbaar tot geslaagde handmatige publicatie.
+- Geïntegreerde features: PR #58–#61 via PR #61, mergecommit `3af12c943c16db7e51ca6fdffe82aa356d4aa709`.
+- Releasevoorbereiding: PR #62, HEAD `03bbf9495db1e4611bca5f3a2d5f6f24646ef262`, main-mergecommit `f97c8f03b66b8427e3ed784109e194f2f151a6ea`.
+- Gebouwd: ja, standaard HACS-bundel met interne versie en kaartkiezernaam v1.29.0. Geen preview/testregistratie opgenomen in productie.
+- Automatisch getest: release-inhoud lokaal 420/420 Node-tests in UTC en Europe/Amsterdam; alle vijf CI-jobs op release-HEAD groen, inclusief de bestaande browserregressies, immersive Chromium/WebKit en screenshotcontrole. De handmatige publicatierun heeft dezelfde main-mergecommit opnieuw volledig gevalideerd, inclusief Chromium/WebKit, vóór tag/release. In de aparte automatische main-run werd bij één WebKit-lifecyclecontrole de pagina/browser gesloten (47/48); dezelfde volledige suite slaagde in de release-PR en publicatierun. Alleen de mislukte main-browserjob is opnieuw gestart, zonder codewijzigingen; zie [de run](https://github.com/eelbrethouwer-jpg/energiehuis_card/actions/runs/43303747268).
+- Praktisch getest: eigenaar beoordeelde de code-equivalente testvariant positief in eigen HA/iPhone en meldde dat het flikkeren verdwenen lijkt. Geen volledige fysieke acceptatie geclaimd; model/iOS/VoiceOver en niet-observeerbare laadpauzes zijn niet volledig vastgelegd.
+- Gepubliceerd: ja: [v1.29.0](https://github.com/eelbrethouwer-jpg/energiehuis_card/releases/tag/v1.29.0), gepubliceerd op 12 november 2026 om 21:54 CET. Tag verwijst naar `f97c8f03b66b8427e3ed784109e194f2f151a6ea`. De [handmatige publicatierun](https://github.com/eelbrethouwer-jpg/energiehuis_card/actions/runs/43303763456) is volledig geslaagd, inclusief validate en publish.
+- Toestemming: eigenaar heeft expliciet gevraagd de wijziging live te zetten; merge en release zijn binnen die opdracht uitgevoerd.
+- Nieuwe weergave: landscape Home, stabiele meetupdates, conservatieve sessietotalen, morgenprijzen en optionele alleen-lezen HA-laadplanning volgens de aangeleverde ApexCharts-YAML.
+- Geen nieuwe HA-servicecalls, opslagkeys, entiteitsmigraties of wijzigingen aan Alfen-bediening, 1×40 A en Active Load Balancing.
 
-Nieuwe aanvraag: kwartierprijzen van morgen op Home. Branch `feature/immersive-tomorrow-prices` bouwt voort op PR #60 HEAD `784994c7d9f291cdc889cc2d6d5bc94ed8270634`. Alleen echte forecastprijzen worden toegevoegd; de eigenaar heeft package én kaart-YAML aangeleverd en de optionele alleen-lezen HA-laadplanning is toegevoegd op basis van dezelfde bestaande helpers. Gebouwd op de featurebranch, automatische controles in uitvoering, niet praktisch getest of gepubliceerd.
+Na HACS-update: normale resource en `type: custom:energiehuis-card` gebruiken. Bestaande sensoren en beveiligde Media Source-afbeelding behouden. Optioneel `live_cockpit_immersive: true`, `live_cockpit_planning: true` en expliciete `kwartier_forecast` uit de eigen installatie. Planning is geen bevestiging van daadwerkelijk laden. Bij schaarse historie kan de sessie niet beschikbaar blijven. De aparte `/local/eh-pr59.js` en `custom:energiehuis-card-pr59-test` zijn uitsluitend testvarianten. Terugval via HACS v1.28.0 of de immersive-optie uitzetten.
 
-Praktijkbevinding: de testkaart werkt in kiosk/paneelweergave, maar de eigenaar meldt flikkeren bij veranderende meetwaarden. Vervolgfix `fix/immersive-live-update-flicker` bouwt voort op PR #59 HEAD `be2f2b943b7ddb77baa42eb135ab33084cea44b4` en houdt de zichtbare Home-shell verbonden tijdens meetupdates. De fix moet opnieuw fysiek worden getest voordat merge/release worden afgerond.
-
-- Gecontroleerde `main`: `cd38a2ecd4fcf9d544c2badc435c623a7b429b45`; v1.28.0 is gepubliceerd.
-- PR #58: draft, beoordeelde HEAD `d140a0c7f0ecd8d733b0ffc2d306027d94dd428e`; CI 5/5 groen.
-- Reviewfix op `fix/live-cockpit-sparse-session`, gebaseerd op die PR-HEAD: onzekere sessiegrens bij schaarse tellerhistorie geeft geen bevestigd kWh-totaal. Deze correctie wordt apart aangeboden aan de featurebranch.
-- Gebouwd: ja, bron en gegenereerde bundel op de fixbranch. Automatische testresultaten staan bij de fix-PR; echte iPhone/HA-praktijktest: niet uitgevoerd. De correctie is niet gepubliceerd.
-- Vervolg: herreview van de fix en PR #58, daarna echte iPhone/HA-praktijktest. Merge en release blijven afzonderlijke eigenaarsbesluiten.
+---
 
 ## Historische status — 10 november 2026
 
