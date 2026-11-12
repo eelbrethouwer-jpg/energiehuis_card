@@ -443,6 +443,18 @@ function ehImmDayLines(key,d,extra,sw){
  };
  P._render=function(){
   const on=ehImmOn(this);
+  // Meetupdates op de zichtbare Home mogen de shell (en daarmee de compositorlaag van de scène)
+  // niet loskoppelen. Alleen gewijzigde UI/configuratie vraagt de bestaande volledige renderketen.
+  const homeKey=()=>JSON.stringify([this.config,this._eh19Density,!!this._eh26MenuOpen,eh19ConnectionState(this._hass,window)]);
+  const ctl=this._ehLive?.ctl;
+  if(on&&this._hass&&this._view==='overview'&&!this._ehImmAll&&!this._detail&&
+     !this._ehImmFocus&&!this._eh26RestoreFocus&&ctl&&!ctl.debug.suspended&&!ctl.debug.destroyed&&
+     ctl.host.isConnected&&this.shadowRoot?.querySelector('.shell.eh-imm-home')&&
+     this._ehImmHomeKey===homeKey()){
+   ctl.update(this._hass,false);
+   return;
+  }
+  this._ehImmHomeKey=null;
   // Opt-in uitgezet terwijl een immersive pagina open stond: veilig terug naar Home.
   if(!on&&EH_IMM_VIEWS[this._view]){this._view='overview';this._detail=null;}
   if(!on)this._ehImmAll=false;
@@ -522,5 +534,6 @@ function ehImmDayLines(key,d,extra,sw){
    const tile=this._ehLive?.ctl?.cockpit?.el?.querySelector(this._ehImmFrom==='price'?'.eh-price':'.tile[data-key="'+this._ehImmFrom+'"]');
    if(tile)tile.focus({preventScroll:true});
   }
+  if(view==='overview'&&live&&!this._ehImmAll)this._ehImmHomeKey=homeKey();
  };
 })();

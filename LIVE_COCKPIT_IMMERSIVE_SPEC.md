@@ -137,3 +137,9 @@ Naast de tijd in de pil bovenaan de scène staan nu de datum en de buitentempera
 **Screenshots in CI.** De workflow bewaart de Home-screenshots (844×390, 932×430, 390×844 en 1280×800, in Chromium en WebKit, plus extra maten) als artifact `home-screenshots-fictive-data`, controleert dat de vier verplichte bestanden bestaan en zet op elke PNG een rode balk dat de data fictief is (gesimuleerde HA-gegevens en een synthetisch beeld, niet de goedgekeurde master) met de commit-SHA.
 
 Tests: `tests/v128-immersive-day-session-price.test.cjs` (25 Node-tests, UTC en Europe/Amsterdam, DST via `process.env.TZ`) en `tests/browser/live-cockpit-immersive.cjs` (47 controles). De browsertests draaien met een vaste klok (`page.clock.setFixedTime`) en een consistente gesimuleerde HA (tellers, historie, sessies, gaten, resets).
+
+## 11. Praktijkfix: flikkeren bij meetupdates
+
+Op de iPhone is flikkeren gemeld zodra een meetwaarde verandert. De bestaande renderketen verving de buitenste shadow-DOM en plaatste dezelfde cockpit terug; behoud van alleen de cockpit/afbeeldingsidentiteit voorkwam die tijdelijke loskoppeling niet.
+
+Bij een bestaande, actieve immersive Home verversen meetupdates nu alleen het cockpitmodel en de extra gegevens. De shell blijft verbonden. Navigatie, configuratie, dichtheid, menu en verbindingstatus van de werkbalk gebruiken bij wijziging de volledige renderketen. Andere schermen en de uitgeschakelde opt-in behouden hun renderpad. De lifecycle-browsercontrole observeert expliciet verwijderingen en controleert de shell-identiteit tijdens 60 meetupdates; navigatie heen en terug blijft onderdeel van dezelfde controle. Dit moet opnieuw op een fysieke iPhone worden beoordeeld.

@@ -324,7 +324,13 @@ const PAGE=()=>{
    const card=document.querySelector('energiehuis-card'),host0=card.shadowRoot.querySelector('.eh-live-home'),img0=host0.shadowRoot.querySelector('.ehm-scene');
    const ro0=window.__ro,fr=()=>new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));
    let navs=0;const nav=card._ehImmNavigate;card._ehImmNavigate=function(k){navs++;return nav.call(this,k);};
+   const shell0=card.shadowRoot.querySelector('.shell');
+   let removals=0;
+   const observe=records=>{for(const r of records)for(const n of r.removedNodes)if(n===shell0||n===host0||n.contains?.(host0))removals++;};
+   const mo=new MutationObserver(observe);mo.observe(card.shadowRoot,{childList:true,subtree:true});
    for(let i=1;i<=60;i++){window.__push([['net',-400-i]]);if(i%10===0)await fr();}
+   await fr();observe(mo.takeRecords());mo.disconnect();
+   const sameShell=card.shadowRoot.querySelector('.shell')===shell0;
    const views=[];
    for(let round=0;round<3;round++)for(const k of ['pv','house','net','battery','cupra','practice']){
     card.shadowRoot.querySelector('.eh-live-home').shadowRoot.querySelector('.ehm-tiles .tile[data-key="'+k+'"]').click();await fr();views.push(card._view);
@@ -332,10 +338,11 @@ const PAGE=()=>{
    }
    await new Promise(res=>setTimeout(res,200));
    const host1=card.shadowRoot.querySelector('.eh-live-home');
-   return {sameHost:host0===host1,sameImg:host1.shadowRoot.querySelector('.ehm-scene')===img0,ro:window.__ro-ro0,navs,views:views.length,resolves:window.__resolves,dbg:card._ehLive.ctl.debug,anim:card._ehLive.ctl.cockpit.isAnimating(),net:host1.shadowRoot.querySelector('.tile[data-key="net"] .t-value').textContent};
+   return {sameShell,removals,sameHost:host0===host1,sameImg:host1.shadowRoot.querySelector('.ehm-scene')===img0,ro:window.__ro-ro0,navs,views:views.length,resolves:window.__resolves,dbg:card._ehLive.ctl.debug,anim:card._ehLive.ctl.cockpit.isAnimating(),net:host1.shadowRoot.querySelector('.tile[data-key="net"] .t-value').textContent};
   });
   const media=log.filter(l=>l.startsWith('/media/')).length;await ctx.close();
   assert.equal(r.sameHost,true);assert.equal(r.sameImg,true);assert.equal(r.ro,0,'geen nieuwe ResizeObservers');
+  assert.equal(r.sameShell,true,'meetupdates behouden de zichtbare shell');assert.equal(r.removals,0,'geen loskoppeling van shell of cockpit tijdens meetupdates');
   assert.equal(r.navs,18,'één klik = één navigatie');assert.equal(r.resolves,1);assert.equal(media,1);
   assert.equal(r.dbg.suspended,false);assert.equal(r.dbg.timer,true);assert.equal(r.anim,true);
   assert.match(r.net,/^−460\s?W$/);assert.deepEqual(errors,[]);
