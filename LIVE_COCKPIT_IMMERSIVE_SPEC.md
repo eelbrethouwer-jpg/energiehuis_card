@@ -88,3 +88,25 @@ Alleen actief bij `live_cockpit_immersive: true`. Ontwerpbesluit: de bestaande g
 Tests (`tests/browser/live-cockpit-immersive.cjs`, 32 controles): landscape 844×390, 932×430 en 667×375 (scène ≥ 80 % van de hoogte en ≥ 60 % van de breedte, 667×375 ≥ 60 % en ≥ 55 % vanwege de breedte; zes kaarten binnen de scène, rail links, tekst naast de scène, geen overflow of overlap); veilige zones; alle functies via echte touch-tikken in liggend (Laden → Slim laden, Inzicht-menu met alle items, Meer, Cupra, Batterij, historie, kosten/contracten, Alle metingen); rotatie portret ⇄ liggend (zelfde host en beeld, 0 nieuwe resolves, 0 extra listeners of observers, geen frame zonder scène of beeld, huidige pagina en meetdata blijven staan); landscape zonder meting, zonder beeld en offline; landscape met reduced motion.
 
 **Alleen te verifiëren op een echte iPhone:** werkelijke safe-areas en adresbalk in Safari en de Companion-app, het gedrag van `orientationchange` en `innerHeight` bij het draaien in iOS, de leesbaarheid van de kaarten en de rail op het scherm in de hand, en het gedrag van de rail binnen de Home Assistant-toolbar.
+
+## 9. Definitieve Home: scène + vakjes + kwartierprijs (PR #58)
+
+Alleen actief bij `live_cockpit_immersive: true`. De Home bestaat uit de bestaande goedgekeurde scène, de bestaande interactieve vakjes en een kleine kwartierprijs-overlay. Het live-paneel naast het beeld en het tekstblok eronder zijn weg.
+
+| Onderdeel | Uitvoering |
+|---|---|
+| Geen panelen | Status, samenvatting en legenda staan niet meer naast of onder het beeld. Ze blijven bestaan voor schermlezers (visueel verborgen, `aria-live` blijft); de LIVE/OFFLINE-pil staat in de scène. Een waarschuwing bij een tegenstrijdige meetketen blijft zichtbaar, als dunne balk bovenaan de scène. De decoratienotitie ("lichtlijnen in het beeld zijn decoratief") is niet meer zichtbaar op Home; die tekst staat nog in de toegankelijke beschrijving van het beeld. Dit is een bewuste keuze en moet door de eigenaar worden bevestigd. |
+| Vakjes | Per vakje de grote livewaarde met een kleine regel eronder. Op de scène zijn de vakjes iets hoger (naar beneden) zodat de regels passen; ze blijven over de afgedekte ingebakken kaart. In portret (lijst) staan ze onder de scène. |
+| Zonnepanelen | `Vandaag: x kWh`, rechtstreeks uit de dagsensor van de omvormer (`zonne_energie`). Zonder die sensor uit de statistieken. |
+| Huis | `Vandaag: x kWh` (huis exclusief Cupra). Dit is de bestaande eigen kWh-teller of de bestaande afleiding (afname − teruglevering + opwek − laden) uit de statistieken. Als dat niet kan: de regel ontbreekt. Bij een schatting uit het gemiddelde vermogen staat `≈`. |
+| Cupra | `Vandaag: x kWh` (Alfen-statistieken) en `Sessie: x kWh`. De sessie alleen als de Cupra nu laadt, de waarde uit `cupra_charged_energy` in kWh is, jonger dan 35 minuten en plausibel (> 0 en ≤ 1,2 × de bruikbare accucapaciteit). Wat die entiteit exact meet (sessie of totaal) is niet in een echte HA geverifieerd. |
+| Net | `Vandaag: x kWh` (afname − teruglevering, met hetzelfde teken als de livewaarde: teruglevering is negatief) en `Kosten: € x,xx` uit `cost_zonneplan_day`, alleen als die sensor vandaag is bijgewerkt. |
+| Praktijkruimte en batterij | Praktijkruimte: "Nog niet gekoppeld", geen cijfers. Virtuele batterij: het label "Simulatie" blijft. |
+| Dagtotalen | Eén read-only `recorder/statistics_during_period`-vraag (dezelfde vorm als de detailpagina's, vandaag, uurbuckets, 5 min cache); per 5 minuten hooguit één. Offline of zonder data: de regels ontbreken. Geen servicecalls, geen opslag, geen schrijfacties. |
+| Kwartierprijs | Subtiele overlay rechtsonder op de scène (in portret een rij onder de vakjes): label, actuele prijs, kwartiertijd en 96 staafjes met het huidige kwartier wit gemarkeerd en de goedkoopste 25 % groen. Data uit de bestaande Zonneplan-prijssensoren (`ehPricesForDay`). Zonder kwartierdata: "Uurprijs" met de huidige uurprijs. Zonder prijs: "Kwartierprijs · geen data". `pointer-events: none`; raakt geen vakje. |
+| Beeldgrootte | Door het wegvallen van de tekstregels is de scène op tablet en desktop groter geworden. In landscape staat de navigatie als rail links (zie §8). |
+| Niet gewijzigd | Hotspots/covers, routes, detailpagina's, het `live_cockpit_immersive: false`-gedrag (DOM en pixels identiek aan v1.28.0), alle bestaande functies en HA-gegevens. |
+
+Tests (`tests/browser/live-cockpit-immersive.cjs`, 38 controles): vier schermmaten (844×390, 932×430, 390×844, 1280×800) op de definitieve samenstelling (dagregels, prijs, geen panelen, geen overlap met vakjes, hotspots); ontbrekende statistieken, kostensensor, sessie, kwartierdata, prijssensor en offline; één statistiekvraag per 60 hass-updates en geen servicecalls. Testdata is gesimuleerd.
+
+**Alleen te verifiëren op een echte HA/iPhone:** werkelijke statistieken (Alfen, P1, GoodWe), de betekenis van `cupra_charged_energy` en `cost_zonneplan_day`, de Zonneplan-kwartierattributen, de leesbaarheid van de kleine regels en de prijsoverlay op het scherm.

@@ -126,6 +126,109 @@ function ehImmPageHtml(card,view){
   requestAnimationFrame(()=>{if(this.isConnected&&typeof this.scrollIntoView==='function')this.scrollIntoView({block:'start'});});
   return true;
  };
+ // ===== Home-extra's (alleen lezen): dagtotalen in de vakjes en de kwartierprijs-overlay =====
+ // Dagtotalen: dezelfde read-only recorder-statistiekvraag als de detailpagina's (vandaag, uurbuckets, 5 min cache);
+ // de dagsensor van de omvormer, de kostensensor en de Cupra-sessie komen rechtstreeks uit de HA-toestanden.
+ // Geen servicecalls, geen opslag, geen schrijfacties, geen aannames: ontbrekend ⇒ regel verborgen.
+ const DAY_TTL_MS=5*60*1000;
+ const kwh=n=>Number.isFinite(n)?ehFmt(n,Math.abs(n)>=100?0:Math.abs(n)>=10?1:2):null;
+ const sumKey=(b,k)=>{const v=b.map(x=>x[k]).filter(Number.isFinite);return v.length?v.reduce((a,x)=>a+x,0):null;};
+ const stateKwh=(h,id)=>{
+  const e=id&&h?.states?.[id],n=e?ehNum(e.state):null;if(n===null)return null;
+  const u=String(e.attributes?.unit_of_measurement||'').trim().toLowerCase();
+  return u==='kwh'?n:u==='wh'?n/1000:u==='mwh'?n*1000:null;
+ };
+ const sameLocalDay=(iso,now)=>{const t=Date.parse(iso);return Number.isFinite(t)&&ehDayKey(new Date(t))===ehDayKey(now);};
+ const sessionKwh=(h,c,m)=>{
+  // "Sessie" alleen tijdens het laden, met een verse kWh-waarde uit de Cupra-integratie en een plausibel bereik.
+  const e=c.cupra_charged_energy&&h?.states?.[c.cupra_charged_energy];if(!e||!m.tiles.cupra.charging)return null;
+  const v=stateKwh(h,c.cupra_charged_energy),t=Date.parse(e.last_updated||e.last_changed||'');
+  if(v===null||!Number.isFinite(t)||Date.now()-t>35*60000||v<=0||v>(Number(c.cupra_usable_kwh)||59)*1.2)return null;
+  return v;
+ };
+ const costToday=(h,c,now)=>{
+  const e=c.cost_zonneplan_day&&h?.states?.[c.cost_zonneplan_day];if(!e)return null;
+  const n=ehNum(e.state),u=String(e.attributes?.unit_of_measurement||'').trim().toLowerCase();
+  if(n===null||!['','€','eur'].includes(u)||!sameLocalDay(e.last_updated||e.last_changed,now))return null;
+  return (n<0?'−':'')+'€ '+ehFmt(Math.abs(n),2);
+ };
+ P._ehImmLoadDay=async function(){
+  const c=this.config,h=this._hass,st=this._ehImmDay||(this._ehImmDay={at:0,data:null,loading:false});
+  if(!h||typeof h.callWS!=='function'||!c||st.loading||(st.at&&Date.now()-st.at<DAY_TTL_MS))return;
+  st.loading=true;st.at=Date.now();   // ook na een mislukking pas na de TTL opnieuw
+  try{
+   const lim=ehPeriodLimits('today'),bins=ehWindows(lim);
+   const ids=[...new Set([c.import,c.export,c.zonne_energie,c.laad_energie,c.huis_energie,c.huis].filter(Boolean))];
+   if(ids.length){
+    const before=new Date(lim.from.getTime()-3600000);
+    const stats=await h.callWS({type:'recorder/statistics_during_period',start_time:before.toISOString(),end_time:lim.to.toISOString(),statistic_ids:ids,period:lim.step,types:['change','sum','mean'],units:{energy:'kWh'}});
+    const b=ehEnergyBuckets(stats,bins,lim.step,c,h);
+    st.data={dayKey:ehDayKey(new Date()),import:sumKey(b,'import'),export:sumKey(b,'export'),sun:sumKey(b,'sun'),ev:sumKey(b,'ev'),home:sumKey(b,'home'),estimated:b.some(x=>x.estimated)};
+   }
+  }catch(_){st.data=null;}
+  finally{st.loading=false;}
+  const ctl=this._ehLive?.ctl;
+  if(ctl&&!ctl.debug.suspended&&ehImmOn(this))ctl.cockpit.rerender();
+ };
+ /** Korte tekstregels onder de livewaarde van een vakje (leeg = verborgen). */
+ P._ehImmTileDay=function(key,m){
+  const c=this.config,h=this._hass,now=new Date(),d=this._ehImmDay?.data,ok=!!d&&d.dayKey===ehDayKey(now),L=[];
+  if(!c||!m||!m.connected)return null;
+  if(key==='pv'){const v=stateKwh(h,c.zonne_energie)??(ok?d.sun:null);if(v!==null)L.push('Vandaag: '+kwh(v)+' kWh');}
+  else if(key==='house'){if(ok&&d.home!==null)L.push('Vandaag: '+(d.estimated?'≈ ':'')+kwh(d.home)+' kWh');}
+  else if(key==='cupra'){
+   if(ok&&d.ev!==null)L.push('Vandaag: '+kwh(d.ev)+' kWh');
+   const s=sessionKwh(h,c,m);if(s!==null)L.push('Sessie: '+kwh(s)+' kWh');
+  }else if(key==='net'){
+   if(ok&&d.import!==null&&d.export!==null){const n=d.import-d.export;L.push('Vandaag: '+(n<-0.005?'−':'')+kwh(Math.abs(n))+' kWh');}
+   const k=costToday(h,c,now);if(k)L.push('Kosten: '+k);
+  }
+  return L;
+ };
+ /** Kwartierprijs-overlay (Zonneplan, uit de bestaande prijssensoren; geen fictieve data). */
+ P._ehImmPrice=function(){
+  const ctl=this._ehLive?.ctl;if(!ctl||ctl.debug.suspended)return;
+  const tiles=ctl.cockpit.el.querySelector('.ehm-tiles');if(!tiles)return;
+  const doc=tiles.ownerDocument;
+  let el=tiles.querySelector(':scope > .eh-price');
+  if(!el){el=doc.createElement('div');el.className='eh-price';el.setAttribute('role','img');tiles.appendChild(el);}
+  const now=new Date(),c=this.config,h=this._hass;
+  let info=null;try{info=ehPricesForDay(h,c,now);}catch(_){}
+  const day=(info?.day||[]).slice().sort((a,b)=>Date.parse(a.t)-Date.parse(b.t));
+  const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const cur=info?.currentQ||null,curStart=cur?Date.parse(cur.t):null;
+  let state='none',label='Kwartierprijs',nowTxt='geen data',at='',aria='Kwartierprijs: geen kwartierdata beschikbaar.',bars='';
+  if(day.length>=8){
+   state='quarter';
+   const ps=day.map(q=>q.p),min=Math.min(...ps),max=Math.max(...ps),span=Math.max(.001,max-min);
+   const idx=t=>Math.max(0,Math.min(95,Math.round((Date.parse(t)-dayStart)/900000)));
+   const nowIdx=cur?idx(cur.t):-1;
+   bars=day.map(q=>{const i=idx(q.t),hh=3+(q.p-min)/span*19,cls=i===nowIdx?'now':(q.p-min)<=span*.25?'cheap':'';
+    return '<rect class="'+cls+'" x="'+(i+.08).toFixed(2)+'" y="'+(24-hh).toFixed(2)+'" width=".84" height="'+hh.toFixed(2)+'"/>';}).join('');
+   if(nowIdx>=0)bars='<line x1="'+(nowIdx+.5)+'" x2="'+(nowIdx+.5)+'" y1="0" y2="24"/>'+bars;
+   if(cur){nowTxt='€ '+ehFmt(cur.p,3);at=ehClock(curStart);aria='Kwartierprijs: nu € '+ehFmt(cur.p,3)+' per kWh (kwartier '+ehClock(curStart)+' tot '+ehClock(curStart+900000)+'). Vandaag laagste € '+ehFmt(min,3)+', hoogste € '+ehFmt(max,3)+'.';}
+   else{nowTxt='nu onbekend';aria='Kwartierprijs: het huidige kwartier is niet beschikbaar. Vandaag laagste € '+ehFmt(min,3)+', hoogste € '+ehFmt(max,3)+'.';}
+  }else if(info&&Number.isFinite(info.currentHour)){
+   state='hour';label='Uurprijs';nowTxt='€ '+ehFmt(info.currentHour,3);aria='Uurprijs: nu € '+ehFmt(info.currentHour,3)+' per kWh. Geen kwartierdata beschikbaar.';
+  }
+  const sig=state+'|'+nowTxt+'|'+at+'|'+bars.length+'|'+(day.length?day[0].t+day[day.length-1].t:'');
+  if(el.dataset.sig===sig)return;
+  el.dataset.sig=sig;el.dataset.state=state;el.setAttribute('aria-label',aria);
+  const top=doc.createElement('div');top.className='eh-price-top';
+  for(const [cls,txt,tag] of [['eh-price-label',label,'span'],['eh-price-now',nowTxt,'strong'],['eh-price-at',at,'span']]){if(!txt)continue;const n=doc.createElement(tag);n.className=cls;n.textContent=txt;top.appendChild(n);}
+  el.replaceChildren(top);
+  if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 96 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
+ };
+ P._ehImmExtras=function(){
+  if(!ehImmOn(this)||this._view!=='overview'||this._ehImmAll)return;
+  this._ehImmPrice();this._ehImmLoadDay();
+  // Dagregels bijwerken als een niet door de cockpit bewaakte bron (dagsensor, kosten, sessie) is gewijzigd.
+  const ctl=this._ehLive?.ctl,m=ctl&&!ctl.debug.suspended?ctl.cockpit.model:null;
+  if(m){
+   const sig=['pv','house','cupra','net'].map(k=>(this._ehImmTileDay(k,m)||[]).join('|')).join('#');
+   if(sig!==this._ehImmSig){this._ehImmSig=sig;ctl.cockpit.rerender();}
+  }
+ };
  P._render=function(){
   const on=ehImmOn(this);
   // Opt-in uitgezet terwijl een immersive pagina open stond: veilig terug naar Home.
@@ -156,6 +259,7 @@ function ehImmPageHtml(card,view){
   const view=this._view,live=!!this._ehLiveShown;
   if(view==='overview'&&live&&!this._ehImmAll){
    shell.classList.add('eh-imm-home');
+   this._ehImmExtras();
   }else if(view==='overview'&&this._ehImmAll){
    // "Alle metingen": de oude Home-inhoud (metingen, grafiek, energiecoach) met een eigen kop; cockpit gepauzeerd.
    shell.classList.add('eh-imm-all');
