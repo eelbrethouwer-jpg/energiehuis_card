@@ -8,9 +8,9 @@ const foundation=read('src/legacy/00-foundation.js'),shell=read('src/legacy/02-c
 const bundle=read('energiehuis-card.js'),notes=read('RELEASE_NOTES_v1.28.0.md');
 const workflow=read('.github/workflows/publish-v1280.yml');
 
-test('v1.28.0: version, Lovelace catalogue, generated HACS bundle and immersive routing match',()=>{
- for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.28\.0';/);
- for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.28\.0'/);
+test('current release: version, Lovelace catalogue, generated HACS bundle and immersive routing match',()=>{
+ for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.29\.0';/);
+ for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.29\.0'/);
  assert.match(bundle,/const EH_IMM_ROUTES/);
  assert.match(bundle,/live_cockpit_immersive/);
  assert.match(bundle,/function eh40Cockpit\(/);
