@@ -2,7 +2,7 @@
 
 ## Actuele status — 12 november 2026
 
-Nieuwe aanvraag: kwartierprijzen van morgen op Home. Branch `feature/immersive-tomorrow-prices` bouwt voort op PR #60 HEAD `784994c7d9f291cdc889cc2d6d5bc94ed8270634`. Alleen echte forecastprijzen worden toegevoegd; gegevensbron voor de externe Slim laden-grafiek wacht op kaart-YAML van de eigenaar. Gebouwd op de featurebranch, automatische controles in uitvoering, niet praktisch getest of gepubliceerd.
+Nieuwe aanvraag: kwartierprijzen van morgen op Home. Branch `feature/immersive-tomorrow-prices` bouwt voort op PR #60 HEAD `784994c7d9f291cdc889cc2d6d5bc94ed8270634`. Alleen echte forecastprijzen worden toegevoegd; de eigenaar heeft package én kaart-YAML aangeleverd en de optionele alleen-lezen HA-laadplanning is toegevoegd op basis van dezelfde bestaande helpers. Gebouwd op de featurebranch, automatische controles in uitvoering, niet praktisch getest of gepubliceerd.
 
 Praktijkbevinding: de testkaart werkt in kiosk/paneelweergave, maar de eigenaar meldt flikkeren bij veranderende meetwaarden. Vervolgfix `fix/immersive-live-update-flicker` bouwt voort op PR #59 HEAD `be2f2b943b7ddb77baa42eb135ab33084cea44b4` en houdt de zichtbare Home-shell verbonden tijdens meetupdates. De fix moet opnieuw fysiek worden getest voordat merge/release worden afgerond.
 

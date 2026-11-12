@@ -671,7 +671,7 @@ const PAGE=()=>{
    assert.match(T.cupra.aria,/Huidige laadsessie: 1,99 kWh\./);
    assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,x.sim.quarters);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
    assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,x.sim.quarters);assert.equal(x.price.pe,'auto');
-   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Tik voor het prijsoverzicht\.$/);
+   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Vandaag · morgen nog niet beschikbaar\. Tik voor het prijsoverzicht\.$/);
    if(x.layout!=='list'){
     const p=x.price.rect,ks=Object.keys(T);
     for(const k of ks){const r=T[k].rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
@@ -747,6 +747,25 @@ const PAGE=()=>{
   assert.equal(twoDays.price.slots,192);assert.equal(twoDays.price.bars,192);assert.equal(twoDays.price.now,1);
   assert.ok(twoDays.price.svg.includes('class="daybreak"'));assert.match(twoDays.price.aria,/Vandaag en morgen/);assert.match(twoDays.price.text,/Vandaag · morgen/);
   out.update=true;out.tomorrow=twoDays.price.bars;return out;
+ });
+ await check('HA-laadplanning: zelfde bestaande helpers, groen/oranje kwartieren tot vertrek, prijsgrens en wijzigingen zonder nieuwe forecast of loskoppeling',async()=>{
+  const {ctx,page,errors}=await open({...IMM,live_cockpit_planning:true},{width:932,height:430});await settle(page);
+  await page.evaluate(()=>{
+   const card=document.querySelector('energiehuis-card'),s={...window.__hass.states},now=new Date(),departure=new Date(+now+6*3600000);
+   for(const [id,v] of Object.entries({'input_select.cupra_prijsstrategie':'Goedkoopste kwartieren','input_number.cupra_gewenste_soc':'80','sensor.cupra_actuele_laadgrens':'.25','sensor.cupra_slim_effectieve_vertrektijd':departure.toISOString(),'sensor.cupra_slim_minimaal_bekende_kwartieren_nodig':'3'}))s[id]={state:v};
+   window.__hass={...window.__hass,states:s};card.hass=window.__hass;
+  });await frames(page,6);
+  const plan=await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),sr=card._ehLive.ctl.host.shadowRoot;window.__planShell=card.shadowRoot.querySelector('.shell');return {planned:sr.querySelectorAll('rect.planned').length,waiting:sr.querySelectorAll('rect.waiting').length,text:sr.querySelector('.eh-price').textContent,limit:!!sr.querySelector('line.limit')};});
+  assert.equal(plan.planned,3);assert.ok(plan.waiting>0);assert.match(plan.text,/Laadplanning/);assert.equal(plan.limit,false);
+  await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),s={...window.__hass.states};s['sensor.cupra_slim_minimaal_bekende_kwartieren_nodig']={state:'1'};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+  const changed=await page.evaluate(()=>{const card=document.querySelector('energiehuis-card');return {same:window.__planShell===card.shadowRoot.querySelector('.shell'),planned:card._ehLive.ctl.host.shadowRoot.querySelectorAll('rect.planned').length};});
+  assert.deepEqual(changed,{same:true,planned:1});
+  await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),s={...window.__hass.states};s['input_select.cupra_prijsstrategie']={state:'Vast'};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+  assert.equal(await page.evaluate(()=>!!document.querySelector('energiehuis-card')._ehLive.ctl.host.shadowRoot.querySelector('line.limit')),true);
+  await page.evaluate(()=>{const card=document.querySelector('energiehuis-card'),s={...window.__hass.states};s['sensor.cupra_actuele_laadgrens']={state:'unavailable'};window.__hass={...window.__hass,states:s};card.hass=window.__hass;});await frames(page,6);
+  const unavailable=await page.evaluate(()=>{const sr=document.querySelector('energiehuis-card')._ehLive.ctl.host.shadowRoot;return {planned:sr.querySelectorAll('rect.planned,rect.waiting,rect.cheap').length,text:sr.querySelector('.eh-price').textContent};});
+  assert.equal(unavailable.planned,0);assert.match(unavailable.text,/Planning n.b./);assert.match(unavailable.text,/laadgrens ontbreekt/);
+  assert.deepEqual(errors,[]);await ctx.close();return {plan,changed,unavailable};
  });
  await check('kwartierprijs-knop: tik, klik en toetsenbord (Enter/Space) openen het bestaande prijsoverzicht (Slim laden); ≥ 44×44, bereikbaar en onbedekt op 320/390/430/844/932; terug naar Home met focus op de knop',async()=>{
   const out={};

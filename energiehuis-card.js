@@ -5718,6 +5718,8 @@ const EhLiveCockpit=(function(){
   '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
   '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
   '.eh-price-bars line.daybreak{stroke:#fff;stroke-width:.65;stroke-dasharray:2 2;opacity:.7}.eh-price-period{display:block;margin-top:2px;font-size:.85em;opacity:.75;white-space:normal}' +
+  '.ehc--master:not([data-layout="list"]) .eh-price-period{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}' +
+  '.eh-price-bars rect.planned{fill:#4bd66d}.eh-price-bars rect.waiting{fill:#ffad32}.eh-price-bars rect.planned.now,.eh-price-bars rect.waiting.now{stroke:#fff;stroke-width:.5}.eh-price-bars line.limit{stroke:#ef6666;stroke-width:.6}' +
   '.eh-price[data-state="none"] .eh-price-now{font-size:1em;font-weight:600;opacity:.8}' +
   '.ehc--master[data-layout="list"] .eh-price{position:static;grid-column:1 / -1;padding:.55rem .8rem;border-radius:.95rem;font-size:.8rem;background:color-mix(in srgb,var(--bg-2) 80%,transparent)}' +
   '.ehc--master[data-layout="list"] .eh-price-bars{height:34px;max-height:none}' +
@@ -6578,16 +6580,47 @@ function ehImmQuarterModel(quarters,now){
  const ps=items.map(x=>x.p);
  return {dayStart,dayEnd,slots,todaySlots,hasTomorrow,tomorrowKnown:items.filter(x=>x.t>=tomorrowStart).length,items,nowIdx,cur,known:items.length,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null};
 }
+/** Alleen-lezen weergave van de aangeleverde ApexCharts-planner. Geen laadopdrachten of nieuwe helpers.
+ *  Zelfde selectie: 36 uur vooruit; met SOC-doel tot vertrek en N goedkoopste of prijsgrens;
+ *  zonder SOC-doel per lokale dag 25% goedkoopste of prijsgrens. Onbekende invoer is geen nul. */
+function ehImmPlanningModel(quarters,now,h){
+ const val=id=>ehNum(h?.states?.[id]?.state),no=reason=>({available:false,reason});
+ const strategy=h?.states?.['input_select.cupra_prijsstrategie']?.state,target=val('input_number.cupra_gewenste_soc');
+ if(!['Vast','Onder daggemiddelde','Gemiddeld - marge','Goedkoopste kwartieren'].includes(strategy)||target===null||target<0||target>100)return no('plangegevens ontbreken');
+ const cheap=strategy==='Goedkoopste kwartieren',threshold=val('sensor.cupra_actuele_laadgrens');
+ if(!cheap&&threshold===null)return no('laadgrens ontbreekt');
+ let end=now.getTime()+36*3600000,needed=null;
+ if(target>0){
+  const departure=Date.parse(h?.states?.['sensor.cupra_slim_effectieve_vertrektijd']?.state||'');
+  if(!Number.isFinite(departure))return no('vertrektijd ontbreekt');
+  if(departure<=now.getTime())return no('vertrektijd verstreken');
+  end=Math.min(end,departure);
+  if(cheap){needed=val('sensor.cupra_slim_minimaal_bekende_kwartieren_nodig');if(needed===null||needed<0||!Number.isInteger(needed))return no('benodigde kwartieren ontbreken');}
+ }
+ const start=Math.floor(now.getTime()/3600000)*3600000,by=new Map();
+ for(const q of quarters||[]){const t=Date.parse(q.t),p=ehNum(q.p);if(!Number.isFinite(t)||p===null||t+900000<=now.getTime()||t>=end)continue;by.set(t,{t,p});}
+ const points=[...by.values()].sort((a,b)=>a.t-b.t),selected=new Set();
+ const select=(slots,n)=>[...slots].sort((a,b)=>a.p-b.p).slice(0,n).forEach(s=>selected.add(s.t));
+ if(cheap&&target>0)select(points,needed);
+ else if(cheap){const days=new Map();for(const q of points){const key=ehDayKey(new Date(q.t));if(!days.has(key))days.set(key,[]);days.get(key).push(q);}for(const slots of days.values())select(slots,Math.max(1,Math.ceil(slots.length*.25)));}
+ else for(const q of points)if(q.p<=threshold)selected.add(q.t);
+ const items=points.map(q=>({...q,i:Math.floor((q.t-start)/900000),planned:selected.has(q.t)})),ps=items.map(q=>q.p),nowIdx=Math.floor((now.getTime()-start)/900000);
+ const midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
+ return {available:true,dayStart:start,dayEnd:end,slots:Math.ceil((end-start)/900000),todaySlots:Math.round((midnight-start)/900000),hasTomorrow:end>midnight,
+  items,known:items.length,nowIdx,cur:items.find(q=>q.t<=now.getTime()&&now.getTime()<q.t+900000)||null,min:ps.length?Math.min(...ps):null,max:ps.length?Math.max(...ps):null,
+  limit:cheap&&target>0?null:threshold,selected:selected.size,strategy,departure:target>0?end:null};
+}
 /** SVG-staafjes met nulbasislijn (negatieve prijzen hangen eronder); geen interpolatie voor ontbrekende kwartieren. */
 function ehImmQuarterBars(model){
- const {slots,items,nowIdx,min,max}=model,top=Math.max(0,max),bot=Math.min(0,min),range=Math.max(0.001,top-bot),H=22,y0=1+top/range*H;
+ const {slots,items,nowIdx,min,max}=model,top=Math.max(0,max,model.limit??0),bot=Math.min(0,min,model.limit??0),range=Math.max(0.001,top-bot),H=22,y0=1+top/range*H;
  const span=Math.max(0.0001,max-min);
  let out=bot<0?'<line class="zero" x1="0" x2="'+slots+'" y1="'+y0.toFixed(2)+'" y2="'+y0.toFixed(2)+'"/>':'';
  if(model.hasTomorrow)out+='<line class="daybreak" x1="'+model.todaySlots+'" x2="'+model.todaySlots+'" y1="0" y2="24"/>';
+ if(Number.isFinite(model.limit)){const y=(1+(top-model.limit)/range*H).toFixed(2);out+='<line class="limit" x1="0" x2="'+slots+'" y1="'+y+'" y2="'+y+'"/>';}
  if(nowIdx>=0&&nowIdx<slots)out+='<line class="nowline" x1="'+(nowIdx+.5)+'" x2="'+(nowIdx+.5)+'" y1="0" y2="24"/>';
  for(const it of items){
   const hh=Math.max(0.8,Math.abs(it.p)/range*H),y=it.p>=0?y0-hh:y0;
-  const cls=it.i===nowIdx?'now':(it.p-min)<=span*.25?'cheap':it.i<nowIdx?'past':'';
+  const cls=it.unplanned?(it.i===nowIdx?'now':''):typeof it.planned==='boolean'?(it.planned?'planned':'waiting')+(it.i===nowIdx?' now':''):it.i===nowIdx?'now':(it.p-min)<=span*.25?'cheap':it.i<nowIdx?'past':'';
   out+='<rect class="'+cls+'" x="'+(it.i+.08).toFixed(2)+'" y="'+y.toFixed(2)+'" width=".84" height="'+hh.toFixed(2)+'"/>';
  }
  return out;
@@ -6739,19 +6772,23 @@ function ehImmDayLines(key,d,extra,sw){
   }
   const now=new Date(),c=this.config,h=this._hass;
   let info=null;try{info=ehPricesForDay(h,c,now);}catch(_){}
-  const model=ehImmQuarterModel(info?.quarters||[],now),cur=model.cur;
+  const plan=c.live_cockpit_planning===true?ehImmPlanningModel(info?.quarters||[],now,h):null;
+  const model=plan?.available?plan:ehImmQuarterModel(info?.quarters||[],now),cur=model.cur;
+  if(plan&&!plan.available)for(const it of model.items)it.unplanned=true;
   let state='none',label='Kwartierprijs',nowTxt='geen data',at='',aria='Kwartierprijs: geen kwartierdata beschikbaar.',bars='';
   const eur=p=>(p<0?'−':'')+'€ '+ehFmt(Math.abs(p),3);
-  if(model.known>=8){
+  if(model.known>=8||(plan?.available&&model.known>0)){
    state='quarter';bars=ehImmQuarterBars(model);
-   const range=(model.hasTomorrow?'Vandaag en morgen':'Vandaag')+' laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
+   if(plan)label=plan.available?'Laadplanning':'Planning n.b.';else if(model.hasTomorrow)label='Vandaag/morgen';
+   const range=(plan?.available?'Laadplanning, '+model.selected+' geselecteerde kwartieren;':model.hasTomorrow?'Vandaag en morgen':'Vandaag')+' laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
    if(cur){nowTxt=eur(cur.p);at=ehClock(cur.t);aria='Kwartierprijs: nu '+eur(cur.p)+' per kWh (kwartier '+ehClock(cur.t)+' tot '+ehClock(cur.t+900000)+'). '+range;}
    else{nowTxt='nu onbekend';aria='Kwartierprijs: het huidige kwartier is niet beschikbaar. '+range;}
   }else if(info&&Number.isFinite(info.currentHour)){
    state='hour';label='Uurprijs';nowTxt=eur(info.currentHour);aria='Uurprijs: nu '+eur(info.currentHour)+' per kWh. Geen kwartierdata beschikbaar.';
   }
   // Handtekening over de ECHTE prijsdata (niet over de tekenlengte): elke gewijzigde prijs of tijdstip rendert opnieuw.
-  const sig=ehImmHash(state+'|'+nowTxt+'|'+at+'|'+model.slots+'|'+model.nowIdx+'|'+model.items.map(x=>x.i+':'+Math.round(x.p*10000)).join(','));
+  const periodText=plan?.available?'Groen: laden · oranje: wachten'+(model.departure?' · tot '+ehClock(model.departure):' · 36 uur'):plan?'Planning niet beschikbaar: '+plan.reason:model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar';
+  const sig=ehImmHash(state+'|'+label+'|'+periodText+'|'+model.limit+'|'+nowTxt+'|'+at+'|'+model.slots+'|'+model.nowIdx+'|'+model.items.map(x=>x.i+':'+Math.round(x.p*10000)+':'+x.planned).join(','));
   if(el.dataset.sig===sig)return;
   el.dataset.sig=sig;el.dataset.state=state;el.dataset.slots=String(model.slots);
   el.setAttribute('aria-label',aria+' Tik voor het prijsoverzicht.');
@@ -6761,7 +6798,7 @@ function ehImmDayLines(key,d,extra,sw){
   if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 '+model.slots+' 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
   if(state==='quarter'){
    const period=doc.createElement('span');period.className='eh-price-period';
-   period.textContent=model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar';
+   period.textContent=periodText;
    el.appendChild(period);el.setAttribute('aria-label',aria+' '+period.textContent+'. Tik voor het prijsoverzicht.');
   }
  };
