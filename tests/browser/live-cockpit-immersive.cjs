@@ -79,7 +79,7 @@ const SETUP=([config,mode])=>{
   const F=(meter,t)=>{const rel=Math.max(0,t-t0);const i=Math.floor(rel/H),fr=(rel-i*H)/H;let sum=0;for(let r=0;r<i;r++)sum+=mH(r);return meter.base+meter.k*(sum+mH(i)*fr);};
   const meters={[c.import]:{base:1200,k:.25},[c.export]:{base:800,k:.18}};
   // Alfen: segmenten [van,tot,kW] (ms); standaard een eerdere sessie vanochtend en een lopende sessie van 40 minuten.
-  const segs=cfg.alfenMin?cfg.alfenMin.map(([a,b,kw])=>[now-a*60000,now-b*60000,kw]):[...(now>t0+4*H+3600000?[[t0+2*H,t0+4*H,7.4]]:[]),[now-40*60000,now,2.98]];
+  const segs=cfg.alfenMin?cfg.alfenMin.map(([a,b,kw])=>[now-a*60000,now-b*60000,kw]):[[now-300*60000,now-200*60000,7.4],[now-40*60000,now,2.98]];
   const rawA=t=>5000+segs.reduce((a,[f,e,kw])=>a+kw*Math.max(0,Math.min(t,e)-f)/H*(t>f?1:0),0);
   const resetT=cfg.resetMinAgo!=null?now-cfg.resetMinAgo*60000:null;
   const A=t=>resetT!==null&&t>=resetT?rawA(t)-rawA(resetT):rawA(t);
@@ -201,13 +201,16 @@ const PAGE=()=>{
   fs.writeFileSync(path.join(SHOTS,name),Buffer.from(url.split(',')[1],'base64'));
  }
  console.log(browserType.name(),browser.version());
- async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null,sim=null,time='2026-11-12T14:37:00+01:00',tz='Europe/Amsterdam'}={}){
+ async function open(config,{width=1300,height=900,mode='ok',dpr=1,wait=true,reducedMotion='no-preference',fontScale=1,hasTouch=false,init=null,sim=null,time=null,tz='Europe/Amsterdam'}={}){
   const ctx=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr,locale:'nl-NL',timezoneId:tz,reducedMotion,hasTouch});
   const page=await ctx.newPage();const errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/40[134]|Failed to load resource/.test(m.text()))errors.push(m.text());});
   if(sim)await page.addInitScript(c=>{window.__simCfg=c;},sim);
   if(init)await page.addInitScript(init);
-  if(time)await page.clock.setFixedTime(new Date(time));
+  // Vaste starttijd zonder Playwright-klok: alleen Date start op dat moment en loopt daarna gewoon door (timers en rAF blijven echt).
+  if(time)await page.addInitScript(t=>{const R=Date,start=R.now(),base=t;
+   class FD extends R{constructor(...a){if(a.length===0)super(base+(R.now()-start));else super(...a);}static now(){return base+(R.now()-start);}}
+   window.Date=FD;},new Date(time).getTime());
   await page.addInitScript(()=>{const RO=window.ResizeObserver;window.__ro=0;window.ResizeObserver=class extends RO{constructor(cb){super(cb);window.__ro++;}};});
   await page.goto(base);if(fontScale!==1)await page.addStyleTag({content:'html{font-size:'+(fontScale*100)+'%}'});await page.evaluate(SETUP,[config,mode]);
   if(wait&&config.live_cockpit===true)await page.waitForFunction(()=>{const h=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home');const e=h&&h.shadowRoot.querySelector('.ehc');return e&&e.dataset.scene!=='loading';},null,{timeout:15000});
