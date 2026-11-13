@@ -101,6 +101,22 @@ function ehDailyHistoryPoints(data,id,h,from,to){
  }
  return points.filter((p,i,a)=>i===0||p.t!==a[i-1].t||p.v!==a[i-1].v).sort((a,b)=>a.t-b.t);
 }
+// Geschat kWh uit werkelijk beschikbare vermogenshistorie (niet uit ontbrekende punten).
+// Waarden op een 5-minutenraster worden als trapezia geïntegreerd, met zichtbare gaten.
+function ehHomeHistoryEnergy(points,from,to){
+ if(!Array.isArray(points)||points.length<2||!Number.isFinite(from)||!Number.isFinite(to)||to<=from)return null;
+ let kwh=0,covered=0,derived=false,night=false;
+ for(let i=1;i<points.length;i++){
+  const a=points[i-1],b=points[i],dt=b.t-a.t;
+  if(!(dt>0&&dt<=10*60000&&a.t>=from&&b.t<=to&&Number.isFinite(a.v)&&Number.isFinite(b.v)))continue;
+  kwh+=(a.v+b.v)*0.5*dt/3600000000;
+  covered+=dt;
+  derived=derived||!!a.derived||!!b.derived;
+  night=night||!!a.nightSolar||!!b.nightSolar;
+ }
+ if(!covered)return null;
+ return {kwh,covered,complete:covered>=to-from-60000,derived,night};
+}
 // Eén autonome grafiek: groot genoeg voor aanraken op iPhone en aanklikbaar op desktop.
 function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  const day=period==='today'||period==='yesterday';
@@ -124,10 +140,18 @@ function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  let lines='';
  if(isRaw){
    lines=series.map(([label,pts,color])=>{
-     const ps=pts.map(p=>[xp(p.t),yp(p.v)]);
-     if(ps.length===1)return `<circle cx="${ps[0][0]}" cy="${ps[0][1]}" r="4" fill="${color}"/>`;
-     const d=ps.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-     return `<path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>`;
+     // Maak echte onderbrekingen zichtbaar: verbind nooit twee losse meetreeksen.
+     const segments=[];let part=[];
+     for(const p of pts){
+       if(Number.isFinite(p.v))part.push([xp(p.t),yp(p.v)]);
+       else if(part.length){segments.push(part);part=[];}
+     }
+     if(part.length)segments.push(part);
+     return segments.map(ps=>{
+       if(ps.length===1)return `<circle cx="${ps[0][0]}" cy="${ps[0][1]}" r="4" fill="${color}"/>`;
+       const d=ps.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+       return `<path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>`;
+     }).join('');
    }).join('');
  }else{
    // Groepsgewijze balken voorkomen dat ontbrekende meetdagen als nul worden weergegeven.

@@ -272,11 +272,15 @@ class EnergiehuisCard extends HTMLElement {
     const buckets=ehEnergyBuckets(stats,bins,lim.step,c,h);
     let raw=[];
     if(p==='today'&&this._history?.samples?.length){
-      raw=this._history.samples.map(o=>({t:o.t,v:o[id]})).filter(o=>Number.isFinite(o.v));
+      raw=this._history.samples.map(o=>({t:o.t,v:o[id],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}));
     }else if(p==='yesterday'&&id){
       try{
-        const data=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[id],minimal_response:true,no_attributes:false,significant_changes_only:false});
-        raw=ehDailyHistoryPoints(data,id,h,lim.from.getTime(),lim.to.getTime());
+        const historyIds=type==='home'?[c.zonnepanelen,c.huis,c.net,c.laden,...(h.states?.['sun.sun']?['sun.sun']:[])].filter(Boolean):[id];
+        const data=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[...new Set(historyIds)],include_start_time_state:true,minimal_response:true,no_attributes:false,significant_changes_only:false});
+        if(type==='home'){
+          const history=ehSamplesFromHistory(data,historyIds,h,new Date(lim.to),{start:lim.from.getTime(),end:lim.to.getTime(),dayEnd:lim.to.getTime(),p1Sign:c.p1_sign});
+          raw=history?.samples?.map(o=>({t:o.t,v:o[id],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}))||[];
+        }else raw=ehDailyHistoryPoints(data,id,h,lim.from.getTime(),lim.to.getTime());
       }catch(_){/* Recorder-statistieken blijven bruikbaar. */}
     }
     let comparison=null;
@@ -314,14 +318,25 @@ class EnergiehuisCard extends HTMLElement {
      return values.length&&values.length===list.length?values.reduce((a,b)=>a+b,0):null;
    };
    const total=(key)=>sum(bins,key);
+   // Korte periodes: de vermogenshistorie levert een geschat kWh-totaal wanneer
+   // de Recorder-energiestatistieken onvolledig zijn. Een deels gemeten dag
+   // krijgt nadrukkelijk NIET het label volledig dagtotaal.
+   const historyRaw=period==='today'&&hist?.samples?.length
+      ?hist.samples.map(o=>({t:o.t,v:o[({grid:c.net,sun:c.zonnepanelen,home:c.huis,car:c.laden})[type]],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}))
+      :(actual?.raw||[]);
+   const homeHistory=type==='home'&&(period==='today'||period==='yesterday')&&actual
+      ?ehHomeHistoryEnergy(historyRaw,actual.limits.from.getTime(),actual.limits.to.getTime()):null;
+   const homeStats=total('home');
+   const homeTotalText=Number.isFinite(homeStats)?ehEnergy(homeStats)
+     :homeHistory?(homeHistory.complete?'≈ ':'Beschikbaar ≈ ')+ehEnergy(homeHistory.kwh)+(homeHistory.complete?'':' (onvolledig)'):'—';
    const summary=type==='grid'?`<div class="energy-totals"><div><small>Netafname</small><strong>${ehEnergy(total('import'))}</strong></div><div><small>Teruglevering</small><strong>${ehEnergy(total('export'))}</strong></div></div>`:
-     `<div class="energy-totals"><div><small>${type==='home'?'Woning excl. auto':type==='sun'?'Totaal opgewekt':'Totaal geladen'}</small><strong>${ehEnergy(total(parts[0][1]))}</strong></div></div>`;
+     `<div class="energy-totals"><div><small>${type==='home'?'Woning excl. auto':type==='sun'?'Totaal opgewekt':'Totaal geladen'}</small><strong>${type==='home'?homeTotalText:ehEnergy(total(parts[0][1]))}</strong></div></div>`;
    const old=actual?.comparison,oldTotal=old&&sum(old,type==='grid'?'import':parts[0][1]);
    const currentTotal=total(type==='grid'?'import':parts[0][1]);
    const diff=period==='year'&&Number.isFinite(oldTotal)&&oldTotal>0&&Number.isFinite(currentTotal)?(currentTotal-oldTotal)/oldTotal*100:null;
    const compare=period==='year'?`<div class="energy-compare"><span>${type==='grid'?'Netafname · ':''}Zelfde periode vorig jaar</span><strong>${ehEnergy(oldTotal)}</strong><span>${diff===null?'Vergelijking niet beschikbaar':`${diff>0?'+':''}${ehFmt(diff,1)}% ${diff>0?'meer':diff<0?'minder':'gelijk'}`}</span></div>`:'';
-   const raw=period==='today'&&hist?.samples?.length?hist.samples.map(o=>({t:o.t,v:o[({grid:c.net,sun:c.zonnepanelen,home:c.huis,car:c.laden})[type]]})).filter(o=>Number.isFinite(o.v)):(actual?.raw||[]);
-   const values=(period==='today'||period==='yesterday')&&raw.length?raw:bins.filter(b=>parts.some(a=>Number.isFinite(b[a[1]])));
+   const raw=historyRaw;
+   const values=(period==='today'||period==='yesterday')&&raw.length?raw.filter(x=>Number.isFinite(x.v)):bins.filter(b=>parts.some(a=>Number.isFinite(b[a[1]])));
    const picked=values.length?values.reduce((a,b)=>this._metricSelectedTime===null||this._metricSelectedTime===undefined?(b.t>a.t?b:a):(Math.abs(b.t-this._metricSelectedTime)<Math.abs(a.t-this._metricSelectedTime)?b:a),values[0]):null;
    const reading= picked? ((period==='today'||period==='yesterday')&&raw.length
      ?`${ehClock(picked.t)} · ${ehPower(picked.v)}`
@@ -338,6 +353,7 @@ class EnergiehuisCard extends HTMLElement {
       <div class="energy-point-readout" aria-live="polite">${ehEsc(reading)}</div><p class="detail-muted">Tik op de grafiek om een meetmoment, dag of maand te selecteren.</p>
       <div class="energy-legend">${parts.map(([name,key,color])=>`<span><i style="background:${color}"></i>${ehEsc(name)}</span>`).join('')}</div>
       ${estimated?'<p class="detail-muted">Een deel van het woningverbruik is geschat op basis van gemiddeld vermogen; deze totalen kunnen afwijken.</p>':''}
+      ${type==='home'&&homeHistory&&!Number.isFinite(homeStats)?'<p class="detail-muted">≈ Berekend uit beschikbare historische vermogensmetingen, niet uit een volledige kWh-teller. '+(homeHistory.complete?'Hele periode gedekt.':'Een deel van de periode mist: getoond getal is geen volledig dagtotaal.')+(homeHistory.night?' Tijdens door Home Assistant bevestigde zon-onder-horizon-periodes is ontbrekende PV als 0 W afgeleid.':'')+'</p>':''}
       <p class="detail-muted">${ehEsc(sourceInfo)} Ontbrekende meetperioden worden niet opgevuld met fictieve waarden.</p>
      </section>`;
  }
@@ -386,7 +402,7 @@ class EnergiehuisCard extends HTMLElement {
  async _loadHistory(){
   const h=this._hass,c=this.config;
   if(!this.isConnected||!h?.callWS||!c||this._historyLoading)return;
-  const ids=[c.zonnepanelen,c.huis,c.net,c.laden].filter(Boolean);
+  const ids=[c.zonnepanelen,c.huis,c.net,c.laden,...(h.states?.['sun.sun']?['sun.sun']:[])].filter(Boolean);
   const now=new Date(),key=ehDayKey(now)+'|'+ids.join('|');
   if(this._historyKey===key && Date.now()-this._historyAt<5*60*1000)return;
   if(this._historyKey && !this._historyKey.startsWith(ehDayKey(now)+'|'))this._selectedAt=null;
@@ -395,10 +411,10 @@ class EnergiehuisCard extends HTMLElement {
     const data=await h.callWS({
       type:'history/history_during_period',
       start_time:ehMidnight(now).toISOString(),end_time:now.toISOString(),
-      entity_ids:[...new Set(ids)],minimal_response:true,no_attributes:false,
+      entity_ids:[...new Set(ids)],include_start_time_state:true,minimal_response:true,no_attributes:false,
       significant_changes_only:false
     });
-    this._history=ehSamplesFromHistory(data,ids,h,now);
+    this._history=ehSamplesFromHistory(data,ids,h,now,{p1Sign:c.p1_sign});
     this._historyError=false;this._historyKey=key;this._historyAt=Date.now();
   } catch(err){
     this._historyError=true;this._historyKey=key;this._historyAt=Date.now();

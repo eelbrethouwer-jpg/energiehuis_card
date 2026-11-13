@@ -180,45 +180,67 @@ function ehCupraText(st,digits=1){
 }
 const ehDayKey=(date)=>`${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
 const ehMidnight=(now)=>new Date(now.getFullYear(),now.getMonth(),now.getDate());
-function ehSamplesFromHistory(history, ids, h, now){
-  if(!history || typeof history !== 'object') return null;
-  const start = ehMidnight(now).getTime();
-  const cutoff = now.getTime();
-  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1).getTime();
-  const elapsed = Math.max(1,(cutoff-start)/60000);
-  const count = Math.max(24,Math.min(289,Math.ceil(elapsed/5)+1));
-  const groups = {};
-  if(Array.isArray(history)) {
-    // Home Assistant usually sends one array per requested entity.
+function ehSamplesFromHistory(history, ids, h, now, options={}) {
+  // Zowel Vandaag als Gisteren: neem de HA-starttoestand van vóór lokale middernacht mee.
+  // Belangrijk: 'unknown'/'unavailable' zijn echte onderbrekingen, geen reden om de laatst
+  // bekende geldige waarde onbeperkt door te trekken.
+  if(!history || typeof history!=='object')return null;
+  const start=Number.isFinite(options.start)?options.start:ehMidnight(now).getTime();
+  const cutoff=Number.isFinite(options.end)?options.end:now.getTime();
+  const dayEnd=Number.isFinite(options.dayEnd)?options.dayEnd:new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
+  if(cutoff<=start)return null;
+  const count=Math.max(24,Math.min(313,Math.ceil((cutoff-start)/300000)+1));
+  const sunId=ids.includes('sun.sun')?'sun.sun':null;
+  const pvId=ids[0],houseId=ids[1],netId=ids[2],evId=ids[3];
+  const groups={};
+  if(Array.isArray(history)){
     for(let i=0;i<history.length;i++){
-      const arr = Array.isArray(history[i]) ? history[i] : [];
-      const id = arr.find(x=>x?.entity_id)?.entity_id || ids[i];
-      if(id) groups[id]=arr;
+      const arr=Array.isArray(history[i])?history[i]:[];
+      const id=arr.find(x=>x?.entity_id)?.entity_id||ids[i];
+      if(id)groups[id]=arr;
     }
-  } else {
-    for(const id of ids) groups[id]=history[id] || [];
-  }
+  }else for(const id of ids)groups[id]=history[id]||[];
   const all={};
   for(const id of ids){
     const list=Array.isArray(groups[id])?groups[id]:[];
     all[id]=list.map(o=>{
-      const v=ehNum(o.s??o.state);
       const ts=o.lu??o.lc??o.last_updated??o.last_changed;
       const t=typeof ts==='number'?ts*1000:Date.parse(ts);
-      const currentUnit=String(h?.states?.[id]?.attributes?.unit_of_measurement||'').toLowerCase();
-      const histUnit=String(o.a?.unit_of_measurement||o.attributes?.unit_of_measurement||currentUnit).toLowerCase();
-      return {t,v:v===null||!Number.isFinite(t)||!['w','kw'].includes(histUnit)?null:v*(histUnit==='kw'?1000:1)};
-    }).filter(o=>o.v!==null && Number.isFinite(o.t) && o.t<=cutoff).sort((a,b)=>a.t-b.t);
+      const raw=o.s??o.state;
+      if(id===sunId)return {t,v:raw==='below_horizon'||raw==='above_horizon'?raw:null};
+      const v=ehNum(raw);
+      const currentUnit=String(h?.states?.[id]?.attributes?.unit_of_measurement||'').trim().toLowerCase();
+      const histUnit=String(o.a?.unit_of_measurement||o.attributes?.unit_of_measurement||currentUnit).trim().toLowerCase();
+      return {t,v:v===null||!['w','kw'].includes(histUnit)?null:v*(histUnit==='kw'?1000:1)};
+    }).filter(o=>Number.isFinite(o.t)&&o.t<=cutoff).sort((a,b)=>a.t-b.t);
   }
-  if(!ids.some(id=>all[id].length)) return null;
+  if(!ids.some(id=>all[id].length))return null;
   const samples=[],cursors=Object.fromEntries(ids.map(id=>[id,0]));
   const last=Object.fromEntries(ids.map(id=>[id,null]));
   for(let i=0;i<count;i++){
     const t=start+(cutoff-start)*i/(count-1),item={t};
     for(const id of ids){
       const series=all[id];
-      while(cursors[id]<series.length && series[cursors[id]].t<=t){last[id]=series[cursors[id]].v;cursors[id]++}
+      while(cursors[id]<series.length&&series[cursors[id]].t<=t){
+        last[id]=series[cursors[id]].v;cursors[id]++;
+      }
       item[id]=last[id];
+    }
+    if(houseId&&!Number.isFinite(item[houseId])&&Number.isFinite(item[netId])&&Number.isFinite(item[evId])){
+      const pvMeasured=Number.isFinite(item[pvId]);
+      // Geen fictieve PV-nul: uitsluitend een afgeleide nul in een door HA
+      // geregistreerde 'below_horizon'-periode; niet bij ontbrekende sun.sun.
+      const pvNight=!pvMeasured&&sunId&&item[sunId]==='below_horizon';
+      if(pvMeasured||pvNight){
+        const sign=options.p1Sign==='export_positive'?-1:1;
+        const home=sign*item[netId]+(pvMeasured?item[pvId]:0)-item[evId];
+        // Negatieve grote afwijkingen wijzen op inconsistente bronnen: niet als 0 presenteren.
+        if(home>=-30&&Number.isFinite(home)){
+          item[houseId]=Math.max(0,home);
+          item.__ehHouseDerived=true;
+          item.__ehNightSolar=!!pvNight;
+        }
+      }
     }
     samples.push(item);
   }
@@ -424,6 +446,22 @@ function ehDailyHistoryPoints(data,id,h,from,to){
  }
  return points.filter((p,i,a)=>i===0||p.t!==a[i-1].t||p.v!==a[i-1].v).sort((a,b)=>a.t-b.t);
 }
+// Geschat kWh uit werkelijk beschikbare vermogenshistorie (niet uit ontbrekende punten).
+// Waarden op een 5-minutenraster worden als trapezia geïntegreerd, met zichtbare gaten.
+function ehHomeHistoryEnergy(points,from,to){
+ if(!Array.isArray(points)||points.length<2||!Number.isFinite(from)||!Number.isFinite(to)||to<=from)return null;
+ let kwh=0,covered=0,derived=false,night=false;
+ for(let i=1;i<points.length;i++){
+  const a=points[i-1],b=points[i],dt=b.t-a.t;
+  if(!(dt>0&&dt<=10*60000&&a.t>=from&&b.t<=to&&Number.isFinite(a.v)&&Number.isFinite(b.v)))continue;
+  kwh+=(a.v+b.v)*0.5*dt/3600000000;
+  covered+=dt;
+  derived=derived||!!a.derived||!!b.derived;
+  night=night||!!a.nightSolar||!!b.nightSolar;
+ }
+ if(!covered)return null;
+ return {kwh,covered,complete:covered>=to-from-60000,derived,night};
+}
 // Eén autonome grafiek: groot genoeg voor aanraken op iPhone en aanklikbaar op desktop.
 function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  const day=period==='today'||period==='yesterday';
@@ -447,10 +485,18 @@ function ehMetricChart(type,period,buckets,raw,selectedAt,range){
  let lines='';
  if(isRaw){
    lines=series.map(([label,pts,color])=>{
-     const ps=pts.map(p=>[xp(p.t),yp(p.v)]);
-     if(ps.length===1)return `<circle cx="${ps[0][0]}" cy="${ps[0][1]}" r="4" fill="${color}"/>`;
-     const d=ps.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-     return `<path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>`;
+     // Maak echte onderbrekingen zichtbaar: verbind nooit twee losse meetreeksen.
+     const segments=[];let part=[];
+     for(const p of pts){
+       if(Number.isFinite(p.v))part.push([xp(p.t),yp(p.v)]);
+       else if(part.length){segments.push(part);part=[];}
+     }
+     if(part.length)segments.push(part);
+     return segments.map(ps=>{
+       if(ps.length===1)return `<circle cx="${ps[0][0]}" cy="${ps[0][1]}" r="4" fill="${color}"/>`;
+       const d=ps.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+       return `<path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>`;
+     }).join('');
    }).join('');
  }else{
    // Groepsgewijze balken voorkomen dat ontbrekende meetdagen als nul worden weergegeven.
@@ -1038,11 +1084,15 @@ class EnergiehuisCard extends HTMLElement {
     const buckets=ehEnergyBuckets(stats,bins,lim.step,c,h);
     let raw=[];
     if(p==='today'&&this._history?.samples?.length){
-      raw=this._history.samples.map(o=>({t:o.t,v:o[id]})).filter(o=>Number.isFinite(o.v));
+      raw=this._history.samples.map(o=>({t:o.t,v:o[id],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}));
     }else if(p==='yesterday'&&id){
       try{
-        const data=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[id],minimal_response:true,no_attributes:false,significant_changes_only:false});
-        raw=ehDailyHistoryPoints(data,id,h,lim.from.getTime(),lim.to.getTime());
+        const historyIds=type==='home'?[c.zonnepanelen,c.huis,c.net,c.laden,...(h.states?.['sun.sun']?['sun.sun']:[])].filter(Boolean):[id];
+        const data=await h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[...new Set(historyIds)],include_start_time_state:true,minimal_response:true,no_attributes:false,significant_changes_only:false});
+        if(type==='home'){
+          const history=ehSamplesFromHistory(data,historyIds,h,new Date(lim.to),{start:lim.from.getTime(),end:lim.to.getTime(),dayEnd:lim.to.getTime(),p1Sign:c.p1_sign});
+          raw=history?.samples?.map(o=>({t:o.t,v:o[id],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}))||[];
+        }else raw=ehDailyHistoryPoints(data,id,h,lim.from.getTime(),lim.to.getTime());
       }catch(_){/* Recorder-statistieken blijven bruikbaar. */}
     }
     let comparison=null;
@@ -1080,14 +1130,25 @@ class EnergiehuisCard extends HTMLElement {
      return values.length&&values.length===list.length?values.reduce((a,b)=>a+b,0):null;
    };
    const total=(key)=>sum(bins,key);
+   // Korte periodes: de vermogenshistorie levert een geschat kWh-totaal wanneer
+   // de Recorder-energiestatistieken onvolledig zijn. Een deels gemeten dag
+   // krijgt nadrukkelijk NIET het label volledig dagtotaal.
+   const historyRaw=period==='today'&&hist?.samples?.length
+      ?hist.samples.map(o=>({t:o.t,v:o[({grid:c.net,sun:c.zonnepanelen,home:c.huis,car:c.laden})[type]],derived:!!o.__ehHouseDerived,nightSolar:!!o.__ehNightSolar}))
+      :(actual?.raw||[]);
+   const homeHistory=type==='home'&&(period==='today'||period==='yesterday')&&actual
+      ?ehHomeHistoryEnergy(historyRaw,actual.limits.from.getTime(),actual.limits.to.getTime()):null;
+   const homeStats=total('home');
+   const homeTotalText=Number.isFinite(homeStats)?ehEnergy(homeStats)
+     :homeHistory?(homeHistory.complete?'≈ ':'Beschikbaar ≈ ')+ehEnergy(homeHistory.kwh)+(homeHistory.complete?'':' (onvolledig)'):'—';
    const summary=type==='grid'?`<div class="energy-totals"><div><small>Netafname</small><strong>${ehEnergy(total('import'))}</strong></div><div><small>Teruglevering</small><strong>${ehEnergy(total('export'))}</strong></div></div>`:
-     `<div class="energy-totals"><div><small>${type==='home'?'Woning excl. auto':type==='sun'?'Totaal opgewekt':'Totaal geladen'}</small><strong>${ehEnergy(total(parts[0][1]))}</strong></div></div>`;
+     `<div class="energy-totals"><div><small>${type==='home'?'Woning excl. auto':type==='sun'?'Totaal opgewekt':'Totaal geladen'}</small><strong>${type==='home'?homeTotalText:ehEnergy(total(parts[0][1]))}</strong></div></div>`;
    const old=actual?.comparison,oldTotal=old&&sum(old,type==='grid'?'import':parts[0][1]);
    const currentTotal=total(type==='grid'?'import':parts[0][1]);
    const diff=period==='year'&&Number.isFinite(oldTotal)&&oldTotal>0&&Number.isFinite(currentTotal)?(currentTotal-oldTotal)/oldTotal*100:null;
    const compare=period==='year'?`<div class="energy-compare"><span>${type==='grid'?'Netafname · ':''}Zelfde periode vorig jaar</span><strong>${ehEnergy(oldTotal)}</strong><span>${diff===null?'Vergelijking niet beschikbaar':`${diff>0?'+':''}${ehFmt(diff,1)}% ${diff>0?'meer':diff<0?'minder':'gelijk'}`}</span></div>`:'';
-   const raw=period==='today'&&hist?.samples?.length?hist.samples.map(o=>({t:o.t,v:o[({grid:c.net,sun:c.zonnepanelen,home:c.huis,car:c.laden})[type]]})).filter(o=>Number.isFinite(o.v)):(actual?.raw||[]);
-   const values=(period==='today'||period==='yesterday')&&raw.length?raw:bins.filter(b=>parts.some(a=>Number.isFinite(b[a[1]])));
+   const raw=historyRaw;
+   const values=(period==='today'||period==='yesterday')&&raw.length?raw.filter(x=>Number.isFinite(x.v)):bins.filter(b=>parts.some(a=>Number.isFinite(b[a[1]])));
    const picked=values.length?values.reduce((a,b)=>this._metricSelectedTime===null||this._metricSelectedTime===undefined?(b.t>a.t?b:a):(Math.abs(b.t-this._metricSelectedTime)<Math.abs(a.t-this._metricSelectedTime)?b:a),values[0]):null;
    const reading= picked? ((period==='today'||period==='yesterday')&&raw.length
      ?`${ehClock(picked.t)} · ${ehPower(picked.v)}`
@@ -1104,6 +1165,7 @@ class EnergiehuisCard extends HTMLElement {
       <div class="energy-point-readout" aria-live="polite">${ehEsc(reading)}</div><p class="detail-muted">Tik op de grafiek om een meetmoment, dag of maand te selecteren.</p>
       <div class="energy-legend">${parts.map(([name,key,color])=>`<span><i style="background:${color}"></i>${ehEsc(name)}</span>`).join('')}</div>
       ${estimated?'<p class="detail-muted">Een deel van het woningverbruik is geschat op basis van gemiddeld vermogen; deze totalen kunnen afwijken.</p>':''}
+      ${type==='home'&&homeHistory&&!Number.isFinite(homeStats)?'<p class="detail-muted">≈ Berekend uit beschikbare historische vermogensmetingen, niet uit een volledige kWh-teller. '+(homeHistory.complete?'Hele periode gedekt.':'Een deel van de periode mist: getoond getal is geen volledig dagtotaal.')+(homeHistory.night?' Tijdens door Home Assistant bevestigde zon-onder-horizon-periodes is ontbrekende PV als 0 W afgeleid.':'')+'</p>':''}
       <p class="detail-muted">${ehEsc(sourceInfo)} Ontbrekende meetperioden worden niet opgevuld met fictieve waarden.</p>
      </section>`;
  }
@@ -1152,7 +1214,7 @@ class EnergiehuisCard extends HTMLElement {
  async _loadHistory(){
   const h=this._hass,c=this.config;
   if(!this.isConnected||!h?.callWS||!c||this._historyLoading)return;
-  const ids=[c.zonnepanelen,c.huis,c.net,c.laden].filter(Boolean);
+  const ids=[c.zonnepanelen,c.huis,c.net,c.laden,...(h.states?.['sun.sun']?['sun.sun']:[])].filter(Boolean);
   const now=new Date(),key=ehDayKey(now)+'|'+ids.join('|');
   if(this._historyKey===key && Date.now()-this._historyAt<5*60*1000)return;
   if(this._historyKey && !this._historyKey.startsWith(ehDayKey(now)+'|'))this._selectedAt=null;
@@ -1161,10 +1223,10 @@ class EnergiehuisCard extends HTMLElement {
     const data=await h.callWS({
       type:'history/history_during_period',
       start_time:ehMidnight(now).toISOString(),end_time:now.toISOString(),
-      entity_ids:[...new Set(ids)],minimal_response:true,no_attributes:false,
+      entity_ids:[...new Set(ids)],include_start_time_state:true,minimal_response:true,no_attributes:false,
       significant_changes_only:false
     });
-    this._history=ehSamplesFromHistory(data,ids,h,now);
+    this._history=ehSamplesFromHistory(data,ids,h,now,{p1Sign:c.p1_sign});
     this._historyError=false;this._historyKey=key;this._historyAt=Date.now();
   } catch(err){
     this._historyError=true;this._historyKey=key;this._historyAt=Date.now();
