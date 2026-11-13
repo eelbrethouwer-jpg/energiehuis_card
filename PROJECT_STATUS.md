@@ -1,5 +1,18 @@
 # PROJECT_STATUS — Energiehuis
 
+## Open bugfix — 13 november 2026 (nog niet gepubliceerd)
+
+- **PR #64** (draft), branch `fix/home-night-history-20261113`, basis main `c0d14378986c1de7477e303e3ed9e29e7fe723d0`.
+- Doel: gemiste huisverbruikmetingen in de nacht bij **Vandaag** en **Gisteren** herstellen. De historische code had geen fallback voor een onbeschikbare huissensor/GoodWe, verloor `unknown`-overgangen bij het filteren en had niet altijd een bruikbare sensor-beginstand.
+- Wijziging: reconstrueer beschikbaar huisvermogen conservatief uit P1 + PV − Alfen, waarbij een ontbrekende PV-meting alleen als afgeleide 0 W geldt wanneer de **historische** `sun.sun`-status `below_horizon` is; behoud werkelijke meetgaten. Een fallback-kWh-totaal uit vermogenshistorie wordt expliciet **geschat / onvolledig** getoond.
+- Gebouwd: ja, op PR-branch; HACS-bundel uit bron gegenereerd en gevalideerd. Geen wijzigingen aan laden, opslag of entiteitsconfiguratie.
+- Automatisch getest: de Node-tests in UTC en Europe/Amsterdam en buildvalidatie zijn groen op commit `e70d286d10232a2d4bef907f016eb31da734caab`. Browsercheck was bij deze statusupdate nog in uitvoering. Eventuele nieuwe commit vraagt opnieuw CI.
+- Praktisch getest: nee, geen directe toegang tot de gebruiker zijn Home Assistant en de werkelijke GoodWe-/huis-templatehistorie.
+- Gepubliceerd: nee; de gepubliceerde versie blijft v1.29.0. PR #64 niet mergen/releasen zonder expliciete toestemming.
+- Open: controleer de echte `sensor.energiehuis_huisverbruik_exclusief_auto`, `sun.sun`, GoodWe, P1 en Alfen in Recorder voor 00:00–08:00. De tekst **'Tijdstempel onbekend'** is een bronkwaliteitssignaal en wordt niet opgelost door historische grafiekcode als de entiteit zelf onvoldoende timestamp/waarde aanlevert.
+
+---
+
 ## Actuele status — 12 november 2026
 
 - Geïntegreerde features: PR #58–#61 via PR #61, mergecommit `3af12c943c16db7e51ca6fdffe82aa356d4aa709`.
