@@ -1,0 +1,16 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const src=fs.readFileSync(path.resolve(__dirname,'../src/legacy/17-live-immersive.js'),'utf8');
+const i=src.indexOf('function ehImmPracticeCompute('),j=src.indexOf('\nfunction ehImmPracticeCostText(',i);
+assert.ok(i>=0&&j>i);
+const ctx={eh17PriceAt:(prices,t,unit)=>{const q=prices.filter(p=>p.t<=t&&t-p.t<=5400000).at(-1);return q?(/ct|cent/.test(unit)?q.v/100:q.v):null;}};
+vm.runInNewContext(src.slice(i,j)+';this.fn=ehImmPracticeCompute',ctx);
+const calc=ctx.fn,start=Date.parse('2026-11-01T00:00:00Z'),hr=3600000;
+const e=a=>a.map(([h,v])=>({t:start+h*hr,v,unit:'kWh'})),p=a=>a.map(([h,v])=>({t:start+h*hr,v}));
+test('twee tariefuren koppelen aan kWh-incrementen',()=>{const r=calc(e([[0,10],[1,11],[2,13]]),p([[0,.2],[1,.25]]),'€/kWh',start,start+2*hr);assert.equal(r.kwh,3);assert.equal(r.cost,.7);assert.equal(r.partial,false);});
+test('ontbrekend uur wordt geen nulprijs',()=>{const r=calc(e([[0,10],[1,11],[4,13]]),p([[0,.2]]),'€/kWh',start,start+4*hr);assert.equal(r.cost,.2);assert.equal(r.unpriced,2);assert.equal(r.partial,true);});
+test('meterstart na maandstart deels',()=>{const r=calc(e([[2,10],[3,11]]),p([[2,.2]]),'€/kWh',start,start+3*hr);assert.equal(r.partial,true);assert.match(r.reason,/maandstart/);});
+test('tellerreset wordt overgeslagen',()=>{const r=calc(e([[0,100],[1,5],[2,6]]),p([[1,.3]]),'€/kWh',start,start+2*hr);assert.equal(r.resets,1);assert.equal(r.kwh,1);assert.equal(r.partial,true);});
+test('cent/kWh',()=>{const r=calc(e([[0,0],[1,2]]),p([[0,30]]),'ct/kWh',start,start+hr);assert.equal(r.cost,.6);});
+test('ongeldige prijsunit en ontbrekende historie geven geen kosten',()=>{assert.equal(calc(e([[0,0],[1,1]]),p([[0,.2]]),'m/s',start,start+hr).cost,null);assert.equal(calc(e([[0,0]]),p([[0,.2]]),'€/kWh',start,start+hr).cost,null);});
+test('live practice zonder wijziging aan huisbalans',()=>{const s=fs.readFileSync(path.resolve(__dirname,'../src/legacy/16-live-cockpit.js'),'utf8');assert.match(s,/const practiceLive = live && cur\(r\.practice\)/);assert.match(s,/PASS_KEYS = \[[^\]]*'praktijk'/);});

@@ -6441,8 +6441,14 @@ function ehImmPageHtml(card,view){
  const back='<button type="button" class="eh-imm-back" data-eh-page="overview" aria-label="Terug naar Home">← Terug naar Home</button>';
  let now='';
  if(view==='practice'){
-  now='<div class="eh-imm-practice" role="note"><strong>Nog niet gekoppeld.</strong> Er is geen meting van de praktijkruimte: er worden geen vermogens of energiewaarden getoond, en niets wordt bij het huis opgeteld of ervan afgetrokken. Koppelen vraagt een aparte, goedgekeurde wijziging.</div>';
- }else if(t){
+   const data=card._ehImmPractice||null,linked=!!card.config?.praktijk,watt=t?.value||'—';
+   const kwh=Number.isFinite(data?.kwh)?ehFmt(data.kwh,2)+' kWh':'—',price=ehImmPracticeCostText(data);
+   const detail=linked?(data?.reason||'Historie laden'):'Praktijkruimte-submeter nog niet geconfigureerd';
+   now='<section class="eh-imm-now" aria-label="Actueel praktijkruimtevermogen"><strong>'+ehEsc(watt)+'</strong><span>'+ehEsc(t?.sub||'Meting niet beschikbaar')+'</span></section>'+
+    '<section class="eh-imm-practice" role="region" aria-label="Praktijkruimte maandkosten en historie"><strong>Deze maand: '+ehEsc(kwh)+'</strong><p>'+ehEsc(price)+'</p>'+
+    ehImmPracticeChart(data)+'<small>'+ehEsc(detail)+'</small><p><small>'+(data?.partial?'Onvolledige historie; kosten gelden alleen voor de meetbare periode. ':'')+
+    'Bedrag indicatief: zonder toerekening van eigen zonnestroom. De praktijkruimte wordt niet dubbel bij het huis opgeteld.</small></p></section>';
+  }else if(t){
   const age=rd&&Number.isFinite(rd.ageMs)?EhLiveCockpit.scope.EhPve04Model.ageLabel(rd.ageMs):'';
   const meta=[['Entiteit',t.entity||'—'],['Tijdstempel',rd?.stampSource?(rd.stampSource+(age?' · '+age:'')):'onbekend']];
   let shown={value:t.value,label:t.sub,tone:t.tone,direction:''};
@@ -6682,6 +6688,56 @@ function ehImmDayLines(key,d,extra,sw){
  }
  return {lines:L,aria:A};
 }
+
+/** Historische praktijkruimte-kosten: geen fictieve prijzen bij meetgaten. */
+function ehImmPracticeCompute(energy,prices,priceUnit,from,to){
+ const unit=String(priceUnit||'').toLowerCase().replace(/\s/g,'');
+ if(unit&&!/(€|eur|ct|cent)/.test(unit))return {state:'invalid-price-unit',reason:'Onbekende prijseenheid',cost:null,kwh:null,partial:true,days:[]};
+ const E=energy.filter(p=>Number.isFinite(p.t)&&p.t<=to).map(p=>{
+  const u=String(p.unit||'').toLowerCase().trim();
+  return {t:p.t,v:u==='kwh'?p.v:u==='wh'?p.v/1000:null};
+ }).filter(p=>Number.isFinite(p.v)).sort((a,b)=>a.t-b.t);
+ if(E.length<2)return {state:'missing',reason:'Nog onvoldoende meterhistorie',cost:null,kwh:null,partial:true,days:[]};
+ let kwh=0,cost=0,priced=0,unpriced=0,resets=0,gaps=0;const days=new Map();
+ for(let i=1;i<E.length;i++){
+  const a=E[i-1],b=E[i],dt=b.t-a.t,raw=b.v-a.v;
+  if(dt<=0||b.t<=from)continue;
+  if(raw<-.001){resets++;continue;}
+  if(raw<=0)continue;
+  const delta=raw*Math.min(1,(b.t-Math.max(a.t,from))/dt);
+  if(delta<=0)continue;
+  if(dt>12*3600000||delta>dt/3600000*10+.5){gaps++;unpriced+=delta;continue;}
+  kwh+=delta;
+  const day=new Date(b.t),key=day.getFullYear()+'-'+String(day.getMonth()+1).padStart(2,'0')+'-'+String(day.getDate()).padStart(2,'0');
+  days.set(key,(days.get(key)||0)+delta);
+  // De teller rapporteert soms pas na een uur. Bij langere intervallen is de verdeling over uurprijzen onbekend.
+  const rate=dt>2*3600000?null:eh17PriceAt(prices,a.t+dt/2,unit);
+  if(Number.isFinite(rate)&&rate>=-1&&rate<=5){cost+=delta*rate;priced+=delta;}
+  else unpriced+=delta;
+ }
+ const baseline=E[0].t<=from+120000,partial=!baseline||unpriced>.001||resets>0||gaps>0;
+ const reason=!baseline?'Meterhistorie begint na maandstart':unpriced>.001?'Prijsuren of meetintervallen niet volledig':resets?'Tellerreset vastgesteld':gaps?'Meetgaten vastgesteld':'Indicatief: geen aparte waardering van eigen zonnestroom';
+ const hasCost=priced>.001||(kwh===0&&baseline);
+ return {state:hasCost?'ok':'no-price',cost:hasCost?cost:null,kwh,priced,unpriced,resets,gaps,partial,reason,
+  days:[...days].sort(([x],[y])=>x.localeCompare(y)).map(([date,consumption])=>({date,kwh:consumption}))};
+}
+function ehImmPracticeCostText(s){
+ if(!s||s.loading)return 'Kosten deze maand: …';
+ if(!Number.isFinite(s.cost))return 'Kosten deze maand: —';
+ return 'Kosten deze maand: ± '+(s.cost<0?'−':'')+'€ '+ehFmt(Math.abs(s.cost),2)+(s.partial?' (deels)':'');
+}
+function ehImmPracticeChart(s){
+ const days=(s?.days||[]).slice(-14);
+ if(!days.length)return '';
+ const max=Math.max(.01,...days.map(d=>d.kwh)),w=12+days.length*28;
+ const bars=days.map((d,i)=>{
+  const height=Math.max(1,Math.round(76*d.kwh/max)),x=10+i*28;
+  return '<rect x="'+x+'" y="'+(84-height)+'" width="17" height="'+height+'" rx="3" fill="#69d5bd"/>'+
+   '<text x="'+(x+8)+'" y="102" font-size="9" fill="#9dbbd1" text-anchor="middle">'+ehEsc(d.date.slice(8))+'</text>';
+ }).join('');
+ return '<svg role="img" aria-label="Gemeten dagverbruik afgelopen maximaal 14 dagen; onvolledige meetdagen zijn mogelijk" style="display:block;width:100%;height:auto;margin:8px 0" viewBox="0 0 '+w+' 110"><line x1="6" x2="'+w+'" y1="84" y2="84" stroke="#9dbbd177"/>'+bars+'</svg>';
+}
+
 (function ehImmInstall(){
  const P=EnergiehuisCard.prototype,previous=P._render;
  /** Enige ingang vanuit de Live Cockpit (onTileNavigate). Alleen bestemmingen uit de whitelist. */
@@ -6691,6 +6747,7 @@ function ehImmDayLines(key,d,extra,sw){
   this._ehImmFrom=key;this._ehImmAll=false;this._ehImmFocus='page';
   this._view=r.view;this._detail=r.detail;this._metricSelectedTime=null;
   if(r.view==='cupra'&&typeof this._loadCupraInsights==='function')this._loadCupraInsights();
+  if(r.view==='practice'&&typeof this._ehImmLoadPractice==='function')this._ehImmLoadPractice();
   this._schedule();
   if(r.detail&&typeof this._loadMetricData==='function')this._loadMetricData();
   requestAnimationFrame(()=>{if(this.isConnected&&typeof this.scrollIntoView==='function')this.scrollIntoView({block:'start'});});
@@ -6705,6 +6762,31 @@ function ehImmDayLines(key,d,extra,sw){
   const ctl=this._ehLive?.ctl;
   if(ctl&&!ctl.debug.suspended&&ehImmOn(this)&&this._view==='overview'&&!this._ehImmAll){ctl.cockpit.rerender();this._ehImmPrice();}
  };
+
+ P._ehImmLoadPractice=async function(){
+  const c=this.config,h=this._hass;
+  if(!ehImmOn(this)||!c?.praktijk||!c?.praktijk_energie||!c?.prijs||!h?.callWS)return;
+  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),1),key=now.getFullYear()+'-'+now.getMonth()+'|'+c.praktijk_energie+'|'+c.prijs;
+  const old=this._ehImmPractice;
+  if(old?.loading||(old?.key===key&&Date.now()-old.at<(old.error?2:10)*60000))return;
+  const st={key,at:Date.now(),loading:true,cost:null,kwh:null,partial:true,days:[]};this._ehImmPractice=st;
+  try{
+   const data=await h.callWS({type:'history/history_during_period',
+    start_time:new Date(start.getTime()-7200000).toISOString(),end_time:now.toISOString(),
+    entity_ids:[c.praktijk_energie,c.prijs],minimal_response:false,no_attributes:false,significant_changes_only:false});
+   if(this._ehImmPractice!==st)return;
+   const energy=ehNumericHistory(data,c.praktijk_energie,h),prices=ehNumericHistory(data,c.prijs,h);
+   const current=h.states?.[c.praktijk_energie],v=ehNum(current?.state),t=Date.parse(current?.last_updated||'');
+   if(v!==null&&Number.isFinite(t)&&(!energy.length||t>energy[energy.length-1].t))energy.push({t,v,unit:current?.attributes?.unit_of_measurement||''});
+   const unit=h.states?.[c.prijs]?.attributes?.unit_of_measurement||prices[0]?.unit||'';
+   Object.assign(st,ehImmPracticeCompute(energy,prices,unit,start.getTime(),now.getTime()));
+  }catch(_){st.error=true;st.reason='Recorder-historie niet beschikbaar';}
+  finally{
+   st.loading=false;st.at=Date.now();
+   if(this._ehImmPractice===st){this._ehImmRefresh();if(this._view==='practice')this._schedule();}
+  }
+ };
+
  P._ehImmLoadDay=async function(){
   const c=this.config,h=this._hass,st=this._ehImmDay||(this._ehImmDay={at:0,key:'',rows:null,error:false,loading:false});
   if(!h||typeof h.callWS!=='function'||!c||st.loading)return;
@@ -6759,7 +6841,12 @@ function ehImmDayLines(key,d,extra,sw){
  /** Tekstregels onder de livewaarde van een vakje; breedte van de scène bepaalt de vorm (zie ehImmDayLines). */
  P._ehImmTileDay=function(key,m,sw){
   const c=this.config,h=this._hass,now=new Date();
-  if(!c||!m||!m.connected||!['pv','house','cupra','net'].includes(key))return null;
+  if(!c||!m||!m.connected)return null;
+  if(key==='practice'){
+   if(!c.praktijk)return null;
+   const line=ehImmPracticeCostText(this._ehImmPractice);return {lines:[line],aria:[line]};
+  }
+  if(!['pv','house','cupra','net'].includes(key))return null;
   return ehImmDayLines(key,this._ehImmMetrics(),{cost:key==='net'?ehImmCostToday(h,c,now):null,session:key==='cupra'?this._ehImmSession(m):null},sw||0);
  };
  /** Kwartierprijs-knop (Zonneplan, bestaande prijssensoren; echte tijdstempels, 92/96/100 kwartieren; opent Slim laden). */
@@ -6823,12 +6910,12 @@ function ehImmDayLines(key,d,extra,sw){
  };
  P._ehImmExtras=function(){
   if(!ehImmOn(this)||this._view!=='overview'||this._ehImmAll)return;
-  this._ehImmPrice();this._ehImmLoadDay();
+  this._ehImmPrice();this._ehImmLoadDay();this._ehImmLoadPractice();
   // Dagregels bijwerken als een niet door de cockpit bewaakte bron (dagsensor, kosten, sessie, dagtotalen) is gewijzigd.
   const ctl=this._ehLive?.ctl,m=ctl&&!ctl.debug.suspended?ctl.cockpit.model:null;
   if(m){
    const stage=ctl.cockpit.el.querySelector('.ehm-stage'),sw=stage?stage.getBoundingClientRect().width:0;
-   const sig=['pv','house','cupra','net'].map(k=>{const r=this._ehImmTileDay(k,m,sw);return r?r.lines.join('|')+'~'+r.aria.join('|'):'';}).join('#')+'#'+this._ehImmPillExtra(m);
+   const sig=['pv','house','cupra','net','practice'].map(k=>{const r=this._ehImmTileDay(k,m,sw);return r?r.lines.join('|')+'~'+r.aria.join('|'):'';}).join('#')+'#'+this._ehImmPillExtra(m);
    if(sig!==this._ehImmSig){this._ehImmSig=sig;ctl.cockpit.rerender();}
   }
  };
@@ -6851,6 +6938,7 @@ function ehImmDayLines(key,d,extra,sw){
   if(!on)this._ehImmAll=false;
   previous.call(this);
   if(!on||!this.config||!this._hass)return;
+  if(this._view==='practice')this._ehImmLoadPractice();
   const root=this.shadowRoot,shell=root?.querySelector?.('.shell');
   if(!shell)return;
   const style=root.querySelector('style');
