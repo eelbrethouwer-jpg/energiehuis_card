@@ -1,5 +1,15 @@
 # PROJECT_STATUS — Energiehuis
 
+## Open feature — 14 november 2026 · PR #65 (draft)
+
+- **Gebouwd:** praktijkruimte-submeter met echte live W, kWh- en dynamische maandkostenindicatie, daggrafiek; branch `feature/praktijkruimte-live-maandkosten`, basis main `c0d14378986c1de7477e303e3ed9e29e7fe723d0`.
+- **Automatisch getest:** op feature-HEAD `6869be5fdfa2bd2d973b529abc979040622b78a8` zijn v1.7 Node-matrix, HACS-check en multi-supplier-regressie groen. Browsercheck loopt; nieuwe praktijkruimte-browsertest moet op de opvolgende HEAD worden gecontroleerd.
+- **Praktisch getest:** nee; eigen HA, iPhone, historische prijsdekking en 1×40A-installatie nog niet gecontroleerd.
+- **Gepubliceerd:** nee. Main en HACS v1.29.0 blijven ongewijzigd. Geen merge, tag of release zonder apart akkoord.
+- **Actie voor gebruik na release:** vul `praktijk` en `praktijk_energie` in de Lovelace-kaartconfiguratie in. De nieuwe kaart rekent praktijkverbruik niet dubbel bij Huis.
+
+---
+
 ## Actuele status — 12 november 2026
 
 - Geïntegreerde features: PR #58–#61 via PR #61, mergecommit `3af12c943c16db7e51ca6fdffe82aa356d4aa709`.
