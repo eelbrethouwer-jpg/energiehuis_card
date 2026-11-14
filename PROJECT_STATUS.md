@@ -1,12 +1,14 @@
 # PROJECT_STATUS — Energiehuis
 
-## Open feature — 14 november 2026 · PR #65 (draft)
+## Releasekandidaat — 14 november 2026 · v1.30.0
 
-- **Gebouwd:** praktijkruimte-submeter met echte live W, kWh- en dynamische maandkostenindicatie, daggrafiek; branch `feature/praktijkruimte-live-maandkosten`, basis main `c0d14378986c1de7477e303e3ed9e29e7fe723d0`.
-- **Automatisch getest:** op feature-HEAD `6869be5fdfa2bd2d973b529abc979040622b78a8` zijn v1.7 Node-matrix, HACS-check en multi-supplier-regressie groen. Browsercheck loopt; nieuwe praktijkruimte-browsertest moet op de opvolgende HEAD worden gecontroleerd.
-- **Praktisch getest:** nee; eigen HA, iPhone, historische prijsdekking en 1×40A-installatie nog niet gecontroleerd.
-- **Gepubliceerd:** nee. Main en HACS v1.29.0 blijven ongewijzigd. Geen merge, tag of release zonder apart akkoord.
-- **Actie voor gebruik na release:** vul `praktijk` en `praktijk_energie` in de Lovelace-kaartconfiguratie in. De nieuwe kaart rekent praktijkverbruik niet dubbel bij Huis.
+- **Gebouwd:** Praktijkruimte-submeter, maandkostenindicatie en daggrafiek uit PR #65. Feature-HEAD `e70dea3efe5d82f30f19111c638c71c1977b4d48`; main-featuremerge `76b7cd3d78f41c24d623d756009ee21493965779`.
+- **Automatisch getest:** vier CI-workflows op feature-HEAD geslaagd, inclusief Node UTC/Amsterdam en Chromium/WebKit. Release-HEAD nog opnieuw controleren.
+- **Praktisch getest:** nee; echte HA/iPhone en prijsdekking nog te controleren.
+- **Gepubliceerd:** nog niet; laatste bevestigde GitHub-release is v1.29.0. v1.30.0 pas na gescheiden release-PR, groene CI en handmatige workflow.
+- **Veiligheid:** Huis/GoodWe/P1/Alfen niet gewijzigd; praktijkenergie niet dubbel bijgeteld. Geen extra servicecalls.
+- **Toestemming:** op 14 november heeft de eigenaar expliciet opdracht gegeven te testen, mergen en releasen.
+- **Na publicatie:** voeg `praktijk` en `praktijk_energie` aan de Lovelace-configuratie toe.
 
 ---
 
