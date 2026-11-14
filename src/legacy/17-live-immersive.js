@@ -20,7 +20,7 @@ const EH_IMM_VIEWS=Object.freeze({
  sun:Object.freeze({route:'pv',title:'Zonnepanelen',icon:'sun',tile:'pv',reading:'pv',intro:'Actuele opwek van de GoodWe-omvormer, met historie en periodevergelijking.'}),
  home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, uit de bestaande huisverbruik-sensor (geen nieuwe berekening).'}),
  grid:Object.freeze({route:'net',title:'Net',icon:'grid',tile:'net',reading:'net',intro:'P1-netvermogen: afname en teruglevering, met historie.'}),
- practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:null,intro:'Alleen-lezen. Er is nog geen submeter gekoppeld.'})
+ practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:'practice',intro:'Live vermogen, gemeten energie en indicatieve maandkosten.'})
 });
 function ehImmOn(card){return typeof EhLiveCockpit!=='undefined'&&!!card?.config&&EhLiveCockpit.immersiveEnabled(card.config);}
 /** Actuele (niet-gepauzeerde) modelstand voor de bestemmingspagina's: zelfde adapter en regels als de Live Cockpit. */
@@ -568,7 +568,7 @@ function ehImmDayLines(key,d,extra,sw){
    const item=(page,icon,title,sub,extra)=>'<button type="button" data-eh-imm-menu="1" data-eh-page="'+page+'"'+(extra||'')+'>'+ehIcon(icon)+'<span><strong>'+ehEsc(title)+'</strong><small>'+ehEsc(sub)+'</small></span></button>';
    menu.insertAdjacentHTML('beforeend',
     item('sun','sun','Zonnepanelen','Opwek en historie')+item('home','home','Huisverbruik','Exclusief Cupra, historie')+
-    item('grid','grid','Net','Afname, teruglevering, historie')+item('practice','home','Praktijkruimte','Nog niet gekoppeld')+
+    item('grid','grid','Net','Afname, teruglevering, historie')+item('practice','home','Praktijkruimte','Live vermogen en maandkosten')+
     item('overview','chart','Alle metingen','Alle tegels, grafiek en energiecoach',' data-eh-imm-all="1"'));
   }
   // Focus: na navigatie naar de paginakop; na "Terug naar Home" naar de kaart waarmee de navigatie begon.

@@ -10,6 +10,8 @@ const EH_DEFAULTS = {
   stroom: 'sensor.alfen_stroom_l1',
   prijs: 'sensor.zonneplan_current_hourly_electricity_tariff',
   huis: 'sensor.energiehuis_huisverbruik_exclusief_auto',
+  praktijk: '', // optionele praktijkruimte-submeter
+  praktijk_energie: '', // cumulatieve praktijkruimte-energiemeter
   import: 'sensor.p1_meter_energie_import',
   export: 'sensor.p1_meter_energie_export',
   zonne_energie: 'sensor.goodwe_today_s_pv_generation',
@@ -4450,12 +4452,14 @@ const EhLiveCockpit=(function(){
 
     // ---- routes (geen grace: ongeldig = direct inactief)
     const practiceSim = cur(r.practice) && r.practice.simulated && r.practice.value >= 0;
+    const practiceLive = live && cur(r.practice) && !r.practice.simulated && r.practice.value >= 0;
+    const practiceFlow = practiceSim || practiceLive;
     const cand = {
       'sun-home': { ok: pv !== null && pv >= T.routeMinW, w: pv, why: cur(r.pv) ? 'Onder 30 W' : r.pv.reason },
       'grid-home': { ok: direction === 'import', w: importW, why: cur(r.net) ? 'Geen netafname' : r.net.reason },
       'home-grid': { ok: direction === 'export', w: importW === null ? null : -importW, why: cur(r.net) ? 'Geen teruglevering' : r.net.reason },
       'home-ev': { ok: ev !== null && ev >= T.routeMinW, w: ev, why: evInvalid || (cur(r.ev) ? 'Cupra laadt niet' : r.ev.reason) },
-      'home-practice': { ok: practiceSim && r.practice.value >= T.routeMinW, w: practiceSim ? r.practice.value : null, why: r.practice.state === 'unlinked' ? 'Nog niet gekoppeld' : 'Geen simulatie' }
+      'home-practice': { ok: practiceFlow && r.practice.value >= T.routeMinW, w: practiceFlow ? r.practice.value : null, why: r.practice.state === 'unlinked' ? 'Nog niet gekoppeld' : r.practice.reason || 'Geen actuele meting' }
     };
     const routes = {};
     for (const id of ROUTES) {
@@ -4465,7 +4469,7 @@ const EhLiveCockpit=(function(){
         id, active,
         watts: active ? c.w : null,
         intensity: active ? intensityOf(c.w) : 0,
-        simulated: id === 'home-practice',
+        simulated: id === 'home-practice' && practiceSim,
         reason: blocked || (active ? (live ? 'Actief' : 'Actief (DEMO)') : c.why)
       });
     }
@@ -4482,9 +4486,9 @@ const EhLiveCockpit=(function(){
     // Vertraagde P1 (RC1-A): alleen de grootte tonen, zonder teken of richting (de richting is niet actueel bevestigd).
     const netShown = importW === null && r.net.state === 'recent' ? formatPower(r.net.shown) : null;
     tiles.net = { title: 'Net', value: importW === null ? (netShown || '—') : formatNet(importW, direction), sub: netSub, tone: tone(r.net), direction, entity: specs.net.entity, p1Sign };
-    tiles.practice = practiceSim
-      ? { title: 'Praktijkruimte', value: formatPower(r.practice.value), sub: 'SIMULATIE · niet gemeten', tone: 'sim', entity: '—' }
-      : { title: 'Praktijkruimte', value: '—', sub: 'Nog niet gekoppeld', tone: 'muted', entity: '—' };
+    tiles.practice = practiceFlow
+      ? { title: 'Praktijkruimte', value: formatPower(r.practice.value), sub: practiceSim ? 'SIMULATIE · niet gemeten' : 'Actueel verbruik', tone: practiceSim ? 'sim' : tone(r.practice), entity: specs.practice.entity || '—' }
+      : { title: 'Praktijkruimte', value: '—', sub: r.practice.state === 'unlinked' ? 'Nog niet gekoppeld' : r.practice.reason || 'Meting niet beschikbaar', tone: r.practice.state === 'unlinked' ? 'muted' : 'warn', entity: specs.practice.entity || '—' };
     const charging = routes['home-ev'].active;
     const cu = input.cupra || {};
     const cupraLabel = charging ? (cu.label || 'Laden') : (cu.idleLabel || 'Niet aan het laden');
@@ -4992,7 +4996,7 @@ const EhLiveCockpit=(function(){
   // Modelroute → ingebakken lijn (alleen als pad voor de lichtpunten), richting en kleur van de lichtpunten.
   const ROUTE = {
     'sun-home': { flow: 'flow-pv', dir: 1, color: '#FFC83D', label: 'Zon → huis' },
-    'home-practice': { flow: 'flow-practice', dir: -1, color: '#F4F1EA', label: 'Huis → praktijk (SIMULATIE)' },
+    'home-practice': { flow: 'flow-practice', dir: -1, color: '#F4F1EA', label: 'Huis → praktijk' },
     'home-grid': { flow: 'flow-net', dir: 1, color: '#3FE6F2', label: 'Huis → net (teruglevering)' },
     'grid-home': { flow: 'flow-net', dir: -1, color: '#FF8A3D', label: 'Net → huis (afname)' },
     'home-ev': { flow: 'flow-car', dir: 1, color: '#7CFF4A', label: 'Huis → Cupra' }
@@ -5316,7 +5320,7 @@ const EhLiveCockpit=(function(){
       setText(D.value, (key === 'net' ? M.netPresentation(model).value : d.value) + (key === 'cupra' ? ' · accu ' + d.soc : ''));
       const rows = [['Status', d.sub], [LIVE ? 'Entiteit' : 'Bron (DEMO-label)', d.entity || '—']];
       if (key === 'cupra' && LIVE) rows.push(['Accuniveau', d.soc + (d.socReason && d.socReason !== 'Actueel' ? ' · ' + d.socReason : '') + (d.socEntity ? ' (' + d.socEntity + ')' : '')]);
-      if (LIVE && model.readings) { const rk = { pv: 'pv', house: 'house', net: 'net', cupra: 'ev', battery: 'battery' }[key]; const rd = rk && model.readings[rk]; if (rd && rd.stampSource) rows.push(['Tijdstempel', rd.stampSource + (Number.isFinite(rd.stampMs) ? ' · ' + hms(rd.stampMs) : '') + (Number.isFinite(rd.ageMs) ? ' · ' + M.ageLabel(rd.ageMs) : '') + ' — tijdstip van de HA-statusmelding, geen bewezen fysieke meettijd']); }
+      if (LIVE && model.readings) { const rk = { pv: 'pv', house: 'house', net: 'net', cupra: 'ev', battery: 'battery', practice: 'practice' }[key]; const rd = rk && model.readings[rk]; if (rd && rd.stampSource) rows.push(['Tijdstempel', rd.stampSource + (Number.isFinite(rd.stampMs) ? ' · ' + hms(rd.stampMs) : '') + (Number.isFinite(rd.ageMs) ? ' · ' + M.ageLabel(rd.ageMs) : '') + ' — tijdstip van de HA-statusmelding, geen bewezen fysieke meettijd']); }
       if (key === 'net') {
         const na = model.routes['grid-home'].active || model.routes['home-grid'].active;
         rows.push(['Richting', !na && (d.direction === 'import' || d.direction === 'export') ? 'Niet bevestigd: netroute staat stil (' + model.routes['home-grid'].reason + ')' : d.direction === 'import' ? '↑ Afname van het net (oranje lichtpunten, net → huis)' : d.direction === 'export' ? '↓ Teruglevering aan het net (cyaan lichtpunten, huis → net)' : d.direction === 'balance' ? 'In balans: geen stroomrichting' : 'Onbekend: geen stroomrichting']);
@@ -5326,7 +5330,7 @@ const EhLiveCockpit=(function(){
         rows.push(['Ruwe P1-sensorwaarde', raw ? (raw.state + (raw.unit ? ' ' + raw.unit : '') + ' (zoals de bron meldt, vóór tekenconfiguratie)') : '—']);
       }
       if (key === 'battery') rows.push(['Let op', 'Virtuele batterij: rekensimulatie, geen fysieke opslag en geen stroomroute.']);
-      if (key === 'practice') rows.push(['Let op', d.tone === 'sim' ? 'Gesimuleerde waarde, niet gemeten en niet opgeteld bij het huis.' : 'Geen submeter gekoppeld: er wordt geen vermogen getoond.']);
+      if (key === 'practice') rows.push(['Let op', d.tone === 'sim' ? 'Gesimuleerde waarde, niet gemeten.' : 'Echte submeter; al onderdeel van het huisverbruik, niet dubbel opgeteld.']);
       if (key === 'house') rows.push(['Balans (rekenkundig)', model.balanceInfo || model.balance]);
       for (const rid of ROUTES_FOR[key]) { const r = model.routes[rid]; rows.push([ROUTE[rid].label, r.active ? 'Actief · ' + M.formatPower(r.watts) : 'Inactief · ' + r.reason]); }
       if (ROUTES_FOR[key].length) rows.push(['Lichtlijn in beeld', 'Decoratief — geen actuele stroomindicator']);
@@ -5516,7 +5520,6 @@ const EhLiveCockpit=(function(){
     const errors = [], notes = [], entities = {};
     for (const [key, s] of Object.entries(SOURCES)) {
       let id = c[s.config] === undefined ? s.default : c[s.config];
-      if (key === 'practice') { if (id) notes.push('praktijk: in HA-01 niet koppelbaar — genegeerd'); id = ''; }
       if (id === '' || id === null) { entities[key] = null; continue; }
       if (typeof id !== 'string' || !ENTITY_RE.test(id)) { errors.push(`${s.config}: ongeldige entiteit-ID`); entities[key] = null; continue; }
       entities[key] = id;
@@ -5647,7 +5650,7 @@ const EhLiveCockpit=(function(){
   * ================================================================================================== */
  const C = scope.EhHaContract, A = scope.EhHaAdapter, X = scope.EhPve04Master;
  const RESOLVE_TIMEOUT_MS = 15000;
- const PASS_KEYS = ['net', 'zonnepanelen', 'huis', 'laden', 'cupra', 'batterij'];
+ const PASS_KEYS = ['net', 'zonnepanelen', 'huis', 'laden', 'cupra', 'batterij', 'praktijk'];
 
  /** Schakelaar: alleen exact `live_cockpit: true` activeert de nieuwe Home (standaard uit). */
  function enabled(c) { return !!c && c.live_cockpit === true; }
@@ -6362,7 +6365,7 @@ const EH_IMM_VIEWS=Object.freeze({
  sun:Object.freeze({route:'pv',title:'Zonnepanelen',icon:'sun',tile:'pv',reading:'pv',intro:'Actuele opwek van de GoodWe-omvormer, met historie en periodevergelijking.'}),
  home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, uit de bestaande huisverbruik-sensor (geen nieuwe berekening).'}),
  grid:Object.freeze({route:'net',title:'Net',icon:'grid',tile:'net',reading:'net',intro:'P1-netvermogen: afname en teruglevering, met historie.'}),
- practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:null,intro:'Alleen-lezen. Er is nog geen submeter gekoppeld.'})
+ practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:'practice',intro:'Live vermogen, gemeten energie en indicatieve maandkosten.'})
 });
 function ehImmOn(card){return typeof EhLiveCockpit!=='undefined'&&!!card?.config&&EhLiveCockpit.immersiveEnabled(card.config);}
 /** Actuele (niet-gepauzeerde) modelstand voor de bestemmingspagina's: zelfde adapter en regels als de Live Cockpit. */
@@ -6910,7 +6913,7 @@ function ehImmDayLines(key,d,extra,sw){
    const item=(page,icon,title,sub,extra)=>'<button type="button" data-eh-imm-menu="1" data-eh-page="'+page+'"'+(extra||'')+'>'+ehIcon(icon)+'<span><strong>'+ehEsc(title)+'</strong><small>'+ehEsc(sub)+'</small></span></button>';
    menu.insertAdjacentHTML('beforeend',
     item('sun','sun','Zonnepanelen','Opwek en historie')+item('home','home','Huisverbruik','Exclusief Cupra, historie')+
-    item('grid','grid','Net','Afname, teruglevering, historie')+item('practice','home','Praktijkruimte','Nog niet gekoppeld')+
+    item('grid','grid','Net','Afname, teruglevering, historie')+item('practice','home','Praktijkruimte','Live vermogen en maandkosten')+
     item('overview','chart','Alle metingen','Alle tegels, grafiek en energiecoach',' data-eh-imm-all="1"'));
   }
   // Focus: na navigatie naar de paginakop; na "Terug naar Home" naar de kaart waarmee de navigatie begon.
