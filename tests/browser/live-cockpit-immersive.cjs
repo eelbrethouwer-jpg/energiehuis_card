@@ -113,6 +113,17 @@ const SETUP=([config,mode])=>{
   window.__sim.pv=+(window.__sim.expected.ev-window.__sim.expected.imp+window.__sim.expected.exp+7.03).toFixed(2);window.__sim.expected.pv=window.__sim.pv;window.__sim.expected.home=window.__sim.expected.imp-window.__sim.expected.exp+window.__sim.pv-window.__sim.expected.ev;
   states[c.zonne_energie]=st(c.zonne_energie,window.__sim.pv,'kWh');states[c.cost_zonneplan_day]=st(c.cost_zonneplan_day,0.31,'EUR',30);
   states[c.cupra_outside_temp]=st(c.cupra_outside_temp,14.4,'°C',600);
+  if(c.praktijk&&c.praktijk_energie){
+   states[c.praktijk]=st(c.praktijk,650,'W');
+   states[c.praktijk_energie]=st(c.praktijk_energie,150.4,'kWh');
+   window.__sim.history[c.praktijk_energie]=[
+    {entity_id:c.praktijk_energie,s:'150',lu:(now-15*60000)/1000,a:{unit_of_measurement:'kWh'}},
+    {entity_id:c.praktijk_energie,s:'150.4',lu:(now-5*60000)/1000,a:{unit_of_measurement:'kWh'}}
+   ];
+   window.__sim.history[c.prijs]=[
+    {entity_id:c.prijs,s:'0.3',lu:(now-20*60000)/1000,a:{unit_of_measurement:'EUR/kWh'}}
+   ];
+  }
  }
   card.hass=window.__hass;
  window.__push=(patch,extra={})=>{const s={...window.__hass.states};for(const [k,v,u] of patch)s[c[k]]=st(c[k],v,u||'W',0);window.__hass={...window.__hass,...extra,states:s};card.hass=window.__hass;};
@@ -217,6 +228,35 @@ const PAGE=()=>{
   await frames(page,4);
   return {ctx,page,errors};
  }
+
+
+ await check('praktijkruimte LIVE: echte 650 W, historische 0,40 kWh × €0,30 en detailpagina zonder dubbeltelling',async()=>{
+  const config={...LIVE,live_cockpit_immersive:true,
+   praktijk:'sensor.praktijkruimte_kwh_meter_vermogen',
+   praktijk_energie:'sensor.praktijkruimte_kwh_meter_energie_import'};
+  const {ctx,page,errors}=await open(config,{width:932,height:430});
+  await page.waitForFunction(()=>document.querySelector('energiehuis-card')._ehImmPractice?.state==='ok',null,{timeout:10000});
+  await frames(page,4);
+  const home=await page.evaluate(()=>{
+   const card=document.querySelector('energiehuis-card'),tile=card._ehLive.ctl.cockpit.el.querySelector('.tile[data-key="practice"]');
+   const model=card._ehLive.ctl.cockpit.model;
+   return {tile:tile.textContent,cost:card._ehImmPractice.cost,kwh:card._ehImmPractice.kwh,partial:card._ehImmPractice.partial,
+    route:model.routes['home-practice'],house:model.tiles.house.value};
+  });
+  assert.match(home.tile,/650\s*W/);assert.match(home.tile,/Kosten deze maand/);
+  assert.match(home.tile,/€\s*0,12/);assert.equal(home.partial,true);
+  assert.ok(home.route.active);assert.equal(home.route.simulated,false);
+  await clickTile(page,'practice');await frames(page,3);
+  const detail=await page.evaluate(()=>{
+   const c=document.querySelector('energiehuis-card'),s=c.shadowRoot.querySelector('.eh-imm-practice');
+   return {view:c._view,detail:s?.textContent||'',chart:!!s?.querySelector('svg')};
+  });
+  await ctx.close();
+  assert.equal(detail.view,'practice');assert.match(detail.detail,/0,40 kWh/);
+  assert.match(detail.detail,/€\s*0,12/);assert.equal(detail.chart,true);
+  assert.deepEqual(errors,[]);
+  return {power:'650 W',cost:'€ 0,12 (deels)',detail:true};
+ });
 
  await check('opt-in UIT: live_cockpit zonder immersive = v1.27-gedrag (hero, alle metingen, detaildialoog); immersive zonder live_cockpit = genegeerd',async()=>{
   const {ctx,page,errors}=await open(LIVE);

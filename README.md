@@ -229,6 +229,11 @@ Voor kilometerstanden gebruikt Energiehuis waar mogelijk Home Assistant-langeter
 - Prijsinspectie per tijdstip.
 - Mobiel geoptimaliseerde vaste navigatie.
 
+
+### Praktijkruimte (opt-in, PR #65)
+
+Met `live_cockpit: true` en `live_cockpit_immersive: true` kun je `praktijk` (actuele W) en `praktijk_energie` (cumulatieve kWh/Wh) instellen. De tegel toont het echte vermogen en daaronder *Kosten deze maand*; de detailpagina toont gemeten kWh en dagelijkse historie. De kostenschatting gebruikt de daadwerkelijk in Recorder beschikbare meter- en dynamische prijsmetingen. Ontbrekende historische prijsuren, ontbrekende maandstart en tellerresets worden niet aangevuld: `deels` betekent dat de kosten onderschat kunnen zijn. Zonnestroom en contractspecifieke componenten worden niet apart toegerekend. Het verbruik is al inbegrepen in Huis en wordt niet extra opgeteld. Bij `praktijk` leeg blijft de tegel *Nog niet gekoppeld*.
+
 ## Installatie via HACS
 
 1. Voeg deze repository in HACS toe als aangepaste repository, type **Dashboard**.
@@ -247,6 +252,8 @@ laden: sensor.alfen_actief_vermogen_totaal
 stroom: sensor.alfen_stroom_l1
 prijs: sensor.zonneplan_current_hourly_electricity_tariff
 huis: sensor.energiehuis_huisverbruik_exclusief_auto
+praktijk: sensor.praktijkruimte_kwh_meter_vermogen
+praktijk_energie: sensor.praktijkruimte_kwh_meter_energie_import
 import: sensor.p1_meter_energie_import
 export: sensor.p1_meter_energie_export
 cupra: sensor.garage_cupra_born_accuniveau
