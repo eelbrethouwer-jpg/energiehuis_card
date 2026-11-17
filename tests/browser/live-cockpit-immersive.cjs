@@ -230,6 +230,48 @@ const PAGE=()=>{
  }
 
 
+
+ await check('woonkamerthermostaat: livewaarden en één handmatige klimaatservicecall',async()=>{
+  const id='climate.wgw_ot_on_off';
+  const {ctx,page,errors}=await open({...IMM,thermostaat:id},{width:932,height:430});
+  await page.evaluate(id=>{
+   const c=document.querySelector('energiehuis-card');
+   window.__hass.states[id]={entity_id:id,state:'auto',attributes:{current_temperature:20,temperature:20,min_temp:7,max_temp:35,target_temp_step:.5,supported_features:1,temperature_unit:'°C'},last_updated:new Date().toISOString()};
+   window.__serviceCalls=[];
+   window.__hass.callService=async(domain,service,data)=>{window.__serviceCalls.push({domain,service,data});};
+   c.hass={...window.__hass};
+  },id);
+  await frames(page,4);
+  const house=await page.evaluate(()=>document.querySelector('energiehuis-card')._ehLive.ctl.cockpit.el.querySelector('.tile[data-key="house"]').textContent);
+  await clickTile(page,'house');await frames(page,3);
+  const before=await page.evaluate(()=>{
+   const p=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-thermo');
+   return {text:p?.textContent,plus:!!p?.querySelector('[data-eh-thermo-delta="1"]:not(:disabled)')};
+  });
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh-thermo-delta="1"]').click());
+  await frames(page,4);
+  const after=await page.evaluate(()=>({calls:window.__serviceCalls,shown:document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-thermo').textContent}));
+  await ctx.close();
+  assert.match(house,/Binnen 20,0°/);assert.match(before.text,/20,0 °C/);assert.equal(before.plus,true);
+  assert.deepEqual(after.calls,[{domain:'climate',service:'set_temperature',data:{entity_id:id,temperature:20.5}}]);
+  assert.match(after.shown,/20,0 °C/);assert.deepEqual(errors,[]);
+  return {manualCalls:after.calls.length,shownSetpointUnaffectedUntilHassUpdate:true};
+ });
+ await check('woonkamerthermostaat: ontbrekende sensor en geen opt-in blijven fail-closed',async()=>{
+  const {ctx,page,errors}=await open({...IMM,thermostaat:'climate.wgw_ot_on_off'},{width:390,height:844});
+  await clickTile(page,'house');await frames(page,3);
+  const disabled=await page.evaluate(()=>{
+   const p=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-thermo');
+   return !!p&&p.querySelector('[data-eh-thermo-delta="1"]').disabled;
+  });
+  await ctx.close();
+  const {ctx:ctx2,page:page2}=await open(IMM,{width:390,height:844});
+  await clickTile(page2,'house');await frames(page2,3);
+  const absent=await page2.evaluate(()=>!document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-thermo'));
+  await ctx2.close();
+  assert.equal(disabled,true);assert.equal(absent,true);assert.deepEqual(errors,[]);
+  return {disabled,absent};
+ });
  await check('praktijkruimte LIVE: echte 650 W, historische 0,40 kWh × €0,30 en detailpagina zonder dubbeltelling',async()=>{
   const config={...LIVE,live_cockpit_immersive:true,
    praktijk:'sensor.praktijkruimte_kwh_meter_vermogen',
