@@ -10,6 +10,7 @@ const EH_DEFAULTS = {
   stroom: 'sensor.alfen_stroom_l1',
   prijs: 'sensor.zonneplan_current_hourly_electricity_tariff',
   huis: 'sensor.energiehuis_huisverbruik_exclusief_auto',
+  thermostaat: '', // optionele woonkamerthermostaat (climate.*)
   praktijk: '', // optionele praktijkruimte-submeter
   praktijk_energie: '', // cumulatieve praktijkruimte-energiemeter
   import: 'sensor.p1_meter_energie_import',
