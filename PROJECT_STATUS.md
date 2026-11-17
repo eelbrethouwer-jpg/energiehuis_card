@@ -1,5 +1,19 @@
 # PROJECT_STATUS — Energiehuis
 
+## Releasekandidaat — 17 november 2026 · v1.31.0 Woonkamerthermostaat
+
+- **Gebouwd:** feature PR #67 naar main gemerged op `82a18cb9e83444548ccafd23ef2773fb9b6bd428` (geteste HEAD `edf16bb6a7f296a1152f8dfa095deaeca18e83ca`). Optionele woonkamerthermostaat in de bestaande immersive Huis-tegel en een handmatige +/− bediening via de Huis-detailpagina.
+- **Versievoorbereiding:** aparte branch `release/energiehuis-v1.31.0-woonkamerthermostaat` met versie in bron/bundel, release-notes, release-gate en uitsluitend handmatige `publish-v1310.yml`. Geen automatische publicatie bij merge.
+- **Automatisch getest:** feature 5/5 GitHub-checks groen, met een succesvol herstartte WebKit-suite. Releasebranch-CI en latere publicatieworkflow moeten elk hun eigen tests uitvoeren en gerapporteerd worden.
+- **Praktisch getest:** nee; echte Home Assistant, iPhone en feitelijke reactie van de OpenTherm-thermostaat/klokprogramma nog te controleren.
+- **Gepubliceerd:** nee; laatste bevestigde GitHub-release is `v1.30.0`.
+- **Veiligheid:** automatische verwarmingsregeling ontbreekt; de klimaatservicecall gebeurt uitsluitend na een bewuste knopdruk, met HA-setpointgrenzen; geen wijziging aan Alfen, Active Load Balancing, 1×40 A, energieformules, opslag of bestaande sensoren.
+- **Toestemming:** eigenaar heeft 17 november akkoord gegeven voor merge en release **mits tests slagen**; publiceren uitsluitend handmatig vanaf `main` met `PUBLISH_v1.31.0`.
+- **Na release:** HACS updaten en aan bestaande Lovelace-config toevoegen: `thermostaat: climate.wgw_ot_on_off`. Geen overige YAML verwijderen.
+
+---
+
+
 ## Feature in ontwikkeling — 17 november 2026 · woonkamerthermostaat (geen release)
 
 - **Baseline:** main `8435ac6722e4ef9bc205705c49eadf2a1453fb0f`, laatst bevestigde release v1.30.0.
