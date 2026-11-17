@@ -10,6 +10,7 @@ const EH_DEFAULTS = {
   stroom: 'sensor.alfen_stroom_l1',
   prijs: 'sensor.zonneplan_current_hourly_electricity_tariff',
   huis: 'sensor.energiehuis_huisverbruik_exclusief_auto',
+  thermostaat: '', // optionele woonkamerthermostaat (climate.*)
   praktijk: '', // optionele praktijkruimte-submeter
   praktijk_energie: '', // cumulatieve praktijkruimte-energiemeter
   import: 'sensor.p1_meter_energie_import',
@@ -6375,6 +6376,30 @@ function ehImmModel(card){
  // Vorig cockpitmodel meegeven: dezelfde netrichting in de dode band (40–80 W) als de Home-tegel.
  try{return M.computeModel(ctl.adapter.input(card._hass,Date.now()),ctl.cockpit?.model||null);}catch(_){return null;}
 }
+
+function ehImmThermostat(card){
+ const id=card?.config?.thermostaat;
+ if(typeof id!=='string'||!/^climate\.[a-z0-9_]+$/.test(id))return null;
+ const h=card?._hass,s=h?.connected===false?null:h?.states?.[id],a=s?.attributes||{};
+ const available=!!s&&!['unknown','unavailable','none'].includes(String(s.state).toLowerCase());
+ const current=available?ehNum(a.current_temperature):null,target=available?ehNum(a.temperature):null;
+ const min=ehNum(a.min_temp),max=ehNum(a.max_temp),step=ehNum(a.target_temp_step);
+ const writable=available&&typeof h?.callService==='function'&&(Number(a.supported_features)&1)!==0&&target!==null&&
+  min!==null&&max!==null&&max>min&&step!==null&&step>0&&step<=2&&target>=min&&target<=max&&String(s.state).toLowerCase()!=='off';
+ return {id,current,target,min,max,step,writable,available,mode:available?String(s.state):'',unit:String(a.temperature_unit||h?.config?.unit_system?.temperature||'°C')};
+}
+function ehImmThermoHtml(card){
+ const t=ehImmThermostat(card);if(!t)return '';
+ const val=n=>n===null?'—':ehFmt(n,1)+' '+ehEsc(t.unit);
+ const pending=!!card._ehImmThermoPending,down=t.writable&&!pending&&t.target-t.step>=t.min-0.00001,up=t.writable&&!pending&&t.target+t.step<=t.max+0.00001;
+ const status=card._ehImmThermoError||(!t.available?'Thermostaat niet beschikbaar in Home Assistant.':pending?'Wijziging verzenden…':!t.writable?'Alleen uitlezen: bediening niet ondersteund of grenzen onbekend.':'Handmatig instellen; klokprogramma en modus blijven ongewijzigd.');
+ return '<section class="eh-imm-thermo" role="region" aria-label="Woonkamerthermostaat"><div class="eh-imm-thermo-head"><strong>Woonkamer</strong><span>'+ehEsc(t.mode||'Niet beschikbaar')+'</span></div>'+
+ '<div class="eh-imm-thermo-values"><div><small>Huidig</small><strong>'+val(t.current)+'</strong></div><div><small>Ingesteld</small><strong>'+val(t.target)+'</strong></div></div>'+
+ '<div class="eh-imm-thermo-controls"><button type="button" data-eh-thermo-delta="-1" aria-label="Temperatuur lager"'+(down?'':' disabled')+'>−</button>'+
+ '<span>Stap '+(t.step===null?'—':ehFmt(t.step,1)+' '+ehEsc(t.unit))+'</span>'+
+ '<button type="button" data-eh-thermo-delta="1" aria-label="Temperatuur hoger"'+(up?'':' disabled')+'>+</button></div><p role="status">'+ehEsc(status)+'</p></section>';
+}
+
 /**
  * Net-pagina: EXACT dezelfde neutrale netpresentatie als de Net-tegel op Home (EhPve04Model.netPresentation, RC2).
  * Een richting (teken, label) alleen bij een ACTIEVE netroute; anders het absolute P1-vermogen zonder teken met
@@ -6411,6 +6436,10 @@ function ehImmCss(){
   '.eh-imm-now[data-tone="bad"]{border-color:#ff6b6b99}.eh-imm-now[data-tone="bad"] span{color:#ffb3b3}',
   '.eh-imm-meta{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:4px 12px;margin:10px 2px 0;font-size:11px;color:#9dbbd1}.eh-imm-meta dd{margin:0;color:#d5e5ef;overflow-wrap:anywhere}',
   '.eh-imm-page .detail-panel{margin-top:14px}.eh-imm-page .detail-close{display:none}',
+  '.eh-imm-thermo{margin-top:12px;padding:14px 16px;border-radius:16px;border:1px solid #8fb3ca44;background:linear-gradient(145deg,#1a3145,#0c2031);color:#e8f3fb}',
+  '.eh-imm-thermo-head{display:flex;justify-content:space-between;gap:12px}.eh-imm-thermo-head span,.eh-imm-thermo-values small,.eh-imm-thermo p,.eh-imm-thermo-controls span{color:#b7cbda;font-size:12px}',
+  '.eh-imm-thermo-values{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.eh-imm-thermo-values div{display:flex;flex-direction:column;gap:4px}.eh-imm-thermo-values strong{font-size:22px;font-variant-numeric:tabular-nums}',
+  '.eh-imm-thermo-controls{display:flex;align-items:center;justify-content:space-between;gap:12px}.eh-imm-thermo-controls button{min-width:48px;min-height:48px;border-radius:12px;background:#244458;border:1px solid #7eaac0;color:#fff;font:inherit;font-size:24px;cursor:pointer}.eh-imm-thermo-controls button:disabled{opacity:.4;cursor:default}.eh-imm-thermo-controls button:focus-visible{outline:2px solid #76c1ef;outline-offset:3px}.eh-imm-thermo p{line-height:1.45;margin:12px 0 0}',
   '.eh-imm-practice{margin-top:12px;padding:14px 16px;border-radius:16px;border:1px solid #8fb3ca33;background:linear-gradient(145deg,#1a3145,#0c2031);color:#d9e9f2;font-size:13px;line-height:1.55}.eh-imm-practice p{margin:8px 0}.eh-imm-practice small{font-size:12px;color:#a9c3d5}',
   '.eh-imm-follow{appearance:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:9px 14px;border-radius:12px;border:1px solid #38dfa3aa;background:#0d3d34;color:#eafff8;font:inherit;font-size:13px;font-weight:750;cursor:pointer}',
   '.eh-imm-headback{margin:0 0 8px}',
@@ -6462,7 +6491,7 @@ function ehImmPageHtml(card,view){
    '<dl class="eh-imm-meta">'+meta.map(([k,x])=>'<dt>'+ehEsc(k)+'</dt><dd>'+ehEsc(x)+'</dd>').join('')+'</dl>';
  }else now='<section class="eh-imm-now" data-tone="warn" aria-label="Actuele meting"><strong>—</strong><span>Meting niet beschikbaar</span></section>';
  return '<main class="subpage eh-imm-page" data-eh-imm-page="'+ehEsc(view)+'" aria-labelledby="eh-imm-title">'+
-  '<div class="subpage-head"><div>'+back+'<h2 id="eh-imm-title" tabindex="-1">'+ehEsc(v.title)+'</h2><p>'+ehEsc(v.intro)+'</p></div></div>'+now+'</main>';
+  '<div class="subpage-head"><div>'+back+'<h2 id="eh-imm-title" tabindex="-1">'+ehEsc(v.title)+'</h2><p>'+ehEsc(v.intro)+'</p></div></div>'+now+(view==='home'?ehImmThermoHtml(card):'')+'</main>';
 }
 /* ===== Home-extra's: betrouwbare dagtotalen, laadsessie en kwartierprijzen (pure functies, testbaar zonder browser) =====
  * Alleen lezen. Geen aannames: ontbrekende of onvolledige data wordt als zodanig getoond (≥, "onvolledig", "niet beschikbaar"),
@@ -6753,6 +6782,18 @@ function ehImmPracticeChart(s){
   requestAnimationFrame(()=>{if(this.isConnected&&typeof this.scrollIntoView==='function')this.scrollIntoView({block:'start'});});
   return true;
  };
+ /** Alleen een handmatige tik verstuurt een klimaatservicecall. */
+ P._ehImmThermoAdjust=async function(delta){
+  if(this._view!=='home'||!ehImmOn(this)||this._ehImmThermoPending||![1,-1].includes(delta))return false;
+  const t=ehImmThermostat(this);if(!t?.writable)return false;
+  const next=Math.round((t.target+delta*t.step)*100)/100;
+  if(!Number.isFinite(next)||next<t.min-0.00001||next>t.max+0.00001)return false;
+  const service=this._hass.callService.bind(this._hass);
+  this._ehImmThermoPending=true;this._ehImmThermoError='';this._schedule();
+  try{await service('climate','set_temperature',{entity_id:t.id,temperature:next});return true;}
+  catch(_){this._ehImmThermoError='Wijzigen mislukt. Controleer de thermostaat in Home Assistant.';return false;}
+  finally{this._ehImmThermoPending=false;this._schedule();}
+ };
  // ===== Home-extra's: gegevens laden (alleen lezen) =====
  // Dagtotalen: één gedeelde, gecachete recorder-statistiekvraag (uurperiode, vandaag) voor alle vakjes; per 5 minuten hooguit één
  // (2 minuten na een mislukking). De laadsessie komt uit de Alfen-tellerhistorie en wordt alleen tijdens het laden ververst (150 s).
@@ -6847,7 +6888,11 @@ function ehImmPracticeChart(s){
    const line=ehImmPracticeCostText(this._ehImmPractice);return {lines:[line],aria:[line]};
   }
   if(!['pv','house','cupra','net'].includes(key))return null;
-  return ehImmDayLines(key,this._ehImmMetrics(),{cost:key==='net'?ehImmCostToday(h,c,now):null,session:key==='cupra'?this._ehImmSession(m):null},sw||0);
+  const base=ehImmDayLines(key,this._ehImmMetrics(),{cost:key==='net'?ehImmCostToday(h,c,now):null,session:key==='cupra'?this._ehImmSession(m):null},sw||0);
+  if(key!=='house')return base;
+  const t=ehImmThermostat(this);if(!t)return base;
+  const read=n=>n===null?'—':ehFmt(n,1)+'°',line='Binnen '+read(t.current)+' · doel '+read(t.target);
+  return {lines:[...(base?.lines||[]),line],aria:[...(base?.aria||[]),'Woonkamer '+(t.current===null?'niet beschikbaar':ehFmt(t.current,1)+' graden')+'; doel '+(t.target===null?'niet beschikbaar':ehFmt(t.target,1)+' graden')]};
  };
  /** Kwartierprijs-knop (Zonneplan, bestaande prijssensoren; echte tijdstempels, 92/96/100 kwartieren; opent Slim laden). */
  P._ehImmPrice=function(){
@@ -6947,6 +6992,8 @@ function ehImmPracticeChart(s){
    this._ehImmEvents=true;
    root.addEventListener('click',e=>{
     if(!ehImmOn(this))return;
+    const thermo=e.target?.closest?.('[data-eh-thermo-delta]');
+    if(thermo){e.preventDefault();e.stopPropagation();this._ehImmThermoAdjust(Number(thermo.dataset.ehThermoDelta));return;}
     if(e.target?.closest?.('[data-eh-imm-all]')){this._ehImmAll=true;this._ehImmFocus='page';this._schedule();return;}
     const page=e.target?.closest?.('[data-eh-page]');
     if(!page)return;

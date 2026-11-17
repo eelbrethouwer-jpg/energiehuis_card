@@ -1,5 +1,17 @@
 # PROJECT_STATUS — Energiehuis
 
+## Feature in ontwikkeling — 17 november 2026 · woonkamerthermostaat (geen release)
+
+- **Baseline:** main `8435ac6722e4ef9bc205705c49eadf2a1453fb0f`, laatst bevestigde release v1.30.0.
+- **Gebouwd:** optionele thermostaatwaarden op Huis-tegel en handmatige setpointbediening op Huis-detail. Branch `feature/woonkamerthermostaat-live-cockpit-20261117`, draft-PR.
+- **Automatisch getest:** Node-test en Chromium/WebKit-browseracceptatie toegevoegd; CI-resultaat nog controleren.
+- **Praktisch getest:** nee; echte Home Assistant met `climate.wgw_ot_on_off`, iPhone, toegankelijkheid en thermostaatreactie nog te valideren.
+- **Gepubliceerd:** nee; geen merge, tag of HACS-update.
+- **Veiligheid:** geen automatische HVAC-sturing; uitsluitend klik op ± kan `climate.set_temperature` aanroepen, begrensd door HA-attributen. Alfen, load balancing, opslag, kostenformules en klokprogramma ongewijzigd.
+
+---
+
+
 ## Releasekandidaat — 14 november 2026 · v1.30.0
 
 - **Gebouwd:** Praktijkruimte-submeter, maandkostenindicatie en daggrafiek uit PR #65. Feature-HEAD `e70dea3efe5d82f30f19111c638c71c1977b4d48`; main-featuremerge `76b7cd3d78f41c24d623d756009ee21493965779`.

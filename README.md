@@ -332,3 +332,15 @@ Via **Aanbieder uit tarievenlijst** haal je openbare aanbiedingen op van [energi
 Voor dynamische lijstcontracten heb je een HA-prijssensor nodig met **kale beursprijs inclusief btw, zonder energiebelasting of leveranciersopslag**. Deze release maakt die sensor niet aan. Koppel geen volledige Zonneplan-prijs als kale beursprijs. Teruglevering kan dezelfde marktprijs plus een getekende correctie gebruiken. Oude handmatige contracten blijven werken.
 
 Maandkosten worden naar rato van kalenderdagen verdeeld. De uitkomst blijft indicatief: geen automatische staffels, actieprijzen, salderingsregels of historische tariefwijzigingen. Zie [RC2-notes](RELEASE_NOTES_v1.13.0_RC2.md) en [bronvermelding](THIRD_PARTY_TARIFF_DATA.md).
+
+
+## Woonkamerthermostaat (optioneel, Live Cockpit)
+
+Met een gekoppelde thermostaat toont de Huis-tegel de actuele woonkamer- en ingestelde temperatuur. De detailpagina van Huis heeft twee handmatige temperatuurknoppen. Voeg aan de **bestaande** Lovelace-kaart toe:
+
+```yaml
+thermostaat: climate.wgw_ot_on_off
+```
+
+Dit werkt bij `live_cockpit: true` en `live_cockpit_immersive: true`. Zonder `thermostaat` verandert er niets. De knoppen vereisen een beschikbaar `climate`-apparaat met `TARGET_TEMPERATURE`, `min_temp`, `max_temp` en `target_temp_step`; bij ontbrekende of ongeldige data is de bediening uitgeschakeld. Iedere tik geeft maximaal één `climate.set_temperature`-opdracht, binnen de door het apparaat opgegeven grenzen. De zichtbare setpointtemperatuur verandert alleen als Home Assistant daarna de nieuwe waarde terugmeldt. Het klokprogramma, de HVAC-modus en de energie-/laadregeling worden niet gewijzigd. Er is **geen automatische verwarmingssturing**.
+
