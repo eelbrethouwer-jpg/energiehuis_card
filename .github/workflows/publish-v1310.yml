@@ -29,7 +29,7 @@ jobs:
       - name: Verify release identity and notes
         run: |
           test "$GITHUB_REF" = "refs/heads/main"
-          grep -Fq "const EH_VERSION = '1.30.0';" energiehuis-card.js
+          grep -Fq "const EH_VERSION = '1.31.0';" energiehuis-card.js
           grep -Fq "name:'Energiehuis v1.31.0'" energiehuis-card.js
           grep -Fq "function eh40Cockpit" energiehuis-card.js
           grep -Fq "function createController(card, cfg)" energiehuis-card.js

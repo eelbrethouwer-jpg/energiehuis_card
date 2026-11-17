@@ -16,6 +16,8 @@ test('v1.31.0: release alleen na handmatige main-validatie met bevestigingscode'
  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
  assert.match(workflow,/inputs\.confirmation == 'PUBLISH_v1\.31\.0'/);
  assert.match(workflow,/needs: validate/);
+ assert.ok(workflow.includes(`grep -Fq "const EH_VERSION = '1.31.0';" energiehuis-card.js`),'release must validate its own version');
+ assert.ok(!workflow.includes(`grep -Fq "const EH_VERSION = '1.30.0';" energiehuis-card.js`),'release must never expect prior version');
  assert.match(workflow,/git ls-remote --tags origin refs\/tags\/v1\.31\.0/);
  assert.match(workflow,/gh release create v1\.31\.0 --target "\$GITHUB_SHA"/);
 });
