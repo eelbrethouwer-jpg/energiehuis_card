@@ -1,6 +1,6 @@
 # PROJECT_STATUS — Energiehuis
 
-## 21 november 2026 · Batterij-dagadvies
+## Releasekandidaat v1.32.0 · 21 november 2026 · Batterij-dagadvies
 
 Historische net- en zonnelading, ontladen tijdens piekuren en dagelijks financieel saldo op basis van P1 en uurprijzen. Praktijktest in Home Assistant staat open.
 

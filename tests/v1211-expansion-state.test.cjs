@@ -18,8 +18,8 @@ const detail=(cls,label,open=false,contract=null)=>({
 });
 const root=details=>({querySelectorAll:selector=>selector==='details'?details:[]});
 
-test('v1.31.0 behoudt stabiliteitsfix zonder Cupra-state te verwijderen',()=>{
- assert.equal(EH_VERSION,'1.31.0');
+test('v1.32.0 behoudt stabiliteitsfix zonder Cupra-state te verwijderen',()=>{
+ assert.equal(EH_VERSION,'1.32.0');
  assert.match(src,/this\._cupraDetails=!this\._cupraDetails/);
  assert.match(src,/eh28PreserveExpansion/);
 });
