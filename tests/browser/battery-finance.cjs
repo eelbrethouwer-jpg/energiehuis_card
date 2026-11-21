@@ -95,7 +95,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  // One primary, interactive flow chart; legacy scenarios remain accessible but collapsed.
  assert.equal(await page.locator('.eh23-flow-svg').count(),1);
  assert.equal(await page.locator('.eh23-advanced').evaluate(e=>e.open),false);
- assert.match(await page.locator('.eh23-flow').innerText(),/Gesimuleerd, niet fysiek gemeten/);
+ assert.match(await page.locator('.eh24-flow').innerText(),/Gesimuleerd, niet fysiek gemeten/);
  const lastDay=await page.locator('.eh23-day-nav strong').innerText();
  await page.locator('[data-eh23-step="-1"]').click();
  await page.waitForFunction(previous=>{
@@ -178,7 +178,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
  for(const width of [320,390,768,1280]){
   await page.setViewportSize({width,height:900});
   assert.equal(await page.locator('.eh20-panel').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow battery '+width);
-  assert.equal(await page.locator('.eh23-flow').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow flow '+width);
+  assert.equal(await page.locator('.eh24-flow').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow flow '+width);
   assert.equal(await page.locator('.eh30-evidence').evaluate(x=>x.scrollWidth>x.clientWidth+2),false,'Overflow evidence '+width);
  }
  // Cupra's custom expand/collapse uses model state, which must also survive HA rerenders.
