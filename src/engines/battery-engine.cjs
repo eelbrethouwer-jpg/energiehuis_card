@@ -20,6 +20,27 @@ function eh21BatteryProfile(cap,config={}){
   chargeKw:option('charge_kw',power,.1,20),
   dischargeKw:option('discharge_kw',power,.1,20)};
 }
+// Day-ahead price ranks use only the prices of the same local delivery day.
+function ehPeakWindows(rows){
+ const days=new Map(),windows=new Map();
+ for(const row of rows){
+  const day=new Date(row.t).toDateString();
+  if(!days.has(day))days.set(day,[]);
+  days.get(day).push(row);
+ }
+ for(const day of days.values()){
+  const ordered=day.filter(r=>Number.isFinite(r.price)).sort((a,b)=>a.price-b.price||a.t-b.t);
+  const cheapest=new Set(ordered.slice(0,4));
+  const peak=new Set(ordered.slice(-4));
+  let laterPeak=-Infinity;
+  for(let i=day.length-1;i>=0;i--){
+   const row=day[i];
+   windows.set(row.t,{cheap:cheapest.has(row)&&!peak.has(row),peak:peak.has(row),laterPeak});
+   if(peak.has(row))laterPeak=Math.max(laterPeak,row.price);
+  }
+ }
+ return windows;
+}
 function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
  const p=profile&&profile.capacity===cap?profile:eh21BatteryProfile(cap,{battery_sim_power_kw:power});
  const usable=Math.max(.01,Math.min(cap,p.usableCapacity));
@@ -28,7 +49,8 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
  const chargeEff=Math.sqrt(eta),dischargeEff=Math.sqrt(eta);
  const valid=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)&&r.import>=0&&r.export>=0);
  const pricesComplete=valid.length>0&&valid.every(r=>Number.isFinite(r.price));
- if(mode==='smart'&&!pricesComplete)return null;
+ const windows=mode==='peak'?ehPeakWindows(rows):null;
+ if((windows||mode==='smart')&&!pricesComplete)return null;
  const threshold=pricesComplete?eh20Percentile(valid.map(r=>r.price),.25):null;
  let soc=0,pvCharge=0,gridCharge=0,served=0,benefit=0,lostExport=0,lastEnd=null;
  let avoidedPurchase=0,gridPurchase=0;
@@ -57,6 +79,11 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
    if(fullRejected>1e-7)fullHours++;
   }
   // An hour with export cannot also discharge: hourly P1 samples lack event order.
+  const slot=windows?.get(r.t);
+  if(slot?.cheap&&r.export===0&&slot.laterPeak*eta>price+.015){
+   chargedGrid=Math.min(maxCharge,Math.max(0,(usable-soc)/chargeEff),Math.max(0,9.2*hours-r.import));
+   soc+=chargedGrid*chargeEff;gridCharge+=chargedGrid;gridPurchase+=chargedGrid*price;benefit-=chargedGrid*price;
+  }
   if(r.export===0&&mode==='smart'&&price<=threshold){
    const future=valid.filter(v=>v.t>r.t&&v.t<r.t+24*3600000);
    const high=future.length?Math.max(...future.map(v=>v.price)):null;
@@ -68,7 +95,7 @@ function eh20Simulate(rows,cap,roundtrip,power,mode,buy,sell,profile=null){
     gridPurchase+=chargedGrid*price;
    }
   }
-  if(r.export===0&&chargedGrid===0&&r.import>0){
+  if(r.export===0&&chargedGrid===0&&r.import>0&&(!slot||(slot.peak&&price>0))){
    used=Math.max(0,Math.min(r.import,maxDischarge,soc*dischargeEff));
    soc-=used/dischargeEff;served+=used;benefit+=used*price;avoidedPurchase+=used*price;
   }

@@ -1,5 +1,9 @@
 # PROJECT_STATUS — Energiehuis
 
+## 21 november 2026 · Batterij-dagadvies
+
+Historische net- en zonnelading, ontladen tijdens piekuren en dagelijks financieel saldo op basis van P1 en uurprijzen. Praktijktest in Home Assistant staat open.
+
 ## Releasekandidaat — 17 november 2026 · v1.31.0 Woonkamerthermostaat
 
 - **Gebouwd:** feature PR #67 naar main gemerged op `82a18cb9e83444548ccafd23ef2773fb9b6bd428` (geteste HEAD `edf16bb6a7f296a1152f8dfa095deaeca18e83ca`). Optionele woonkamerthermostaat in de bestaande immersive Huis-tegel en een handmatige +/− bediening via de Huis-detailpagina.

@@ -162,3 +162,34 @@ function eh23BatteryFlowChart(card,simulation,rows){
 }
 
 
+
+function ehBatteryDayAdvice(result,solar,day,sell,mode){
+ if(!day)return '';
+ const points=day.indices.map(i=>result.points[i]);
+ const measured=points.filter(p=>Number.isFinite(p?.soc)&&Number.isFinite(p.price));
+ const title=day.date.toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+ const head='<section class="eh23-flow"><h4>Dagadvies · '+ehEsc(title)+'</h4>';
+ if(measured.length!==points.length)return head+'<p>Voor deze dag ontbreken meeturen of uurprijzen. Het dagsaldo is onbekend.</p></section>';
+ const sum=fn=>measured.reduce((total,p)=>total+fn(p),0);
+ const avoided=sum(p=>p.discharged*p.price),purchase=sum(p=>p.chargedGrid*p.price);
+ const solarKwh=sum(p=>p.chargedSolar),grid=sum(p=>p.chargedGrid),served=sum(p=>p.discharged);
+ const lost=solarKwh*sell,net=avoided-purchase-lost;
+ const baseline=day.indices.reduce((total,i)=>{
+  const p=solar.points[i];return total+p.discharged*p.price-p.chargedSolar*sell;
+ },0);
+ const max=Math.max(.001,...measured.map(p=>Math.abs(p.price)));
+ const width=480,step=width/points.length;
+ const bars=points.map((p,i)=>{
+  const height=40*Math.abs(p.price)/max;
+  const hour=new Date(p.t).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  return '<rect x="'+(i*step+1)+'" y="'+(p.price>=0?44-height:44)+'" width="'+(step-2)+'" height="'+Math.max(.5,height)+'" fill="'+(p.discharged?'#ffc378':p.chargedGrid?'#81bdff':p.chargedSolar?'#64d6ac':'#839bab')+'"><title>'+hour+' · '+ehEuro2(p.price)+'/kWh</title></rect>';
+ }).join('');
+ const metric=(name,value)=>'<div><small>'+name+'</small><strong>'+value+'</strong></div>';
+ return head+'<p class="eh26-outlook-summary">Dagsaldo '+ehEuro2(net)+' · '+ehFmt(served,2)+' kWh eigen afname uit de batterij.</p>'+
+ '<div class="eh22-ledger">'+metric('Goedkoop ingekocht',ehFmt(grid,2)+' kWh · '+ehEuro2(purchase))+metric('Geladen uit zon',ehFmt(solarKwh,2)+' kWh')+
+ metric('Vermeden inkoop',ehEuro2(avoided))+metric('Gemiste terugleververgoeding',ehEuro2(lost))+'</div>'+
+ '<svg viewBox="0 0 480 90" width="100%" role="img" aria-label="Uurprijzen met nulniveau en batterijactie"><path d="M0 44H480" stroke="#b8c8d0"/>'+bars+'</svg>'+
+ '<p class="eh20-meta">Uurprijs vanaf middernacht · blauw netladen, groen zonneladen, oranje ontladen. Hoogste '+ehEuro2(Math.max(...points.map(p=>p.price)))+'/kWh · laagste '+ehEuro2(Math.min(...points.map(p=>p.price)))+'/kWh.</p>'+
+ (mode==='smart'?'<p>Verschil met alleen zonneladen op deze dag: '+ehEuro2(net-baseline)+'.</p>':'')+
+ '<p class="eh20-meta">Voorraad gaat mee naar morgen. Vergelijk het saldo over meerdere dagen. Exclusief aanschaf, stand-by en slijtage.</p></section>';
+}
