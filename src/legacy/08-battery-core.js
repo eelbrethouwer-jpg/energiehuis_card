@@ -27,12 +27,12 @@ function eh20HourlyPrices(priceStats,history,bins,id,h){
  const records=Array.isArray(priceStats?.[id])?priceStats[id]:[];
  for(const r of records){
   const t=eh20PriceTime(r.start),price=ehNum(r.mean);
-  if(Number.isFinite(t)&&price!==null&&price>=-2&&price<=10)mapped.set(t,price*factor);
+  if(Number.isFinite(t)&&price!==null&&price*factor>=-2&&price*factor<=10)mapped.set(t,price*factor);
  }
  const grouped=Array.isArray(history)?(history.find(g=>Array.isArray(g)&&g.some(s=>s?.entity_id===id))||history[0]):null;
  const states=Array.isArray(history?.[id])?history[id]:Array.isArray(grouped)?grouped:[];
  const observations=states.map(s=>({t:eh20PriceTime(s.last_changed??s.last_updated??s.lc??s.lu),p:ehNum(s.state??s.s)}))
-  .filter(s=>Number.isFinite(s.t)&&s.p!==null&&s.p>=-2&&s.p<=10).sort((a,b)=>a.t-b.t);
+  .filter(s=>Number.isFinite(s.t)&&s.p!==null&&s.p*factor>=-2&&s.p*factor<=10).sort((a,b)=>a.t-b.t);
  for(const b of bins){
   if(mapped.has(b.t))continue;
   // Require an actual nearby price observation, not a stretched stale price.

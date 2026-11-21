@@ -74,7 +74,7 @@ function eh26ForecastHtml(h,c,cap,power,mode,now=new Date(),card=null){
   '<details class="eh27-chart-info"><summary>Berekening en beperkingen</summary><p class="eh26-foot">Selectie op basis van beschikbare Zonneplan-uurprijzen, zonder terugleververgoeding, slijtage of netbelasting. Bij onvolledige prijzen geen garantie op goedkoopste uren. Geen Home Assistant- of Alfen-commando’s.</p></details></section>';
 }
 function eh26BatteryTabs(card){
- const active=['today','history','returns','compare'].includes(card._eh26Tab)?card._eh26Tab:'today';
+ const active=['today','history','returns','compare'].includes(card._eh26Tab)?card._eh26Tab:'history';
  return '<div class="eh26-tabs" role="group" aria-label="Batterijpagina-onderdelen">'+
   [['today','Vandaag'],['history','Historie'],['returns','Rendement'],['compare','Vergelijken']].map(([key,name])=>'<button type="button" data-eh26-tab="'+key+'" aria-pressed="'+(active===key)+'" class="'+(active===key?'selected':'')+'">'+name+'</button>').join('')+'</div>';
 }
@@ -87,7 +87,7 @@ function eh20BatteryView(card,h,c){
  if(card._eh26Tab==='compare')return eh26BatteryTabs(card)+eh31CompareHtml(card);
  const data=card._eh20Battery,cap=[5,10,15].includes(card._eh17Capacity)?card._eh17Capacity:10;
  const days=card._eh22Days===30?30:7;
- let mode=card._eh20Mode==='smart'?'smart':'solar';
+ let mode=card._eh20Mode==='solar'?'solar':'smart';
  if(card.isConnected&&!card._eh20Loading&&(!data||data.days!==days||Date.now()-data.at>30*60000))card._eh20LoadBattery();
  const baseNote='<p class="subtle">Afzonderlijk chronologisch uurmodel. Start met een lege batterij; bij ontbrekende uren wordt de SOC niet over dat gat doorgetrokken. Uurafname/-teruglevering bepalen geen exacte volgorde binnen het uur. Geen fysieke batterij en geen laadcommando’s.</p>';
  if(!data)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
@@ -97,7 +97,7 @@ function eh20BatteryView(card,h,c){
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
  if(mode==='smart'&&!ratesGood)mode='solar';
  const profiles=[5,10,15].map(size=>eh21BatteryProfile(size,c));
- const results=profiles.map(p=>eh20Simulate(rows,p.capacity,eff,power,mode,buy,sell,p));
+ const results=profiles.map(p=>eh20Simulate(rows,p.capacity,eff,power,mode==='smart'?'peak':mode,buy,sell,p));
  const selected=results.find(r=>r?.capacity===cap),canShow=coverage>=48&&selected;
  const solarAlways=eh20Simulate(rows,cap,eff,power,'solar',buy,sell,eh21BatteryProfile(cap,c));
  const table=results.map((r,i)=>'<tr class="'+([5,10,15][i]===cap?'eh20-active':'')+'"><th scope="row"><button type="button" data-eh17-cap="'+[5,10,15][i]+'" aria-pressed="'+(cap===[5,10,15][i])+'">'+[5,10,15][i]+' kWh</button></th><td>'+(!r||coverage<48?'—':ehFmt(r.served,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehFmt(r.pvLimitedCapacity,1)+' kWh')+'</td><td>'+(!r||coverage<48?'—':ehEuro2(r.savings))+'</td></tr>').join('');
@@ -140,14 +140,14 @@ function eh20BatteryView(card,h,c){
  const eh26Summary=canShow?'<div class="eh26-overview"><div><small>Vermeden netafname · historie</small><strong>'+ehFmt(selected.served,1)+' kWh</strong></div>'+
   '<div><small>Zonnestroom opgeslagen · historie</small><strong>'+ehFmt(selected.pvCharge,1)+' kWh</strong></div>'+
   '<div><small>Indicatieve besparing · historie</small><strong>'+ehEuro2(selected.savings)+'</strong></div></div>':'';
- const eh26Tab=['today','history','returns','compare'].includes(card._eh26Tab)?card._eh26Tab:'today';
- const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+hourPicker+'</div>';
+ const eh26Tab=['today','history','returns','compare'].includes(card._eh26Tab)?card._eh26Tab:'history';
+ const eh26History='<div class="eh26-panel eh26-history" '+(eh26Tab==='history'?'':'hidden')+'>'+blocks+(canShow?ehBatteryDayAdvice(selected,solarAlways,chosenDay,sell,mode):'')+hourPicker+'</div>';
  const eh26Today='<div class="eh26-panel" '+(eh26Tab==='today'?'':'hidden')+'>'+eh26ForecastHtml(h,c,cap,selected?.chargeKw||power,mode,new Date(),card)+'</div>';
  const eh26Returns='<div class="eh26-panel" '+(eh26Tab==='returns'?'':'hidden')+'>'+eh22BatteryFinancialHtml(card,results,rows,cap)+
   '<details class="eh26-advanced"'+(card._eh26AdvancedOpen?' open':'')+'><summary>Capaciteiten, simulatiegegevens en aannames</summary>'+eh25AuditHtml(card,h,c,rows)+
   '<details class="eh23-profiles"><summary>Details van 5, 10 en 15 kWh vergelijken</summary>'+batteryChoices+'</details>'+
   '<div class="eh20-table-wrap"><table class="eh20-table"><caption>Uurmodel bij '+ehEsc(mode==='smart'?'zon en goedkoop netladen':'alleen zonneladen')+'</caption><thead><tr><th>Capaciteit</th><th>Vermeden afname</th><th>Niet opgeslagen: vol</th><th>Indicatieve besparing</th></tr></thead><tbody>'+table+'</tbody></table></div></details></div>';
- const modeText=mode==='smart'?'Goedkope-urenregel op basis van historisch goedkoopste kwartiel en volgende 24 uur; dit is een terugkijkende scenario-aanname met perfecte kennis, geen uitvoerbaar laadplan. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
+ const modeText=mode==='smart'?'Dagprijzen vooraf bekend verondersteld. Vier goedkoopste uren voor netladen als een latere piek na verlies minimaal 1,5 cent/kWh oplevert. Vier duurste uren voor eigen afname. Zonoverschot krijgt voorrang binnen elk uur. Het daadwerkelijke piekvermogen op de 1×40A-aansluiting is hiermee niet gecontroleerd.':'Alleen zonnestroom die anders zou zijn teruggeleverd wordt theoretisch opgeslagen.';
  const delta=canShow&&mode==='smart'&&solarAlways?ehEuro2(selected.savings-solarAlways.savings):null;
  return '<section class="subsection eh20-panel" aria-label="Batterij Simulator 3.0">'+
   '<h3>'+ehIcon('battery')+' Batterij · inzicht en verwachting</h3>'+
