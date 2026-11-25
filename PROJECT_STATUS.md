@@ -1,5 +1,18 @@
 # PROJECT_STATUS — Energiehuis
 
+## Feature in ontwikkeling — 26 november 2026 · Energiehuis 3.0 Balans (geen release)
+
+- **Baseline:** main `eaa76eb5cbafe3b3981b791ff00b72a65ee3052d` (v1.32.0, PR #71). Branch `feature/energiehuis-3-balans-20261126`.
+- **Gebouwd:** nieuwe pagina Inzicht → Balans (alleen lezen) met zuivere engine `src/engines/balance-engine.cjs` (vermogensbalans met kwaliteitsmodel, kWh uit tellers, kostenlagen A/B/C met saldering per datum, meetcontrole) en `src/legacy/18-balance-page.js`. Kleine wijzigingen in `02-card-shell.js` (view `balance`) en `16-regisseur-cockpit.js` (menu-item); beginpagina-lagen `16-live-cockpit.js` en `17-live-immersive.js` byte-identiek aan main.
+- **Automatisch getest (lokaal, niet in CI):** 500/500 Node-tests in `TZ=UTC` en `TZ=Europe/Amsterdam` (nieuw: 38 engine- en 23 pagina-tests inclusief de acht scenario's uit de review). `node scripts/build.cjs --check` en `node --check energiehuis-card.js` geslaagd. Vier bestaande structuurtests zijn doelbewust aangepast voor de nieuwe fragmentvolgorde en het extra engine-bestand.
+- **Handmatig gecontroleerd:** de bundel in een echte Chrome met nagebootste HA-data (telefoon 390 px en desktop 1100 px): Balans rendert zonder consolefouten, Home is pixel-identiek aan v1.32.0, doorklikken via Inzicht → Balans en periodewissel werken.
+- **Niet uitgevoerd:** de Playwright-suites onder `tests/browser/` (Chromium en WebKit; geen browser-downloads in deze sessie), CI-checks en GitHub-API (token ongeldig).
+- **Praktisch getest:** nee. Echte Home Assistant, iPhone, P1-teken, AC/DC van de GoodWe, meetlocatie van de praktijkmeter en beschikbaarheid van langetermijnstatistiek zijn niet gecontroleerd. De Meetcontrole in de pagina helpt dit met eigen data te doen.
+- **Gepubliceerd:** nee. Geen versieverhoging in deze PR (aparte release-PR volgens AGENTS.md §6).
+- **Veiligheid:** geen nieuwe servicecalls, opslagkeys of HA-schrijfacties; Alfen, loadbalancing en 1×40 A ongewijzigd.
+
+---
+
 ## Releasekandidaat v1.32.0 · 21 november 2026 · Batterij-dagadvies
 
 Historische net- en zonnelading, ontladen tijdens piekuren en dagelijks financieel saldo op basis van P1 en uurprijzen. Praktijktest in Home Assistant staat open.

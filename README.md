@@ -1,5 +1,27 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## In ontwikkeling: Energiehuis 3.0 — pagina Balans (alleen lezen)
+
+Nieuwe pagina **Inzicht → Balans**. De beginpagina (Home, Live Cockpit en immersive Huis) is ongewijzigd. De pagina laat zien waar je stroom heen gaat, waar hij vandaan komt en wat het kost, met bij elk getal hoe zeker het is.
+
+- **Nu:** Net, Zonnepanelen, Woning, Praktijkruimte en Cupra, met de controle *Woning + Praktijk + Cupra = Net + Zon*. Woning is de restpost `P1 + PV − Alfen − Praktijk`. Elke waarde heeft een kwaliteitsmarkering: gemeten, berekend, geschat (bijvoorbeeld PV 0 W bij bewezen nacht), verouderd of niet beschikbaar. Een ontbrekende of verouderde bron is nooit stilzwijgend 0; zonder volledige invoer toont Woning geen getal maar de reden.
+- **Periodes** (Vandaag, Gisteren, 7 dagen, 30 dagen, Dit jaar): kWh per verbruiker uit de **tellers** (Recorder-uurstatistiek), niet uit vermogen, en zonder klem per uur. Een periode met gaten toont *minimaal* en het dekkingspercentage.
+- **Kosten in drie lagen:** waarde van het verbruik, netto netkosten en zonne-impact. De bedragen per verbruiker tellen op tot het totaal. Het verdeelmodel (≈) is boekhouding, geen meting.
+- **Saldering:** tot en met 31 december 2026 geldt saldering (benadering per uur); vanaf 1 januari 2027 wordt teruglevering apart vergoed.
+- **Meetcontrole:** controleert op je eigen uurdata van de laatste twee weken het P1-teken, of het PV-vermogen DC lijkt tegenover de teller, en of de uurbalans sluit. Dit is een indicatie, geen bewijs.
+
+Optionele nieuwe configuratie:
+
+```yaml
+terugleververgoeding: 0.07      # €/kWh vanaf 2027, of een sensor (bijv. sensor.zonneplan_terugleververgoeding)
+p1_sign: export_positive        # alleen als je P1-sensor positief is bij teruglevering; alias live_cockpit_p1_sign
+balance_max_skew_s: 10          # maximale tijdspreiding tussen bronnen voor Woning (voorlopige waarde)
+```
+
+Zonder `terugleververgoeding` toont de pagina na 2026 alleen de afnamekosten en laat netto en zonvoordeel weg. De kWh-kant gebruikt `import`, `export`, `zonne_energie`, `laad_energie` en (optioneel) `praktijk_energie`; die sensoren hebben langetermijnstatistiek nodig (`state_class`). De prijskant gebruikt de uurgemiddelden van `prijs`.
+
+Geen servicecalls, geen nieuwe opslagkeys en geen wijziging aan Alfen-bediening, Active Load Balancing of de 1×40 A-grens. Zie ook de engineeringreview *Energiehuis 2.0* (balansdefinities) en `src/engines/balance-engine.cjs`.
+
 ## In ontwikkeling: Live Cockpit als Home (standaard uit)
 
 De goedgekeurde fotorealistische Live Cockpit kan binnen dezelfde Energiehuis-kaart het Home-startscherm worden. Zolang de geïntegreerde versie niet praktisch is getest, staat hij **standaard uit**; de bestaande EnergieRegisseur-cockpit blijft dan ongewijzigd.
