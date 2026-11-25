@@ -335,3 +335,25 @@ test('oudere HA zonder last_reported: constante sensor blijft bruikbaar en de ti
  const c2=makeCard({},stale);
  assert.match(c2._balanceHtml(stale,c2.config),/class="eh3-row-val">—<\/span>/);
 });
+
+test('verloopgrafiek: een kolom per uur, drie lagen, gaten als grijs vlak, toegankelijke samenvatting',async()=>{
+ let hit=0;
+ const per={...HOURLY,'sensor.imp':()=>{hit++;return hit===5?null:{change:1.0};}};
+ const {card,h}=await load({},per);
+ const n=card._balResult.hours,html=card._balanceHtml(h,card.config);
+ const svg=html.match(/<div class="eh3-chart">[\s\S]*?<\/svg>/)[0];
+ assert.equal((svg.match(/<title>/g)||[]).length,n,'één tooltip per uur');
+ assert.equal((svg.match(/class="eh3-miss"/g)||[]).length,1,'het uur met een gat is een grijs vlak');
+ assert.equal((svg.match(/class="eh3-c-w"/g)||[]).length,n-1);
+ assert.equal((svg.match(/class="eh3-c-c"/g)||[]).length,n-1);
+ assert.match(svg,/role="img" aria-label="Verbruik per uur: [\d.,]+ kWh in totaal/);
+ assert.match(svg,/niet volledig/);
+});
+
+test('verloopgrafiek: 7 dagen per dag, geen grafiek zonder complete uren',async()=>{
+ const {card,h}=await load({},HOURLY,'7d');
+ assert.match(card._balanceHtml(h,card.config),/aria-label="Verbruik per dag/);
+ const per={...HOURLY};delete per['sensor.ale'];
+ const bad=await load({},per,'yesterday');
+ assert.doesNotMatch(bad.card._balanceHtml(bad.h,bad.card.config),/eh3-chart/);
+});

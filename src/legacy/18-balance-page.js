@@ -225,6 +225,49 @@ function eh3CoverageHtml(r){
  if(!a.partial)return `<p class="eh3-cov ok">Alle ${a.expected} uren zijn compleet.</p>`;
  return `<p class="eh3-cov partial">Minimaal: ${a.complete} van ${a.expected} uren zijn compleet (${ehFmt(a.coverage*100,0)}% dekking). Totalen zijn gedeeltelijk, niet aangevuld.</p>`;
 }
+// Verloop per uur (t/m 26 uur), per dag (t/m 40 dagen) of per maand. Alleen complete uren tellen mee;
+// een bucket zonder volledige data blijft als grijs vlak zichtbaar. Klemmen van Woning gebeurt hier alleen voor de weergave.
+function eh3Buckets(r){
+ const span=r.hours,unit=span<=26?'hour':span<=24*40?'day':'month';
+ const key=t=>{const d=new Date(t);return unit==='hour'?t:unit==='day'?new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime():new Date(d.getFullYear(),d.getMonth(),1).getTime();};
+ const m=new Map();
+ for(const e of r.agg.intervals){
+  if(e.t===null||e.t===undefined)continue;
+  const k=key(e.t);let b=m.get(k);
+  if(!b){b={t:k,w:0,p:0,c:0,n:0,ok:0};m.set(k,b);}
+  b.n++;
+  if(e.complete){b.ok++;b.w+=e.woning;b.p+=e.praktijk||0;b.c+=e.cupra;}
+ }
+ return {unit,list:[...m.values()].sort((a,b)=>a.t-b.t)};
+}
+function eh3ChartHtml(r){
+ const {unit,list}=eh3Buckets(r);
+ if(list.length<2||!list.some(b=>b.ok))return '';
+ const label=t=>{const d=new Date(t);return unit==='hour'?String(d.getHours()).padStart(2,'0'):unit==='day'?d.getDate()+' '+d.toLocaleDateString('nl-NL',{month:'short'}).replace('.',''):d.toLocaleDateString('nl-NL',{month:'short'}).replace('.','');};
+ const vals=list.map(b=>({w:Math.max(0,b.w),p:r.praktijkOn?Math.max(0,b.p):0,c:Math.max(0,b.c)}));
+ const top=Math.max(0.1,...vals.map(v=>v.w+v.p+v.c));
+ const W=360,H=132,X0=4,Y0=16,Y1=106,bw=(W-X0*2)/list.length,gap=Math.min(2,bw*.2);
+ const y=v=>Y1-(v/top)*(Y1-Y0);
+ const every=Math.max(1,Math.ceil(list.length/8));
+ const unitName=unit==='hour'?'uur':unit==='day'?'dag':'maand';
+ let bars='',axis='';
+ list.forEach((b,i)=>{
+  const x=X0+i*bw+gap/2,w=Math.max(1,bw-gap),v=vals[i],tip=label(b.t)+': '+(b.ok<b.n?'niet volledig':ehFmt(v.w+v.p+v.c,1)+' kWh');
+  if(b.ok<b.n&&!b.ok){bars+=`<rect class="eh3-miss" x="${x.toFixed(1)}" y="${Y0}" width="${w.toFixed(1)}" height="${Y1-Y0}" rx="2"><title>${ehEsc(tip)}</title></rect>`;}
+  else{
+   let acc=0;const seg=(k,val)=>{if(val<=0)return '';const y2=y(acc+val),h=y(acc)-y2;acc+=val;return `<rect class="eh3-c-${k}" x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5,h).toFixed(1)}"></rect>`;};
+   bars+=`<g>${seg('c',v.c)}${seg('p',v.p)}${seg('w',v.w)}<title>${ehEsc(tip+(b.ok<b.n?' (deels)':''))}</title></g>`;
+  }
+  if(i%every===0){
+   const cx=x+w/2,left=cx<24,right=cx>W-24;
+   axis+=`<text x="${(left?X0:right?W-X0:cx).toFixed(1)}" y="${H-6}" text-anchor="${left?'start':right?'end':'middle'}">${ehEsc(label(b.t))}</text>`;
+  }
+ });
+ const total=vals.reduce((s,v)=>s+v.w+v.p+v.c,0);
+ return `<div class="eh3-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verbruik per ${unitName}: ${ehEsc(ehFmt(total,1))} kWh in totaal, hoogste ${ehEsc(ehFmt(top,1))} kWh">
+  <text x="${X0}" y="10" class="eh3-axis-top">${ehEsc(ehFmt(top,1))} kWh per ${unitName}</text>
+  <line x1="${X0}" y1="${Y1}" x2="${W-X0}" y2="${Y1}" class="eh3-base"/>${bars}${axis}</svg></div>`;
+}
 function eh3UseHtml(r){
  const title=`<div class="section-title" id="eh3-use">${ehIcon('home')} Wie verbruikt wat</div>`;
  if(r.error)return `<section class="eh3-card" aria-labelledby="eh3-use">${title}<p class="plan-warning">${ehEsc(r.error)}</p></section>`;
@@ -241,6 +284,7 @@ function eh3UseHtml(r){
   const selfUse=t.pv?Math.min(1,Math.max(0,t.eigenZon/t.pv)):null,selfSuff=t.verbruik>0?Math.min(1,Math.max(0,t.eigenZon/t.verbruik)):null;
   body=`<p class="eh3-big">${ehEsc(eh3Kwh(t.verbruik))}<small> verbruikt${a.partial?' (minimaal)':''}</small></p>
    <div class="eh3-bar" role="img" aria-label="Verdeling van het verbruik">${bar}</div>${lines}
+   ${eh3ChartHtml(r)}
    <div class="eh3-metrics">
     <div><small>Zon opgewekt</small><strong>${ehEsc(eh3Kwh(t.pv))}</strong></div>
     <div><small>Direct zelf gebruikt</small><strong>${ehEsc(eh3Kwh(t.eigenZon))}</strong><span>${ehEsc(eh3Pct(selfUse))} van de opwek</span></div>
@@ -357,6 +401,13 @@ function eh3Css(){
 .eh3 .eh3-key{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px}
 .eh3 .eh3-line{display:grid;grid-template-columns:1fr auto 52px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #6d99b51f;font-size:13px}
 .eh3 .eh3-line small{text-align:right;color:#9fbccd}
+.eh3 .eh3-chart{margin:14px 0 4px}
+.eh3 .eh3-chart svg{display:block;width:100%;height:auto}
+.eh3 .eh3-chart text{fill:#9fbccd;font-size:9px;font-family:inherit}
+.eh3 .eh3-chart .eh3-axis-top{font-size:9px}
+.eh3 .eh3-chart .eh3-base{stroke:#6d99b53d;stroke-width:1}
+.eh3 .eh3-c-w{fill:#ffb48a}.eh3 .eh3-c-p{fill:#61b7ff}.eh3 .eh3-c-c{fill:#38e8a1}
+.eh3 .eh3-miss{fill:#143247;stroke:#6d99b544;stroke-dasharray:3 2}
 .eh3 .eh3-metrics,.eh3 .eh3-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:14px 0 8px}
 .eh3 .eh3-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
 .eh3 .eh3-metrics>div,.eh3 .eh3-tiles>div{padding:10px 11px;border-radius:13px;background:#102636;border:1px solid #6d99b522;min-width:0}
