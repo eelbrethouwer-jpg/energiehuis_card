@@ -161,10 +161,10 @@ function eh26Navigation(view,open){
  }).join('');
  const menu=open?'<div class="eh26-insight-menu" id="eh26-insight-menu" role="group" aria-label="Inzicht onderdelen">'+
   '<span class="eh26-menu-label">Verdiep je inzicht</span>'+
-  '<button type="button" data-eh-page="balance">'+ehIcon('chart')+'<span><strong>Balans</strong><small>Wie verbruikt wat, eigen zon en kosten</small></span></button>'+
   '<button type="button" data-eh-page="cupra">'+ehIcon('car')+'<span><strong>Cupra inzichten</strong><small>Ritten, efficiëntie en laden</small></span></button>'+
   '<button type="button" data-eh-page="battery">'+ehIcon('battery')+'<span><strong>Thuisbatterij</strong><small>Simulatie en rendement</small></span></button>'+
   '<button type="button" data-eh-page="costs">'+ehIcon('euro')+'<span><strong>Kosten & vergelijken</strong><small>Budget, leveranciers en historie</small></span></button>'+
+  '<button type="button" data-eh-page="balance">'+ehIcon('chart')+'<span><strong>Balans</strong><small>Wie verbruikt wat, eigen zon en kosten</small></span></button>'+
   '</div>':'';
  return buttons+menu;
 }
