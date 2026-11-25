@@ -321,3 +321,17 @@ test('na 2026 zonder uren met data meldt de banner het juiste regime',async()=>{
   assert.match(text(card._balanceHtml(h,card.config)),/Vanaf 1 januari 2027 stopt saldering/);
  }finally{clock=NOW;}
 });
+
+test('oudere HA zonder last_reported: constante sensor blijft bruikbaar en de tijdspreiding wordt niet misbruikt',()=>{
+ const old=(state,unit,ageS)=>({state:String(state),attributes:{unit_of_measurement:unit},last_updated:iso(NOW-ageS*1000),last_changed:iso(NOW-ageS*1000)});
+ // Alfen meldt al 20 minuten constant 0 W; P1 en PV zijn vers.
+ const h=hass({'sensor.p1':old(450,'W',2),'sensor.pv':old(0,'W',30),'sensor.alfen':old(0,'W',1200),'sensor.prak':old(60,'W',100)});
+ const card=makeCard({},h);
+ const html=card._balanceHtml(h,card.config);
+ assert.match(html,/class="eh3-row-val">390 W/);
+ assert.doesNotMatch(text(html),/lopen niet gelijk/);
+ // Binnen de ruimere TTL; daarbuiten (>2100 s) blijft verouderd.
+ const stale=hass({'sensor.p1':old(450,'W',2),'sensor.pv':old(0,'W',30),'sensor.alfen':old(0,'W',3000),'sensor.prak':old(60,'W',100)});
+ const c2=makeCard({},stale);
+ assert.match(c2._balanceHtml(stale,c2.config),/class="eh3-row-val">—<\/span>/);
+});

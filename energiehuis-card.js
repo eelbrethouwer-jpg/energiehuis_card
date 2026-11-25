@@ -7603,8 +7603,11 @@ function eh3Source(h,id,spec,now){
  if(w===null)return {w:null,status:'onbeschikbaar',t:null,reason:'onbekende_eenheid'};
  const t=eh3Stamp(st);
  if(!Number.isFinite(t))return {w,status:'verouderd',t:null,reason:'tijdstempel_onbekend'};
- const age=Math.max(0,now-t);
- return {w,status:age>spec.route*1000?'verouderd':'gemeten',t,ageS:age/1000};
+ // Zonder last_reported (oudere HA) verandert last_updated alleen bij een andere waarde: een constante sensor
+ // (Alfen 0 W) lijkt dan oud. Dan geldt de ruimere toon-TTL en wordt de tijdspreiding niet beoordeeld.
+ const reported=!!Date.parse((st&&st.last_reported)||'');
+ const age=Math.max(0,now-t),limit=(reported?spec.route:spec.display)*1000;
+ return {w,status:age>limit?'verouderd':'gemeten',t:reported?t:null,ageS:age/1000};
 }
 function eh3Live(card,h,c){
  const now=Date.now(),src={};
@@ -7806,7 +7809,7 @@ function eh3CostHtml(r){
   const eq=k.qComplete?`<p class="eh3-close">Netto = afname ${ehEsc(ehEuro2(k.afnameKosten))} − teruglevering ${ehEsc(ehEuro2(k.terugleverOpbrengst))} = ${ehEsc(ehEuro2(k.netKosten))}</p>`:'';
   body=`${tiles}${qNote}
    <div class="eh3-table-wrap"><table class="eh3-table"><thead><tr><th scope="col">Verbruiker</th><th scope="col">kWh</th><th scope="col">Waarde</th><th scope="col">Netkosten</th></tr></thead><tbody>${rows}</tbody></table></div>${eq}
-   <p class="subtle"><strong>Gemeten:</strong> kWh en prijs. <strong>Verdeelsleutel (≈):</strong> hoeveel netkosten bij welke verbruiker horen. Achter één aansluiting mengt alle stroom, dus welke zonnestroom naar wie ging is boekhouding, geen meting. De bedragen tellen exact op tot het totaal.</p>`;
+   <p class="subtle"><strong>Gemeten:</strong> kWh en prijs (uurgemiddelde, kwartierprijzen worden gemiddeld). <strong>Verdeelsleutel (≈):</strong> hoeveel netkosten bij welke verbruiker horen. Achter één aansluiting mengt alle stroom, dus welke zonnestroom naar wie ging is boekhouding, geen meting. De bedragen tellen exact op tot het totaal.</p>`;
  }
  const cov=k.partial&&k.used?`<p class="eh3-cov partial">Kosten over ${k.used} van ${k.expected} uren${k.noPrice?` (${k.noPrice} zonder prijs)`:''}.</p>`:'';
  return `<section class="eh3-card" aria-labelledby="eh3-cost">${title}<p class="eh3-regime">${ehEsc(banner)}</p>${cov}${body}</section>`;
