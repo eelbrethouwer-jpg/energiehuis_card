@@ -116,8 +116,60 @@ function ehQtCostDay(priceMap, impMap, expMap, startMs, endMs, opts) {
   return { rows, total: tot, expected: rows.length };
 }
 
+// ---- Weerindicatie (geen prijsvoorspelling): wind en zon wijzen vaak naar goedkopere uren, windstil en donker weer naar duurdere. ----
+const EH_WX_WIND_STRONG = 7;   // m/s daggemiddelde: veel wind
+const EH_WX_WIND_WEAK = 3.5;   // m/s daggemiddelde: weinig wind
+function ehWxMs(speed, unit) {
+  const v = ehQtNum(speed);
+  if (v === null || v < 0) return null;
+  const u = String(unit || 'km/h').toLowerCase();
+  if (u === 'm/s') return v;
+  if (u === 'mph') return v * 0.44704;
+  if (u === 'kn' || u === 'kt') return v * 0.514444;
+  if (u === 'ft/s') return v * 0.3048;
+  return v / 3.6; // km/h (standaard van Home Assistant)
+}
+const EH_WX_CLOUD_BY_CONDITION = { 'sunny': 10, 'clear-night': 10, 'partlycloudy': 50, 'cloudy': 90, 'fog': 90, 'rainy': 90, 'pouring': 95, 'snowy': 90, 'snowy-rainy': 90, 'hail': 90, 'lightning': 90, 'lightning-rainy': 90, 'windy': 40, 'windy-variant': 60 };
+function ehWxCloud(entry) {
+  const c = ehQtNum(entry && entry.cloud_coverage);
+  if (c !== null) return Math.max(0, Math.min(100, c));
+  const k = entry && EH_WX_CLOUD_BY_CONDITION[entry.condition];
+  return k === undefined ? null : k;
+}
+// Normaliseert een dagelijkse voorspelling van een weather-entiteit tot [{dayKey,t,wind,cloud,temp}] vanaf vandaag, maximaal 7 dagen.
+function ehWxDays(daily, nowMs, unit, dayKey) {
+  const out = [], seen = new Set();
+  const today = dayKey(nowMs);
+  for (const e of Array.isArray(daily) ? daily : []) {
+    const t = Date.parse(e && e.datetime);
+    if (!Number.isFinite(t)) continue;
+    const key = dayKey(t);
+    if (key < today || seen.has(key)) continue;
+    seen.add(key);
+    const hi = ehQtNum(e.temperature), lo = ehQtNum(e.templow);
+    out.push({ dayKey: key, t, wind: ehWxMs(e.wind_speed, unit), cloud: ehWxCloud(e), temp: hi !== null && lo !== null ? (hi + lo) / 2 : hi });
+  }
+  return out.sort((a, b) => a.t - b.t).slice(0, 7);
+}
+// score >= 1 → goedkoper, <= -1 → duurder; de redenen worden getoond zodat de indicatie controleerbaar is.
+function ehWxIndication(day, month) {
+  let score = 0; const reasons = [];
+  const summer = month >= 3 && month <= 8;
+  if (day.wind !== null) {
+    if (day.wind >= EH_WX_WIND_STRONG) { score += 1; reasons.push('veel wind'); }
+    else if (day.wind <= EH_WX_WIND_WEAK) { score -= 1; reasons.push('weinig wind'); }
+  }
+  if (day.cloud !== null) {
+    if (summer && day.cloud <= 35) { score += 0.5; reasons.push('zonnig'); }
+    else if (!summer && day.cloud >= 80 && day.wind !== null && day.wind <= EH_WX_WIND_WEAK) { score -= 0.5; reasons.push('donker en windstil'); }
+  }
+  if (day.temp !== null && day.temp <= 2) { score -= 0.5; reasons.push('koud (hoge vraag)'); }
+  const level = score >= 1 ? 'cheaper' : score <= -1 ? 'pricier' : 'average';
+  return { score, level, reasons };
+}
+
 if (typeof module !== 'undefined' && module) {
   try {
-    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay });
+    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay, ehWxMs, ehWxCloud, ehWxDays, ehWxIndication });
   } catch (_) {}
 }
