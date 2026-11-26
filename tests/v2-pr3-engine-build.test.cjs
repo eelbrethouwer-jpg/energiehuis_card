@@ -23,7 +23,7 @@ function fixture(testFn){
 test('PR3: manifest includes the explicit engines and recreates the HACS resource',()=>{
  const buildSource=fs.readFileSync(build,'utf8');
  const manifest=[...buildSource.matchAll(/\{kind:'engine',name:'([^']+)'\}/g)].map(m=>m[1]);
- assert.deepStrictEqual(manifest,['battery-engine.cjs','personal-evidence-engine.cjs','balance-engine.cjs']);
+ assert.deepStrictEqual(manifest,['battery-engine.cjs','personal-evidence-engine.cjs','balance-engine.cjs','quarter-engine.cjs']);
  assert.deepStrictEqual(fs.readdirSync(path.join(root,'src','engines')).sort(),manifest.slice().sort());
  assert.equal(run(root).status,0);
 });

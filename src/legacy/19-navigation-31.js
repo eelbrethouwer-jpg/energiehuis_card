@@ -30,6 +30,7 @@ const EHNV_SEGMENTS=Object.freeze({
  ]),
  money:Object.freeze([
   {id:'costs',label:'Kosten',view:'costs',show:(el,h)=>!el.matches?.('.ehcmp'),folds:[[(el,h)=>!!el.matches?.('.eh18-panel'),'Databronnen en aannames']]},
+  {id:'quarters',label:'Kwartieren',view:'costs',title:['Kwartierprijzen','Bekende prijzen per kwartier voor vandaag en morgen'],inject:card=>ehQtHtml(card),show:el=>ehNvIsHead(el)},
   {id:'contracts',label:'Contracten',view:'costs',show:(el,h)=>!!el.matches?.('.ehcmp')||ehNvIsHead(el)}
  ]),
  more:Object.freeze([
@@ -157,8 +158,14 @@ function ehNvCss(){
    const head=main.querySelector(':scope > .subpage-head h2');
    if(head){head.textContent=s.title[0];const p=head.parentElement?.querySelector('p');if(p)p.textContent=s.title[1];const ey=head.parentElement?.querySelector('.eyebrow');if(ey)ey.textContent='ENERGIEHUIS';}
   }
+  if(s.inject){
+   // Alleen de titel van de kop: de oorspronkelijke kopstegel (huidige prijs e.d.) hoort bij een andere pagina.
+   const hd=main.querySelector(':scope > .subpage-head');
+   if(hd)[...hd.children].forEach(x=>{if(!x.querySelector('h2')&&!x.matches('h2,.eh-imm-back'))x.hidden=true;});
+   main.insertAdjacentHTML('beforeend',s.inject(this));
+  }
   if(s.links){const head=main.querySelector(':scope > .subpage-head');head?head.insertAdjacentHTML('afterend',ehNvLinksHtml()):main.insertAdjacentHTML('afterbegin',ehNvLinksHtml());}
   main.insertAdjacentHTML('afterbegin',ehNvSegmentBar(where.tab,where.seg));
-  if(!s.links&&!shown)main.insertAdjacentHTML('beforeend','<p class="subtle">Voor dit onderdeel is nu niets om te tonen.</p>');
+  if(!s.links&&!s.inject&&!shown)main.insertAdjacentHTML('beforeend','<p class="subtle">Voor dit onderdeel is nu niets om te tonen.</p>');
  };
 })();

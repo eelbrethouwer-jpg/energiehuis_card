@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.2 — Geld › Kwartieren
+
+Nieuw segment in Geld: bekende prijzen per kwartier voor vandaag en morgen (grafiek, goedkoopste 2 en 4 uur, voorbeeld voor 20 kWh) en terugkijken tot circa 10 dagen met kosten per kwartier uit je eigen afname en teruglevering (Home Assistant bewaart 5-minutenstatistiek ongeveer 10 dagen). Alleen lezen; ontbrekende kwartieren worden nooit geschat. Na de salderingsperiode (2026) is netto alleen bekend met `terugleververgoeding`.
+
 ## Energiehuis 3.1 — vijf tabs met segmenten
 
 De onderste balk heeft vijf tabs: **Home**, **Energie** (Balans · Zon · Batterij · Gas & water), **Auto** (Status · Laadbediening · Planning), **Geld** (Kosten · Contracten) en **Meer** (Bronnen & data · Meetcontrole · Home-details). Binnen een tab wissel je met de segmentbalk; het laatst gekozen segment blijft staan. Lange onderdelen staan in uitklappers. Oude paginanamen blijven werken en landen op de juiste tab. Alles is alleen-lezen.
