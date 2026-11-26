@@ -1,5 +1,16 @@
 # PROJECT_STATUS — Energiehuis
 
+## Feature in ontwikkeling — 26 november 2026 · Energiehuis 3.1 navigatie (fase 1 en 2, geen release)
+
+- **Baseline:** main na v1.33.1. Branch `feature/energiehuis-3-1-navigatie-20261126`.
+- **Gebouwd:** `src/legacy/19-navigation-31.js`. Vijf tabs (Home, Energie, Auto, Geld, Meer) met een segmentbalk; het Inzicht-uitklapmenu is vervangen. Bestaande pagina's renderen ongewijzigd en worden per segment gefilterd (alleen presentatie). Lange secties staan in uitklappers. Meetcontrole staat nu onder Meer, de Home-detailpagina's onder Meer › Home-details.
+- **Automatisch getest (lokaal):** 512/512 Node-tests in UTC en Europe/Amsterdam (nieuw: 6 navigatietests). Browser-suites lokaal in Chromium: mobile-visual, regisseur-cockpit, battery-finance, charging-suggestions, personal-battery-comparison, live-cockpit-home (15/15) en live-cockpit-immersive (51/51). stroomvergelijker en WebKit draaien alleen in CI.
+- **Aangepaste tests:** navigatie-aanname (vijf tabs in plaats van vier plus menu) in mobile-visual, live-cockpit-home en live-cockpit-immersive; legacy-pagina-tests zetten `_ehNvOff` zodat ze de volledige pagina blijven zien.
+- **Praktisch getest:** nee, nog niet in een echte Home Assistant of op een iPhone.
+- **Veiligheid:** geen nieuwe servicecalls, opslag of HA-schrijfacties. Home (16-live-cockpit, 17-live-immersive) ongewijzigd ten opzichte van v1.33.1.
+
+---
+
 ## Feature in ontwikkeling — 26 november 2026 · Energiehuis 3.0 Balans (geen release)
 
 - **Baseline:** main `eaa76eb5cbafe3b3981b791ff00b72a65ee3052d` (v1.32.0, PR #71). Branch `feature/energiehuis-3-balans-20261126`.

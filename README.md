@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.1 — vijf tabs met segmenten
+
+De onderste balk heeft vijf tabs: **Home**, **Energie** (Balans · Zon · Batterij · Gas & water), **Auto** (Status · Laadbediening · Planning), **Geld** (Kosten · Contracten) en **Meer** (Bronnen & data · Meetcontrole · Home-details). Binnen een tab wissel je met de segmentbalk; het laatst gekozen segment blijft staan. Lange onderdelen staan in uitklappers. Oude paginanamen blijven werken en landen op de juiste tab. Alles is alleen-lezen.
+
 ## In ontwikkeling: Energiehuis 3.0 — pagina Balans (alleen lezen)
 
 Nieuwe pagina **Inzicht → Balans**. De beginpagina (Home, Live Cockpit en immersive Huis) is ongewijzigd. De pagina laat zien waar je stroom heen gaat, waar hij vandaan komt en wat het kost, met bij elk getal hoe zeker het is.

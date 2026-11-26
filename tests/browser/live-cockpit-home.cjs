@@ -105,7 +105,7 @@ async function check(name,fn){
   const {ctx,page,errors}=await open({mobile_fixed_navigation:false});
   const s=await page.evaluate(STATE),calls=await page.evaluate(()=>window.__calls);await ctx.close();
   assert.equal(s.live,false);assert.equal(s.eh40,true);assert.ok(!calls.includes('media_source/resolve_media'));
-  assert.deepEqual(s.nav,['Home','Laden','Inzicht','Meer']);assert.deepEqual(errors,[]);
+  assert.deepEqual(s.nav,['Home','Energie','Auto','Geld','Meer']);assert.deepEqual(errors,[]);
   return {eh40:s.eh40,live:s.live};
  });
 
@@ -114,7 +114,7 @@ async function check(name,fn){
   const s=await page.evaluate(STATE);await ctx.close();
   assert.equal(s.live,true);assert.equal(s.eh40,false,'geen dubbele cockpit');
   assert.equal(s.legacy,true);assert.equal(s.legacyOpen,false,'aanvullende metingen ingeklapt');
-  assert.deepEqual(s.nav,['Home','Laden','Inzicht','Meer']);
+  assert.deepEqual(s.nav,['Home','Energie','Auto','Geld','Meer']);
   assert.equal(s.scene,'ok');assert.match(s.img,/\/media\/local\/energiehuis\/master\.webp\?authSig=/);
   assert.match(s.badge,/LIVE · alleen-lezen/);assert.doesNotMatch(s.text,/DEMO|fictiev|Schommeling/);
   assert.deepEqual(s.particles,['home-ev','home-grid','sun-home']);assert.match(s.status,/5\/5 meetwaarden actueel/);
@@ -150,7 +150,7 @@ async function check(name,fn){
   const {ctx,page,errors}=await open(LIVE);
   const r=await page.evaluate(async()=>{
    const card=document.querySelector('energiehuis-card'),root=card.shadowRoot,host0=root.querySelector('.eh-live-home');
-   const go=async p=>{root.querySelector('[data-eh-page="'+p+'"]')?.click();await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));};
+   const go=async p=>{(root.querySelector('[data-eh-page="'+p+'"]')||root.querySelector('[data-ehnv-tab="'+(p==='charge'?'auto':p)+'"]'))?.click();await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));};
    const views={};
    for(const p of ['charge','more']){await go(p);views[p]={live:!!root.querySelector('.eh-live-home'),eh40:!!root.querySelector('.eh40-cockpit'),dbg:{...card._ehLive.ctl.debug,anim:card._ehLive.ctl.cockpit.isAnimating()},len:root.querySelector('.shell').textContent.length};}
    window.__push([['net',900]]);await new Promise(res=>requestAnimationFrame(()=>requestAnimationFrame(res)));
