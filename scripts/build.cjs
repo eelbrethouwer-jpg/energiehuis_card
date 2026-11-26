@@ -32,7 +32,10 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'16-live-cockpit.js'},
   {kind:'legacy',name:'16-regisseur-cockpit.js'},
   // v1.28-voorstel: immersive Live Cockpit Home (opt-in live_cockpit_immersive; na alle Home-renderlagen).
-  {kind:'legacy',name:'17-live-immersive.js'}
+  {kind:'legacy',name:'17-live-immersive.js'},
+  // v3.0: Balans-pagina (alleen lezen). De zuivere motor staat vóór het fragment dat hem gebruikt.
+  {kind:'engine',name:'balance-engine.cjs'},
+  {kind:'legacy',name:'18-balance-page.js'}
 ]);
 if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
  console.error('Build aborted: unknown build step kind.');

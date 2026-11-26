@@ -147,7 +147,7 @@ function eh40Css(){
  * This appends to the final source fragment, preserving deterministic HACS assembly.
  */
 function eh26Navigation(view,open){
- const chosen=['cupra','battery','costs'].includes(view);
+ const chosen=['cupra','battery','costs','balance'].includes(view);
  const tabs=[
   ['Home','home','overview'],
   ['Laden','bolt','charge'],
@@ -164,6 +164,7 @@ function eh26Navigation(view,open){
   '<button type="button" data-eh-page="cupra">'+ehIcon('car')+'<span><strong>Cupra inzichten</strong><small>Ritten, efficiëntie en laden</small></span></button>'+
   '<button type="button" data-eh-page="battery">'+ehIcon('battery')+'<span><strong>Thuisbatterij</strong><small>Simulatie en rendement</small></span></button>'+
   '<button type="button" data-eh-page="costs">'+ehIcon('euro')+'<span><strong>Kosten & vergelijken</strong><small>Budget, leveranciers en historie</small></span></button>'+
+  '<button type="button" data-eh-page="balance">'+ehIcon('chart')+'<span><strong>Balans</strong><small>Wie verbruikt wat, eigen zon en kosten</small></span></button>'+
   '</div>':'';
  return buttons+menu;
 }

@@ -8,10 +8,11 @@ class EnergiehuisCard extends HTMLElement {
     const page=e.target.closest('[data-eh-page]');
    if(page){
      const next=page.dataset.ehPage;
-     if(['overview','cupra','charge','battery','costs','more'].includes(next)){
+     if(['overview','cupra','charge','battery','costs','more','balance'].includes(next)){
        this._view=next;this._detail=null;
        this._schedule();
        if(next==='costs'){this._ehcmpInit();this._ehcmpLoad();}
+       if(next==='balance')this._loadBalance();
        if(next==='cupra')this._loadCupraInsights();
        requestAnimationFrame(()=>{if(this.isConnected)this.scrollIntoView({behavior:'smooth',block:'start'});});
        // De pagina blijft binnen dezelfde Lovelace kaart: geen route of backend wijziging.
@@ -864,7 +865,7 @@ class EnergiehuisCard extends HTMLElement {
 @media(max-width:360px){.eh23-power-suggestions{grid-template-columns:1fr}}
 </style>
 <article class="shell" aria-label="Energiehuis energiedashboard">
- ${this._view==='cupra'||this._view==='charge'?this._cupraHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
+ ${this._view==='cupra'||this._view==='charge'?this._cupraHtml(h,c):this._view==='balance'?this._balanceHtml(h,c):this._view==='battery'?this._batteryHtml(h,c):this._view==='costs'?this._costsHtml(h,c):this._view==='more'?this._moreHtml(h,c):`
  <section class="hero" style="background-image:linear-gradient(180deg,#06152477,#07152415 58%,#071522 100%),url('${ehEsc(hero)}')">
   <div class="hero-inner"><div><h2 class="title">Overzicht</h2><div class="subtitle">Slimmer energie. Een duurzamer thuis.</div></div>${weatherBadge}</div>
  </section>
