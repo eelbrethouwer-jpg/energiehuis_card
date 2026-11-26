@@ -15,7 +15,7 @@ const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url=
    if(q.type!=='recorder/statistics_during_period')return {};
    const result={};for(const id of q.statistic_ids){result[id]=[];for(let t=Date.parse(q.start_time);t<Date.parse(q.end_time);t+=3600000)result[id].push({start:t,change:id==='sensor.in'?2:.5,mean:.25});}return result;
   }};
-  card.setConfig({import:'sensor.in',export:'sensor.out',prijs:'sensor.price',mobile_fixed_navigation:false});card.hass=h;card._view='costs';card._render();
+  card.setConfig({import:'sensor.in',export:'sensor.out',prijs:'sensor.price',mobile_fixed_navigation:false});card.hass=h;card._ehNvOff=true;card._view='costs';card._render();
  });
  await page.locator('.ehcmp').waitFor();assert.match(await page.locator('.ehcmp').innerText(),/Leveranciers vergelijken/);await page.locator('[data-ehcmp-action="add"]').click();
  const fill=async(name,value)=>page.locator('[data-ehcmp-form] [name="'+name+'"]').fill(value);

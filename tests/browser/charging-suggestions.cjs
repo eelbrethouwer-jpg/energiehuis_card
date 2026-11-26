@@ -19,7 +19,7 @@ let browser;
   const conf=c.config,states={[conf.laden]:state(7360,'W'),[conf.huis]:state(4000,'W'),[conf.net]:state(6000,'W'),[conf.cupra]:state(50,'%'),[conf.prijs]:state(.25,'€/kWh')};
   states[conf.prijs].attributes.forecast=Array.from({length:24},(_,i)=>({start:new Date(Math.floor(Date.now()/3600000)*3600000+i*3600000).toISOString(),price:.2+(i%4)*.04}));
   window.serviceCalls=0;c._hass={states,callWS:async()=>({}),callService(){window.serviceCalls++;}};
-  c._view='charge';c._departure='2026-11-08T09:00';c._simNeed=20.7;c._simPower=3.7;c._eh17SessionsLoading=true;
+  c._ehNvOff=true;c._view='charge';c._departure='2026-11-08T09:00';c._simNeed=20.7;c._simPower=3.7;c._eh17SessionsLoading=true;
   c._eh17Sessions={at:Date.now(),sessions:[6,7,8].map((kw,i)=>({start:Date.now()-(i+1)*86400000,end:Date.now()-(i+1)*86400000+2*3600000,kwh:kw*2,estimated:false}))};
   c._render();
  });

@@ -373,24 +373,24 @@ const PAGE=()=>{
   return Object.fromEntries(Object.entries(out).map(([k,o])=>[k,o.view+(o.follow?'→'+o.follow:'')]));
  });
 
- await check('ondernavigatie en Inzicht: Home-knop terug; Inzicht bevat Zon/Huis/Net/Praktijk/Alle metingen; "Alle metingen" toont de oude Home-inhoud met de cockpit gepauzeerd',async()=>{
+ await check('ondernavigatie en Meer › Home-details: Home-knop terug; Home-details bevat Zon/Huis/Net/Praktijk/Alle metingen; "Alle metingen" toont de oude Home-inhoud met de cockpit gepauzeerd',async()=>{
   const {ctx,page,errors}=await open(IMM,{width:1280,height:800});
   await clickTile(page,'net');await frames(page,3);
   await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-navitem[data-eh-page="overview"]').click());await frames(page,3);
   const viaNav=await page.evaluate(()=>document.querySelector('energiehuis-card')._view);
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
-  const menu=await page.evaluate(()=>[...document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('.eh26-insight-menu button strong')].map(x=>x.textContent));
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu [data-eh-page="sun"]').click());await frames(page,3);
+  await page.evaluate(()=>{const r=document.querySelector('energiehuis-card').shadowRoot;r.querySelector('[data-ehnv-tab="more"]').click();});await frames(page,3);await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehnv-seg="more:details"]').click());await frames(page,3);
+  const menu=await page.evaluate(()=>[...document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('.ehnv-linklist button strong')].map(x=>x.textContent));
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehnv-linklist [data-eh-page="sun"]').click());await frames(page,3);
   const viaMenu=await page.evaluate(PAGE);
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu [data-eh-imm-all]').click());await frames(page,3);
+  await page.evaluate(()=>{const r=document.querySelector('energiehuis-card').shadowRoot;r.querySelector('[data-ehnv-tab="more"]').click();});await frames(page,3);await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehnv-seg="more:details"]').click());await frames(page,3);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehnv-linklist [data-eh-imm-all]').click());await frames(page,3);
   const all=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;return {view:c._view,all:r.querySelector('.shell').classList.contains('eh-imm-all'),live:!!r.querySelector('.eh-live-home'),legacyOpen:r.querySelector('.eh26-legacy')?.open,metrics:r.querySelectorAll('.eh26-legacy .metric').length,coach:!!r.querySelector('.eh17-panel'),chart:!!r.querySelector('.chart-panel'),suspended:c._ehLive.ctl.debug.suspended,focus:r.activeElement?.id};});
   if(SHOTS&&SHOT_SET)await page.screenshot({path:path.join(SHOTS,`imm-alle-metingen-${browserType.name()}.png`),fullPage:true});
   await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-imm-allhead .eh-imm-back').click());await frames(page,3);
   const back=await page.evaluate(HOME);
   await ctx.close();
   assert.equal(viaNav,'overview');
-  for(const m of ['Zonnepanelen','Huisverbruik','Net','Praktijkruimte','Alle metingen','Cupra inzichten','Thuisbatterij'])assert.ok(menu.includes(m),m);
+  for(const m of ['Zonnepanelen','Huisverbruik','Net','Praktijkruimte','Alle metingen'])assert.ok(menu.includes(m),m);
   assert.equal(viaMenu.view,'sun');assert.equal(viaMenu.pane,true);
   assert.deepEqual([all.view,all.all,all.live,all.legacyOpen,all.coach,all.chart,all.suspended,all.focus],['overview',true,false,true,true,true,true,'eh-imm-title']);
   assert.ok(all.metrics>=6);
@@ -520,7 +520,7 @@ const PAGE=()=>{
    assert.equal(m.rail,true,'navigatie als rail');
    assert.ok(m.stage.l>=m.nav.r-1&&m.stage.t>=m.appbar.b-1&&m.stage.b<=h,'scène rechts van de rail, onder de appbalk, binnen het scherm '+JSON.stringify([m.appbar,m.stage,m.nav]));
    assert.ok(m.appbar.h<=52,'slanke appbalk '+m.appbar.h);
-   assert.ok(m.nav.b<=h+0.5&&m.navItems.length===4&&m.navItems.every(r=>r.t>=0&&r.b<=h&&r.h>=44&&r.r<=m.stage.l),'vier navigatieknoppen ≥44 px in de rail '+JSON.stringify(m.navItems));
+   assert.ok(m.nav.b<=h+0.5&&m.navItems.length===5&&m.navItems.every(r=>r.t>=0&&r.b<=h&&r.h>=44&&r.r<=m.stage.l),'vijf navigatieknoppen ≥44 px in de rail '+JSON.stringify(m.navItems));
    assert.ok(m.side.every(r=>r.w<=1&&r.h<=1),'geen paneel naast of onder de scène: status, samenvatting en legenda alleen voor schermlezers '+JSON.stringify(m.side));
    assert.equal(m.tiles.length,6);
    assert.ok(m.tiles.every(t=>t.vis&&t.l>=m.stage.l-1&&t.r<=m.stage.r+1&&t.t>=m.stage.t-1&&t.b<=m.stage.b+1),'zes kaarten binnen de scène');
@@ -536,15 +536,12 @@ const PAGE=()=>{
    const a=await page.evaluate(LAND);
    await SAFE(page,47,47,21);await frames(page,5);
    const b=await page.evaluate(LAND),home=await page.evaluate(HOME);
-   await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
-   const menu=await page.evaluate(()=>{const m=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'),r=m.getBoundingClientRect();return {l:r.left,r:r.right,t:r.top,b:r.bottom};});
    await ctx.close();
    assert.ok(b.navItems.every(r=>r.l>=47&&r.b<=h-21),'rail-knoppen binnen notch en home-indicator '+JSON.stringify(b.navItems));
    assert.ok(a.navItems.some(r=>r.l<47),'zonder zones geen extra marge');
    assert.ok(b.appbar.r<=w-47,'appbalk binnen de rechternotch');
    assert.ok(b.stage.l>=47&&b.side.every(r=>r.r<=w-47),'scène en tekst binnen de notch '+JSON.stringify([b.stage,b.side]));
    assert.ok(b.stage.l>=b.nav.r-1&&b.stage.b<=h,'scène rechts van de rail');
-   assert.ok(menu.l>=b.nav.r&&menu.r<=w-47&&menu.t>=0&&menu.b<=h-21+0.5,'Inzicht-menu binnen veilige zone '+JSON.stringify(menu));
    assert.equal(b.overflow,false);assert.equal(b.shellOverflow,false);
    assert.deepEqual(home.tiles.filter(t=>!t.hit).map(t=>t.key),[],'tikvlak met veilige zones');
    assert.deepEqual(errors,[]);
@@ -559,28 +556,27 @@ const PAGE=()=>{
   const NAVSEL=k=>['nav',k];
   const reached={};
   // Hoofdnavigatie
-  for(const [page_,v] of [['charge','charge'],['more','more'],['overview','overview']]){
-   await page.evaluate(([k])=>{const c=document.querySelector('energiehuis-card');c.shadowRoot.querySelector('.eh26-navitem[data-eh-page="'+k+'"]').scrollIntoView({block:'nearest'});},[page_]);
-   const r=await page.evaluate(k=>{const n=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-navitem[data-eh-page="'+k+'"]').getBoundingClientRect();return {x:n.left+n.width/2,y:n.top+n.height/2,w:n.width,h:n.height,inside:n.bottom<=innerHeight&&n.top>=0};},page_);
+  for(const [page_,v] of [['auto','cupra'],['money','costs'],['energy','balance'],['more','more'],['overview','overview']]){
+   await page.evaluate(([k])=>{const c=document.querySelector('energiehuis-card');c.shadowRoot.querySelector(k==='overview'?'.eh26-navitem[data-eh-page="overview"]':'.eh26-navitem[data-ehnv-tab="'+k+'"]').scrollIntoView({block:'nearest'});},[page_]);
+   const r=await page.evaluate(k=>{const n=document.querySelector('energiehuis-card').shadowRoot.querySelector(k==='overview'?'.eh26-navitem[data-eh-page="overview"]':'.eh26-navitem[data-ehnv-tab="'+k+'"]').getBoundingClientRect();return {x:n.left+n.width/2,y:n.top+n.height/2,w:n.width,h:n.height,inside:n.bottom<=innerHeight&&n.top>=0};},page_);
    assert.ok(r.inside&&r.h>=44,'navigatieknop '+page_+' '+JSON.stringify(r));
    await page.touchscreen.tap(r.x,r.y);await frames(page,4);
    const st=await view();assert.equal(st.v,v);assert.equal(st.overflow,false);assert.equal(st.shell,false);reached[page_]=st.v;
   }
-  // Inzicht-menu: alle items volledig zichtbaar binnen het scherm; elk item bereikbaar
-  const items=async()=>{await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
-   return page.evaluate(()=>{const m=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu'),mr=m.getBoundingClientRect(),nav=document.querySelector('energiehuis-card').shadowRoot.querySelector('.shell > .nav').getBoundingClientRect();
-    return {menu:{t:mr.top,b:mr.bottom,l:mr.left,r:mr.right,scrolls:m.scrollHeight>m.clientHeight+1},nav:nav.top,innerH:innerHeight,
-     items:[...m.querySelectorAll('button')].map(b=>{const r=b.getBoundingClientRect();return {key:b.hasAttribute('data-eh-imm-all')?'all':(b.dataset.ehPage||b.textContent.trim()),label:b.querySelector('strong')?.textContent,h:Math.round(r.height),t:Math.round(r.top),b:Math.round(r.bottom),l:Math.round(r.left),r:Math.round(r.right)};})};});};
+  // Meer › Home-details: alle items volledig zichtbaar; elk item bereikbaar
+  const items=async()=>{await page.evaluate(()=>{const r=document.querySelector('energiehuis-card').shadowRoot;r.querySelector('[data-ehnv-tab="more"]').click();});await frames(page,3);
+   await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehnv-seg="more:details"]').click());await frames(page,3);
+   return page.evaluate(()=>{const m=document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehnv-linklist');
+    return {items:[...m.querySelectorAll('button')].map(b=>{const r=b.getBoundingClientRect();return {key:b.hasAttribute('data-eh-imm-all')?'all':(b.dataset.ehPage||b.textContent.trim()),label:b.querySelector('strong')?.textContent,h:Math.round(r.height)};})};});};
   const first=await items();
-  assert.ok(first.items.length>=7,'menu-items '+first.items.length);
-  assert.ok(first.menu.t>=0&&first.menu.b<=first.innerH+0.5&&first.menu.l>=0&&first.menu.r<=844,'menu binnen scherm '+JSON.stringify(first.menu));
-  assert.ok(first.items.every(i=>i.h>=44&&i.t>=first.menu.t-1&&i.b<=first.menu.b+1),'alle items zichtbaar ≥44 px '+JSON.stringify(first.items));
+  assert.ok(first.items.length>=5,'home-details-items '+first.items.length);
+  assert.ok(first.items.every(i=>i.h>=44),'alle items ≥44 px '+JSON.stringify(first.items));
   const keys=first.items.map(i=>i.key);
-  for(const k of ['sun','home','grid','practice','all'])assert.ok(keys.includes(k),'menu mist '+k);
+  for(const k of ['sun','home','grid','practice','all'])assert.ok(keys.includes(k),'home-details mist '+k);
   const EXPECT={sun:'sun',home:'home',grid:'grid',practice:'practice',all:'overview'};
   for(let i=0;i<keys.length;i++){
    if(i>0)await items();
-   const it=await page.evaluate(i=>{const b=document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('.eh26-insight-menu button')[i],r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},i);
+   const it=await page.evaluate(i=>{const b=document.querySelector('energiehuis-card').shadowRoot.querySelectorAll('.ehnv-linklist button')[i];b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};},i);
    await page.touchscreen.tap(it.x,it.y);await frames(page,4);
    const st=await view();
    reached[keys[i]]=st.all?'all':st.v;
@@ -657,8 +653,9 @@ const PAGE=()=>{
    await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-navitem[data-eh-page="overview"]').click());await frames(page,5);
   }
   // Alle metingen: open details + view blijven
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-eh26-insights]').click());await frames(page,3);
-  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh26-insight-menu [data-eh-imm-all]').click());await frames(page,4);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehnv-tab="more"]').click());await frames(page,3);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('[data-ehnv-seg="more:details"]').click());await frames(page,3);
+  await page.evaluate(()=>document.querySelector('energiehuis-card').shadowRoot.querySelector('.ehnv-linklist [data-eh-imm-all]').click());await frames(page,4);
   for(const [w,h] of [[844,390],[390,844]]){await page.setViewportSize({width:w,height:h});await frames(page,5);}
   const all=await page.evaluate(()=>{const c=document.querySelector('energiehuis-card'),r=c.shadowRoot;return {all:r.querySelector('.shell').classList.contains('eh-imm-all'),open:r.querySelector('.eh26-legacy')?.open,overflow:document.documentElement.scrollWidth>innerWidth+1};});
   assert.deepEqual(all,{all:true,open:true,overflow:false});
