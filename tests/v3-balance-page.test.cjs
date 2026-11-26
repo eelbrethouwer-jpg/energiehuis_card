@@ -34,10 +34,10 @@ function makeCard(config,h){
 }
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 
-test('Home-lagen zijn byte-identiek aan v1.32.0 (beginpagina blijft onaangeroerd)',()=>{
+test('Home-lagen zijn vastgezet (v1.33.1: alleen de tegel Huis is bewust aangepast; elke verdere wijziging vraagt een nieuwe hash)',()=>{
  const sha=f=>crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'src','legacy',f))).digest('hex');
- assert.equal(sha('16-live-cockpit.js'),'22f687ad807f989a2ae151b8d6b793a53c0f9e0b842bb9c0b2e836790787f6c5');
- assert.equal(sha('17-live-immersive.js'),'c180d9f407a42d4ce2277eb37f2c48a6f7aac25f97e16c87e1403efaa0f556e9');
+ assert.equal(sha('16-live-cockpit.js'),'6640976ad8c2ef8ee93e051e943743fa42e8b0bb245ee771432128b5f76f5738');
+ assert.equal(sha('17-live-immersive.js'),'0688e6f8f4a84049459cda1896644f3becb41c76f547f36c2d83859f1d3613e9');
 });
 
 test('navigatie: Balans staat in het Inzicht-menu en markeert Inzicht als actief',()=>{

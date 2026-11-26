@@ -289,7 +289,13 @@ const EhLiveCockpit=(function(){
     const tiles = {};
     tiles.pv = { title: 'Zonnepanelen', value: pvShown !== null && pvShown >= 0 ? formatPower(pvShown) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: specs.pv.entity };
     tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: cur(r.battery) || r.battery.state === 'unlinked' ? 'Geen fysieke opslag' : 'Geen fysieke opslag · ' + r.battery.reason, tone: 'sim', entity: specs.battery.entity };
-    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (houseShown !== null && houseShown >= T.houseNegW ? formatPower(houseShown) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: specs.house.entity };
+    // De huissensor is het totaal exclusief auto en bevat de praktijkruimte. Met een echte (niet gesimuleerde) submeter
+    // toont de tegel Huis alleen de rest, zodat Huis + Praktijk + Cupra optellen tot Net + zon.
+    const pracW = practiceLive && Number.isFinite(r.practice.value) ? r.practice.value : null;
+    const houseOk = !houseInvalid && houseShown !== null && houseShown >= T.houseNegW;
+    const houseRest = houseOk && pracW !== null ? houseShown - pracW : null;
+    const houseBad = houseRest !== null && houseRest < -T.zeroW;
+    tiles.house = { title: 'Huis', value: houseInvalid || houseBad ? '—' : houseOk ? formatPower(houseRest !== null ? Math.max(0, houseRest) : houseShown) : '—', sub: houseInvalid ? 'Ongeldige meting' : houseBad ? 'Praktijk groter dan huisverbruik: meting controleren' : (cur(r.house) ? (houseRest !== null ? 'Verbruik excl. Cupra en praktijk' : 'Verbruik excl. Cupra') : r.house.reason), tone: houseInvalid || houseBad ? 'bad' : tone(r.house), entity: specs.house.entity };
     const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
     // Vertraagde P1 (RC1-A): alleen de grootte tonen, zonder teken of richting (de richting is niet actueel bevestigd).
     const netShown = importW === null && r.net.state === 'recent' ? formatPower(r.net.shown) : null;

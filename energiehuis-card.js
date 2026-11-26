@@ -2,7 +2,7 @@
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.33.0';
+const EH_VERSION = '1.33.1';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -1659,7 +1659,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.33.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.33.1',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -4541,7 +4541,13 @@ const EhLiveCockpit=(function(){
     const tiles = {};
     tiles.pv = { title: 'Zonnepanelen', value: pvShown !== null && pvShown >= 0 ? formatPower(pvShown) : '—', sub: cur(r.pv) ? (pv >= T.routeMinW ? 'Opwek' : 'Geen opwek') : r.pv.reason, tone: tone(r.pv), entity: specs.pv.entity };
     tiles.battery = { title: 'Virtuele batterij', value: val(r.battery, formatPct), sub: cur(r.battery) || r.battery.state === 'unlinked' ? 'Geen fysieke opslag' : 'Geen fysieke opslag · ' + r.battery.reason, tone: 'sim', entity: specs.battery.entity };
-    tiles.house = { title: 'Huis', value: houseInvalid ? '—' : (houseShown !== null && houseShown >= T.houseNegW ? formatPower(houseShown) : '—'), sub: houseInvalid ? 'Ongeldige meting' : (cur(r.house) ? 'Verbruik excl. Cupra' : r.house.reason), tone: houseInvalid ? 'bad' : tone(r.house), entity: specs.house.entity };
+    // De huissensor is het totaal exclusief auto en bevat de praktijkruimte. Met een echte (niet gesimuleerde) submeter
+    // toont de tegel Huis alleen de rest, zodat Huis + Praktijk + Cupra optellen tot Net + zon.
+    const pracW = practiceLive && Number.isFinite(r.practice.value) ? r.practice.value : null;
+    const houseOk = !houseInvalid && houseShown !== null && houseShown >= T.houseNegW;
+    const houseRest = houseOk && pracW !== null ? houseShown - pracW : null;
+    const houseBad = houseRest !== null && houseRest < -T.zeroW;
+    tiles.house = { title: 'Huis', value: houseInvalid || houseBad ? '—' : houseOk ? formatPower(houseRest !== null ? Math.max(0, houseRest) : houseShown) : '—', sub: houseInvalid ? 'Ongeldige meting' : houseBad ? 'Praktijk groter dan huisverbruik: meting controleren' : (cur(r.house) ? (houseRest !== null ? 'Verbruik excl. Cupra en praktijk' : 'Verbruik excl. Cupra') : r.house.reason), tone: houseInvalid || houseBad ? 'bad' : tone(r.house), entity: specs.house.entity };
     const netSub = importW === null ? r.net.reason : direction === 'import' ? 'Afname van het net' : direction === 'export' ? 'Teruglevering aan het net' : 'In balans';
     // Vertraagde P1 (RC1-A): alleen de grootte tonen, zonder teken of richting (de richting is niet actueel bevestigd).
     const netShown = importW === null && r.net.state === 'recent' ? formatPower(r.net.shown) : null;
@@ -6424,7 +6430,7 @@ const EH_IMM_ROUTES=Object.freeze({
 });
 const EH_IMM_VIEWS=Object.freeze({
  sun:Object.freeze({route:'pv',title:'Zonnepanelen',icon:'sun',tile:'pv',reading:'pv',intro:'Actuele opwek van de GoodWe-omvormer, met historie en periodevergelijking.'}),
- home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, uit de bestaande huisverbruik-sensor (geen nieuwe berekening).'}),
+ home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, en exclusief praktijkruimte zodra die gemeten wordt.'}),
  grid:Object.freeze({route:'net',title:'Net',icon:'grid',tile:'net',reading:'net',intro:'P1-netvermogen: afname en teruglevering, met historie.'}),
  practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:'practice',intro:'Live vermogen, gemeten energie en indicatieve maandkosten.'})
 });
