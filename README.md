@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.3 — grafiek met assen en weerindicatie
+
+De kwartiergrafiek heeft nu een verticale as (0 €, daggemiddelde en hoogste prijs), tijden op de horizontale as en een aanwijsbare waarde: tik of sleep over een kwartier (of gebruik de pijltoetsen) en er verschijnt een bubbel met tijd en prijs. Onder Kwartieren staat een indicatie voor de komende dagen op basis van de `weather`-entiteit (wind, bewolking, temperatuur), gelezen via de Home Assistant-voorspelling (alleen lezen, geen externe verbinding). Het is een indicatie, geen prijsvoorspelling; dagen met bekende prijzen tonen de prijs.
+
 ## Energiehuis 3.2 — Geld › Kwartieren
 
 Nieuw segment in Geld: bekende prijzen per kwartier voor vandaag en morgen (grafiek, goedkoopste 2 en 4 uur, voorbeeld voor 20 kWh) en terugkijken tot circa 10 dagen met kosten per kwartier uit je eigen afname en teruglevering (Home Assistant bewaart 5-minutenstatistiek ongeveer 10 dagen). Alleen lezen; ontbrekende kwartieren worden nooit geschat. Na de salderingsperiode (2026) is netto alleen bekend met `terugleververgoeding`.

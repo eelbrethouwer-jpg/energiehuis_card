@@ -39,6 +39,17 @@ test('vandaag: kerncijfers, grafiek met toegankelijke samenvatting, vensters en 
  assert.match(html,/data-ehqt-day="today"[^>]*aria-pressed="true"/);
 });
 
+test('grafiek: assen met 0, gemiddeld en hoogste; per kwartier een aanwijsbare waarde',()=>{
+ const html=ehQtHtml(card(quarters(0)));
+ const t=text(html);
+ assert.match(t,/€ 0,000/);assert.match(t,/gemiddeld/);assert.match(t,/hoogste/);
+ for(const h of ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'])assert.ok(t.includes(h),h);
+ const m=/data-tips="([^"]+)"/.exec(html);
+ const tips=JSON.parse(m[1].replace(/&quot;/g,'"'));
+ assert.equal(tips.length,96);assert.equal(tips[0].time,'00:00–00:15');assert.match(tips[0].main,/^€ 0,200 per kWh/);
+ assert.match(html,/data-ehqt-chart/);assert.match(html,/class="ehqt-tip"[^>]*hidden/);
+});
+
 test('morgen nog niet bekend: geen verzonnen prijzen; gedeeltelijke dag meldt precies hoeveel bekend is',()=>{
  const none=ehQtHtml(card(quarters(0),{day:'tomorrow'}));
  assert.match(text(none),/prijzen van morgen zijn nog niet bekend/);assert.doesNotMatch(none,/<rect/);
@@ -83,4 +94,23 @@ test('terugkijken: ontbrekende koppelingen en een fout geven een melding in plaa
  d._hass.states['sensor.imp']={state:'1',attributes:{unit_of_measurement:'kWh'}};
  await ctx.API2.load.call(d,1);
  assert.match(text(ehQtHtml(d)),/boem/);
+});
+
+test('weer: zonder weer-entiteit een koppelhint; met entiteit en voorspelling per dag een indicatie met uitleg; bekende dagen tonen de prijs',()=>{
+ const none=card(quarters(0));
+ assert.match(text(ehQtHtml(none)),/Koppel een weer-entiteit/);
+ const c=card(quarters(0).concat(quarters(1)),{config:{weather:'weather.x'}});
+ c._hass.states['weather.x']={state:'cloudy',attributes:{wind_speed_unit:'km/h'}};
+ assert.match(text(ehQtHtml(c)),/Weersverwachting ophalen/);
+ const day=n=>new FakeDate(2026,10,26+n,12).toISOString();
+ c._ehWx={loading:false,at:Date.now(),daily:[{datetime:day(0),wind_speed:10,condition:'cloudy',temperature:6,templow:3},{datetime:day(1),wind_speed:10,condition:'cloudy',temperature:6,templow:3},{datetime:day(2),wind_speed:36,condition:'windy',temperature:8,templow:4},{datetime:day(3),wind_speed:8,condition:'cloudy',temperature:-1,templow:-4}]};
+ const t=text(ehQtHtml(c));
+ assert.match(t,/Vandaag Prijs bekend/);assert.match(t,/Morgen Prijs bekend/);
+ assert.match(t,/Waarschijnlijk goedkoper/);assert.match(t,/veel wind/);
+ assert.match(t,/Waarschijnlijk duurder/);assert.match(t,/weinig wind/);
+ assert.match(t,/geen prijsvoorspelling/);
+ c._ehWx={loading:false,at:Date.now(),error:'Deze weer-entiteit levert geen dagelijkse voorspelling.'};
+ assert.match(text(ehQtHtml(c)),/levert geen dagelijkse voorspelling/);
+ const back=card(quarters(0),{day:'back:1',config:{weather:'weather.x'}});
+ assert.doesNotMatch(text(ehQtHtml(back)),/indicatie op basis van weer/);
 });

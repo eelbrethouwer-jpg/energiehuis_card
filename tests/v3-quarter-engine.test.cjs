@@ -82,6 +82,26 @@ test('kosten: saldering tot en met 2026, daarna alleen met bekende vergoeding; a
  assert.equal(known.total.nettoKnown,true);assert.ok(Math.abs(known.total.netto-(0.3-0.2))<1e-12);
 });
 
+test('weer: eenheden naar m/s, bewolking uit waarde of conditie, dagen zonder dubbelen vanaf vandaag',()=>{
+ assert.equal(E.ehWxMs(36,'km/h'),10);assert.equal(E.ehWxMs(10,'m/s'),10);assert.ok(Math.abs(E.ehWxMs(10,'mph')-4.4704)<1e-9);assert.equal(E.ehWxMs(-1,'km/h'),null);assert.equal(E.ehWxMs('x'),null);
+ assert.equal(E.ehWxCloud({cloud_coverage:140}),100);assert.equal(E.ehWxCloud({condition:'sunny'}),10);assert.equal(E.ehWxCloud({condition:'raar'}),null);
+ const key=ms=>new Date(ms).toISOString().slice(0,10),now=Date.UTC(2026,10,26,12);
+ const d=E.ehWxDays([{datetime:'2026-11-25T12:00:00Z',wind_speed:10},{datetime:'2026-11-26T12:00:00Z',wind_speed:36,temperature:6,templow:2,condition:'cloudy'},{datetime:'2026-11-26T18:00:00Z',wind_speed:99},{datetime:'2026-11-27T12:00:00Z',wind_speed:7.2,cloud_coverage:20}],now,'km/h',key);
+ assert.equal(d.length,2);assert.equal(d[0].wind,10);assert.equal(d[0].temp,4);assert.equal(d[0].cloud,90);assert.equal(d[1].cloud,20);
+ assert.deepEqual(E.ehWxDays(null,now,'km/h',key),[]);
+});
+
+test('weer: indicatie geeft redenen; wind en zon wijzen naar goedkoper, windstil en koud naar duurder',()=>{
+ assert.equal(E.ehWxIndication({wind:9,cloud:50,temp:8},10).level,'cheaper');
+ assert.deepEqual(E.ehWxIndication({wind:9,cloud:50,temp:8},10).reasons,['veel wind']);
+ assert.equal(E.ehWxIndication({wind:2,cloud:95,temp:0},0).level,'pricier');
+ assert.equal(E.ehWxIndication({wind:5,cloud:50,temp:8},5).level,'average');
+ assert.equal(E.ehWxIndication({wind:5,cloud:10,temp:20},5).level,'average','zon alleen is nog geen duidelijk signaal');
+ assert.equal(E.ehWxIndication({wind:8,cloud:10,temp:20},5).level,'cheaper');
+ assert.equal(E.ehWxIndication({wind:null,cloud:null,temp:null},5).level,'average');
+ assert.equal(E.ehWxIndication({wind:5,cloud:10,temp:20},11).score,0,'zon telt alleen in het zomerhalfjaar');
+});
+
 test('motor is zuiver: geen HA, DOM, opslag of netwerk',()=>{
  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src','engines','quarter-engine.cjs'),'utf8');
  assert.doesNotMatch(src,/\bdocument\b|\bwindow\b|localStorage|fetch\(|callWS|callService|hass/);
