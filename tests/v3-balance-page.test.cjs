@@ -62,7 +62,7 @@ test('verouderde bron: geen Woning-getal en geen fictieve nul',()=>{
  const card=makeCard({},h);
  const html=card._balanceHtml(h,card.config);
  assert.match(html,/class="eh3-row-val">—<\/span>/);
- assert.match(text(html),/Een bron ontbreekt of is niet actueel\. \(Cupra \(Alfen\)\)/);
+ assert.match(text(html),/Een bron ontbreekt of is niet actueel\. \(Cupra \(Alfen\): laatste update 7 min geleden\)/);
  assert.doesNotMatch(text(html),/Nu .* verbruik/);
 });
 
@@ -356,4 +356,18 @@ test('verloopgrafiek: 7 dagen per dag, geen grafiek zonder complete uren',async(
  const per={...HOURLY};delete per['sensor.ale'];
  const bad=await load({},per,'yesterday');
  assert.doesNotMatch(bad.card._balanceHtml(bad.h,bad.card.config),/eh3-chart/);
+});
+
+test('rustende lader die zelden meldt: Woning blijft zichtbaar (geschat); een oude hoge waarde of een te oude melding niet',()=>{
+ const rest=hass({'sensor.alfen':st(0,'W',600)});
+ const c1=makeCard({},rest);
+ const html=c1._balanceHtml(rest,c1.config);
+ assert.match(html,/class="eh3-row-val">4,3 kW/);
+ assert.doesNotMatch(text(html),/Een bron ontbreekt/);
+ const busy=hass({'sensor.alfen':st(3700,'W',600)});
+ const c2=makeCard({},busy);
+ assert.match(text(c2._balanceHtml(busy,c2.config)),/Een bron ontbreekt/);
+ const ancient=hass({'sensor.alfen':st(0,'W',3000)});
+ const c3=makeCard({},ancient);
+ assert.match(text(c3._balanceHtml(ancient,c3.config)),/laatste update 50 min geleden/);
 });

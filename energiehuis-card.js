@@ -7538,7 +7538,7 @@ const EH3_SKEW_DEFAULT_S=10; // gelijk aan de Live Cockpit (voorlopige waarde, n
 const EH3_SOURCES=Object.freeze({
  p1:{label:'Net (P1)',cfg:'net',route:60,display:300},
  pv:{label:'Zonnepanelen',cfg:'zonnepanelen',route:90,display:2100},
- alfen:{label:'Cupra (Alfen)',cfg:'laden',route:90,display:2100},
+ alfen:{label:'Cupra (Alfen)',cfg:'laden',route:90,display:2100,idleW:80},
  praktijk:{label:'Praktijkruimte',cfg:'praktijk',route:60,display:300}
 });
 const EH3_REASONS=Object.freeze({
@@ -7607,6 +7607,9 @@ function eh3Source(h,id,spec,now){
  // (Alfen 0 W) lijkt dan oud. Dan geldt de ruimere toon-TTL en wordt de tijdspreiding niet beoordeeld.
  const reported=!!Date.parse((st&&st.last_reported)||'');
  const age=Math.max(0,now-t),limit=(reported?spec.route:spec.display)*1000;
+ // Een rustende lader (≤ 80 W) meldt zich soms zelden. Binnen de toon-TTL telt zo'n oude waarde als schatting
+ // (geen tijdspreiding); een lader die laadt of ouder dan de TTL is blijft verouderd.
+ if(age>(reported?spec.route:spec.display)*1000&&age<=spec.display*1000&&spec.idleW&&Math.abs(w)<=spec.idleW)return {w,status:'geschat',t:null,ageS:age/1000,reason:'rustend_oud'};
  return {w,status:age>limit?'verouderd':'gemeten',t:reported?t:null,ageS:age/1000};
 }
 function eh3Live(card,h,c){
@@ -7722,7 +7725,7 @@ function eh3WoningText(r){
  const w=r.woning;
  if(w.w!==null)return {value:ehPower(w.w),sub:w.note==='meetruis'?'Meetruis, getoond als 0 W':(w.inclPraktijk?'Inclusief praktijkruimte (niet gekoppeld)':'Restpost: alles wat niet apart gemeten wordt'),status:w.status};
  let why=EH3_REASONS[w.reason]||EH3_REASONS.bron_ontbreekt;
- if(w.reason==='bron_ontbreekt'&&Array.isArray(w.missing)&&w.missing.length)why+=' ('+w.missing.map(k=>EH3_SOURCES[k]?.label||k).join(', ')+')';
+ if(w.reason==='bron_ontbreekt'&&Array.isArray(w.missing)&&w.missing.length)why+=' ('+w.missing.map(k=>{const x=r.src&&r.src[k],lab=EH3_SOURCES[k]?.label||k;return x?lab+': '+(x.reason==='niet_gevonden'?'sensor niet gevonden':x.reason==='niet_gekoppeld'?'niet gekoppeld':x.reason==='geen_waarde'?'geen waarde (unavailable)':x.reason==='onbekende_eenheid'?'onbekende eenheid':Number.isFinite(x.ageS)?'laatste update '+Math.round(x.ageS/60)+' min geleden':'niet actueel'):lab;}).join('; ')+')';
  return {value:'—',sub:why,status:'onbeschikbaar'};
 }
 function eh3NowHtml(live){
