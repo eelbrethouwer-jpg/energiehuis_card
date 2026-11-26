@@ -5,8 +5,8 @@ const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'
 const foundation=read('src/legacy/00-foundation.js'),shell=read('src/legacy/02-card-shell.js'),bundle=read('energiehuis-card.js');
 const workflow=read('.github/workflows/publish-v1310.yml'),notes=read('RELEASE_NOTES_v1.31.0.md');
 test('v1.31.0: bron, HACS-bundel en Lovelace-naam consistent',()=>{
- for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.33\.0';/);
- for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.33\.0'/);
+ for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.33\.1';/);
+ for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.33\.1'/);
  assert.match(bundle,/function ehImmThermostat\(/);
  assert.match(bundle,/P\._ehImmThermoAdjust=async function\(/);
 });

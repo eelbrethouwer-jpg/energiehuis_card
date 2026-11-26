@@ -34,10 +34,10 @@ function makeCard(config,h){
 }
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 
-test('Home-lagen zijn byte-identiek aan v1.32.0 (beginpagina blijft onaangeroerd)',()=>{
+test('Home-lagen zijn vastgezet (v1.33.1: alleen de tegel Huis is bewust aangepast; elke verdere wijziging vraagt een nieuwe hash)',()=>{
  const sha=f=>crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'src','legacy',f))).digest('hex');
- assert.equal(sha('16-live-cockpit.js'),'22f687ad807f989a2ae151b8d6b793a53c0f9e0b842bb9c0b2e836790787f6c5');
- assert.equal(sha('17-live-immersive.js'),'c180d9f407a42d4ce2277eb37f2c48a6f7aac25f97e16c87e1403efaa0f556e9');
+ assert.equal(sha('16-live-cockpit.js'),'6640976ad8c2ef8ee93e051e943743fa42e8b0bb245ee771432128b5f76f5738');
+ assert.equal(sha('17-live-immersive.js'),'0688e6f8f4a84049459cda1896644f3becb41c76f547f36c2d83859f1d3613e9');
 });
 
 test('navigatie: Balans staat in het Inzicht-menu en markeert Inzicht als actief',()=>{
@@ -62,7 +62,7 @@ test('verouderde bron: geen Woning-getal en geen fictieve nul',()=>{
  const card=makeCard({},h);
  const html=card._balanceHtml(h,card.config);
  assert.match(html,/class="eh3-row-val">—<\/span>/);
- assert.match(text(html),/Een bron ontbreekt of is niet actueel\. \(Cupra \(Alfen\)\)/);
+ assert.match(text(html),/Een bron ontbreekt of is niet actueel\. \(Cupra \(Alfen\): laatste update 7 min geleden\)/);
  assert.doesNotMatch(text(html),/Nu .* verbruik/);
 });
 
@@ -356,4 +356,18 @@ test('verloopgrafiek: 7 dagen per dag, geen grafiek zonder complete uren',async(
  const per={...HOURLY};delete per['sensor.ale'];
  const bad=await load({},per,'yesterday');
  assert.doesNotMatch(bad.card._balanceHtml(bad.h,bad.card.config),/eh3-chart/);
+});
+
+test('rustende lader die zelden meldt: Woning blijft zichtbaar (geschat); een oude hoge waarde of een te oude melding niet',()=>{
+ const rest=hass({'sensor.alfen':st(0,'W',600)});
+ const c1=makeCard({},rest);
+ const html=c1._balanceHtml(rest,c1.config);
+ assert.match(html,/class="eh3-row-val">4,3 kW/);
+ assert.doesNotMatch(text(html),/Een bron ontbreekt/);
+ const busy=hass({'sensor.alfen':st(3700,'W',600)});
+ const c2=makeCard({},busy);
+ assert.match(text(c2._balanceHtml(busy,c2.config)),/Een bron ontbreekt/);
+ const ancient=hass({'sensor.alfen':st(0,'W',3000)});
+ const c3=makeCard({},ancient);
+ assert.match(text(c3._balanceHtml(ancient,c3.config)),/laatste update 50 min geleden/);
 });

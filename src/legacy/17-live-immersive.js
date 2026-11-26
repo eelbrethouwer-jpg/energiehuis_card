@@ -18,7 +18,7 @@ const EH_IMM_ROUTES=Object.freeze({
 });
 const EH_IMM_VIEWS=Object.freeze({
  sun:Object.freeze({route:'pv',title:'Zonnepanelen',icon:'sun',tile:'pv',reading:'pv',intro:'Actuele opwek van de GoodWe-omvormer, met historie en periodevergelijking.'}),
- home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, uit de bestaande huisverbruik-sensor (geen nieuwe berekening).'}),
+ home:Object.freeze({route:'house',title:'Huisverbruik',icon:'home',tile:'house',reading:'house',intro:'Verbruik van de woning exclusief Cupra, en exclusief praktijkruimte zodra die gemeten wordt.'}),
  grid:Object.freeze({route:'net',title:'Net',icon:'grid',tile:'net',reading:'net',intro:'P1-netvermogen: afname en teruglevering, met historie.'}),
  practice:Object.freeze({route:'practice',title:'Praktijkruimte',icon:'home',tile:'practice',reading:'practice',intro:'Live vermogen, gemeten energie en indicatieve maandkosten.'})
 });
