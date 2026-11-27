@@ -12,7 +12,7 @@ const ctx={console,Date:FakeDate,Math,Map,Set,Array,Object,Number,String,JSON,In
  window:{customCards:[],navigator:{onLine:true},addEventListener(){}},
  customElements:{get:n=>registry.get(n),define:(n,x)=>registry.set(n,x)},
  HTMLElement:class{attachShadow(){this.shadowRoot={innerHTML:'',addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[]};return this.shadowRoot;}}};
-vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};',ctx);
+vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};globalThis.API3={load:EnergiehuisCard.prototype._ehWxBackLoad};',ctx);
 const {ehQtHtml,ehQtPills,EHNV_SEGMENTS}=ctx.API;
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 const mid=()=>new FakeDate(2026,10,26).getTime();
@@ -113,4 +113,27 @@ test('weer: zonder weer-entiteit een koppelhint; met entiteit en voorspelling pe
  assert.match(text(ehQtHtml(c)),/levert geen dagelijkse voorspelling/);
  const back=card(quarters(0),{day:'back:1',config:{weather:'weather.x'}});
  assert.doesNotMatch(text(ehQtHtml(back)),/indicatie op basis van weer/);
+});
+
+test('terugblik: loader vergelijkt weer en dagprijs; de uitleg noemt de kleine steekproef; fout geeft melding',async()=>{
+ const today0=new FakeDate(2026,10,26).getTime(),DAY=86400000;
+ const callWS=async m=>{
+  const id=m.entity_ids[0];
+  if(id==='weather.x'){const l=[];for(let k=9;k>=1;k--){const wind=k%2?36:7;for(let h=0;h<24;h++)l.push({s:'cloudy',a:{temperature:6,wind_speed:wind,wind_speed_unit:'km/h'},lu:(today0-k*DAY+h*3600000)/1000});}return {[id]:l};}
+  const l=[];for(let k=9;k>=1;k--){for(let q=0;q<96;q++)l.push({s:String(k%2?0.20:0.40),lu:(today0-k*DAY+q*900000)/1000});}
+  return {[id]:l};
+ };
+ const c=card(quarters(0),{callWS,config:{weather:'weather.x'}});
+ c._hass.states['weather.x']={state:'cloudy',attributes:{wind_speed_unit:'km/h'}};
+ await ctx.API3.load.call(c);
+ c._ehWx={loading:false,at:Date.now(),daily:[{datetime:new FakeDate(2026,10,28,12).toISOString(),wind_speed:10,temperature:6,templow:3}]};
+ const t=text(ehQtHtml(c));
+ assert.match(t,/Hoe goed klopte dit de afgelopen dagen/);
+ assert.match(t,/\d+ van \d+ duidelijke signalen kwamen uit/);
+ assert.match(t,/Kleine steekproef/);
+ const bad=card(quarters(0),{callWS:async()=>{throw new Error('geen recorder');},config:{weather:'weather.x'}});
+ bad._hass.states['weather.x']={state:'cloudy',attributes:{}};
+ await ctx.API3.load.call(bad);
+ bad._ehWx={loading:false,at:Date.now(),daily:[]};
+ assert.match(text(ehQtHtml(bad)),/Terugblik niet beschikbaar: geen recorder|geen dagelijkse voorspelling/);
 });

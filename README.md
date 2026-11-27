@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.4 — terugblik op de weerindicatie
+
+Onder de weerindicatie staat een uitklapper "Hoe goed klopte dit de afgelopen dagen?": per dag het weer (uit de geschiedenis van je `weather`-entiteit), de indicatie die daaruit volgt en de werkelijke gemiddelde dagprijs, met een telling van hoeveel duidelijke signalen uitkwamen. Alleen complete dagen tellen mee; het is een kleine steekproef (maximaal 9 dagen) en dus een richting, geen bewijs.
+
 ## Energiehuis 3.3 — grafiek met assen en weerindicatie
 
 De kwartiergrafiek heeft nu een verticale as (0 €, daggemiddelde en hoogste prijs), tijden op de horizontale as en een aanwijsbare waarde: tik of sleep over een kwartier (of gebruik de pijltoetsen) en er verschijnt een bubbel met tijd en prijs. Onder Kwartieren staat een indicatie voor de komende dagen op basis van de `weather`-entiteit (wind, bewolking, temperatuur), gelezen via de Home Assistant-voorspelling (alleen lezen, geen externe verbinding). Het is een indicatie, geen prijsvoorspelling; dagen met bekende prijzen tonen de prijs.
