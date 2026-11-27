@@ -12,7 +12,7 @@ const ctx={console,Date:FakeDate,Math,Map,Set,Array,Object,Number,String,JSON,In
  window:{customCards:[],navigator:{onLine:true},addEventListener(){}},
  customElements:{get:n=>registry.get(n),define:(n,x)=>registry.set(n,x)},
  HTMLElement:class{attachShadow(){this.shadowRoot={innerHTML:'',addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[]};return this.shadowRoot;}}};
-vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};globalThis.API3={load:EnergiehuisCard.prototype._ehWxBackLoad};',ctx);
+vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};globalThis.API3={load:EnergiehuisCard.prototype._ehWxBackLoad};globalThis.API4={bars:ehQtDayBars};',ctx);
 const {ehQtHtml,ehQtPills,EHNV_SEGMENTS}=ctx.API;
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 const mid=()=>new FakeDate(2026,10,26).getTime();
@@ -168,4 +168,16 @@ test('prijsvoorspelling: sensor met lijst toont per dag voorspeld gemiddelde, be
  assert.match(text(ehQtHtml(mwh)),/€ 0,080/);
  const gone=card(quarters(0),{config:{prijsvoorspelling:'sensor.weg'}});
  assert.match(text(ehQtHtml(gone)),/sensor\.weg.*niet gevonden/);
+});
+
+test('dagbalken (Praktijkruimte): assen met 0, gemiddeld en hoogste; per dag een aanwijsbare waarde',()=>{
+ const days=Array.from({length:11},(_,i)=>({date:`2026-11-${17+i}`,kwh:8+i*0.5}));
+ const html=ctx.API4.bars(days,{label:'Gemeten dagverbruik'});
+ const t=text(html);
+ assert.match(t,/0,0 kWh/);assert.match(t,/gemiddeld/);assert.match(t,/hoogste/);assert.match(t,/Tik op een dag/);
+ const tips=JSON.parse(/data-tips="([^"]+)"/.exec(html)[1].replace(/&quot;/g,'"'));
+ assert.equal(tips.length,11);assert.equal(tips[10].main,'13,0 kWh');assert.match(tips[0].time,/17 nov/);
+ assert.match(tips[10].sub,/\+\d+% t\.o\.v\. gemiddelde/);
+ assert.equal((html.match(/<rect class="ehqt-neutral"/g)||[]).length,11);
+ assert.equal(ctx.API4.bars([],{}),'');assert.equal(ctx.API4.bars([{date:'x',kwh:NaN}],{}),'');
 });
