@@ -97,7 +97,7 @@ function eh20BatteryView(card,h,c){
  const eh20Missing=!h?.callWS?'De geschiedenis van Home Assistant is in deze weergave niet beschikbaar.':(!c?.import||!c?.export)?'Koppel de tellers voor import en export (instellingen import en export) om de batterijhistorie te berekenen.':'';
  if(!data&&eh20Missing)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(eh20Missing)+'</p>'+baseNote+'</section>';
  if(!data)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
- if(data.error)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p><button type="button" class="eh20-retry" data-eh20-retry>Opnieuw proberen</button>'+baseNote+eh25AuditHtml(card,h,c,[])+'</section>';
+ if(data.error)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice" role="alert">'+ehEsc(data.error)+'</p><button type="button" class="eh20-retry" data-eh20-retry>Opnieuw proberen</button>'+baseNote+eh25AuditHtml(card,h,c,[])+'</section>';
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
  const rows=data.rows,coverage=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
@@ -193,7 +193,7 @@ function eh20Css(){
     h.callWS({type:'recorder/statistics_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),statistic_ids:[priceId],period:'hour',types:['mean']}),
     h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[priceId],minimal_response:true,no_attributes:true,significant_changes_only:false})
    ]):Promise.resolve([]);
-   const priceResults=await eh20WithTimeout(taskPrice,60000);
+   const priceResults=await eh20WithTimeout(taskPrice,60000).catch(()=>[]);
    const bins=eh24BatteryWindows(lim);
    const priceStats=priceResults[0]?.status==='fulfilled'?priceResults[0].value:null;
    const history=priceResults[1]?.status==='fulfilled'?priceResults[1].value:null;

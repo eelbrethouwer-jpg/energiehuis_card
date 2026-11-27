@@ -3282,7 +3282,7 @@ function eh20BatteryView(card,h,c){
  const eh20Missing=!h?.callWS?'De geschiedenis van Home Assistant is in deze weergave niet beschikbaar.':(!c?.import||!c?.export)?'Koppel de tellers voor import en export (instellingen import en export) om de batterijhistorie te berekenen.':'';
  if(!data&&eh20Missing)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(eh20Missing)+'</p>'+baseNote+'</section>';
  if(!data)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="subtle">P1-uurstatistieken ophalen uit Home Assistant Recorder…</p>'+baseNote+'</section>';
- if(data.error)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice">'+ehEsc(data.error)+'</p><button type="button" class="eh20-retry" data-eh20-retry>Opnieuw proberen</button>'+baseNote+eh25AuditHtml(card,h,c,[])+'</section>';
+ if(data.error)return eh26BatteryTabs(card)+'<section class="subsection eh20-panel"><h3>Batterij Simulator 3.0 · uurhistorie</h3><p class="eh20-notice" role="alert">'+ehEsc(data.error)+'</p><button type="button" class="eh20-retry" data-eh20-retry>Opnieuw proberen</button>'+baseNote+eh25AuditHtml(card,h,c,[])+'</section>';
  const eff=eh17N(c.battery_roundtrip_efficiency)??.88,buy=eh17N(c.battery_buy_eur_kwh)??.25,sell=eh17N(c.battery_sell_eur_kwh)??.08,power=eh17N(c.battery_sim_power_kw)??3;
  const rows=data.rows,coverage=rows.filter(r=>Number.isFinite(r.import)&&Number.isFinite(r.export)).length;
  const ratesGood=coverage>=48&&rows.filter(r=>r.import!==null).every(r=>Number.isFinite(r.price));
@@ -3378,7 +3378,7 @@ function eh20Css(){
     h.callWS({type:'recorder/statistics_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),statistic_ids:[priceId],period:'hour',types:['mean']}),
     h.callWS({type:'history/history_during_period',start_time:lim.from.toISOString(),end_time:lim.to.toISOString(),entity_ids:[priceId],minimal_response:true,no_attributes:true,significant_changes_only:false})
    ]):Promise.resolve([]);
-   const priceResults=await eh20WithTimeout(taskPrice,60000);
+   const priceResults=await eh20WithTimeout(taskPrice,60000).catch(()=>[]);
    const bins=eh24BatteryWindows(lim);
    const priceStats=priceResults[0]?.status==='fulfilled'?priceResults[0].value:null;
    const history=priceResults[1]?.status==='fulfilled'?priceResults[1].value:null;
@@ -8084,7 +8084,7 @@ function ehNvCss(){
   '[hidden]{display:none!important}',
   '.ehnv-seg{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:2px 0 12px;padding:2px 1px 4px;-webkit-overflow-scrolling:touch}',
   '.ehnv-seg::-webkit-scrollbar{display:none}',
-  '.ehnv-seg button{flex:none;appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:9px 14px;min-height:40px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}',
+  '.ehnv-seg button{flex:none;appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:9px 14px;min-height:44px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}',
   '.ehnv-seg button.chosen{background:#0f4d45;border-color:#38e8a199;color:#eafff7}',
   '.ehnv-seg button:focus-visible{outline:2px solid #38e8a1;outline-offset:2px}',
   '.ehnv-linklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-top:10px}',
@@ -8242,7 +8242,8 @@ function ehQtPricesFromHistory(states, startMs, endMs) {
   if (!list.length) return out;
   for (let t = startMs; t < endMs; t += EH_QT_STEP_MS) {
     let cur = null;
-    for (const x of list) { if (x.t <= t) cur = x; else break; }
+    // Prijs op het midden van het kwartier: een sensor die enkele seconden na de kwartiergrens bijwerkt, hoort nog bij dit kwartier.
+    for (const x of list) { if (x.t <= t + EH_QT_STEP_MS / 2) cur = x; else break; }
     // Geen waarde vóór dit kwartier: onbekend (niet aanvullen met een latere waarde).
     if (cur && ehQtNum(cur.p) !== null) out.set(t, cur.p);
   }
@@ -8315,12 +8316,13 @@ function ehWxCloud(entry) {
 // Normaliseert een dagelijkse voorspelling van een weather-entiteit tot [{dayKey,t,wind,cloud,temp}] vanaf vandaag, maximaal 7 dagen.
 function ehWxDays(daily, nowMs, unit, dayKey) {
   const out = [], seen = new Set();
-  const today = dayKey(nowMs);
+  const n0 = new Date(nowMs), todayStart = new Date(n0.getFullYear(), n0.getMonth(), n0.getDate()).getTime();
   for (const e of Array.isArray(daily) ? daily : []) {
     const t = Date.parse(e && e.datetime);
     if (!Number.isFinite(t)) continue;
     const key = dayKey(t);
-    if (key < today || seen.has(key)) continue;
+    // Vergelijk op tijd: dagsleutels zijn niet opgevuld met nullen ('2026-11-10' < '2026-11-9' als tekst).
+    if (t < todayStart || seen.has(key)) continue;
     seen.add(key);
     const hi = ehQtNum(e.temperature), lo = ehQtNum(e.templow);
     out.push({ dayKey: key, t, wind: ehWxMs(e.wind_speed, unit), cloud: ehWxCloud(e), temp: hi !== null && lo !== null ? (hi + lo) / 2 : hi });
@@ -8396,7 +8398,7 @@ function ehQtDayBounds(now,offset){
 const EHQT_CHART_W=360;
 function ehQtDrawChart(o){
  const W=EHQT_CHART_W,H=172,X0=46,X1=W-6,Y0=14,Y1=134,n=Math.max(o.n,1),bw=(X1-X0)/n;
- const lo=Math.min(0,o.lo),hi=Math.max(o.hi,lo+0.001),y=v=>Y1-((v-lo)/(hi-lo))*(Y1-Y0),y0=y(0);
+ const lo=Math.min(0,o.lo),hi=Math.max(0,o.hi,lo+0.001),y=v=>Y1-((v-lo)/(hi-lo))*(Y1-Y0),y0=y(0);
  const tips=new Array(n).fill(null);
  let bars='',grid='',axis='';
  for(const it of o.items){
@@ -8420,7 +8422,7 @@ function ehQtDrawChart(o){
  for(let i=0;i<n;i+=12){const x=X0+i*bw;axis+=`<line class="ehqt-xt" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y1}" y2="${Y1+4}"/><text class="ehqt-xl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${ehEsc(ehQtTime(o.first+i*EH_QT_STEP_MS))}</text>`;}
  const nx=o.nowMs>=o.first&&o.nowMs<o.first+n*EH_QT_STEP_MS?X0+((o.nowMs-o.first)/EH_QT_STEP_MS)*bw:null;
  const nowLine=nx===null?'':`<line class="ehqt-nowline" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${Y0-4}" y2="${Y1}"/>`;
- return `<div class="ehqt-chart" tabindex="0" data-ehqt-chart data-key="${ehEsc(o.key)}" data-n="${n}" data-x0="${X0}" data-bw="${bw.toFixed(4)}" data-tips="${ehEsc(JSON.stringify(tips))}" aria-label="${ehEsc(o.label)}. Tik of sleep over de grafiek, of gebruik de pijltoetsen, voor de waarde per kwartier."><div class="ehqt-slot"><span class="ehqt-hint">Tik op een kwartier voor de prijs</span><div class="ehqt-tip" role="status" aria-live="polite" hidden></div></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ehEsc(o.label)}">${grid}${bars}${axis}${nowLine}<line class="ehqt-selline" visibility="hidden" y1="${Y0-4}" y2="${Y1}"/></svg></div>`;
+ return `<div class="ehqt-chart" role="group" tabindex="0" data-ehqt-chart data-key="${ehEsc(o.key)}" data-n="${n}" data-x0="${X0}" data-bw="${bw.toFixed(4)}" data-tips="${ehEsc(JSON.stringify(tips))}" aria-label="${ehEsc(o.label)}. Tik of sleep over de grafiek, of gebruik de pijltoetsen, voor de waarde per kwartier."><div class="ehqt-slot"><span class="ehqt-hint">Tik op een kwartier voor de prijs</span><div class="ehqt-tip" role="status" aria-live="polite" hidden></div></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ehEsc(o.label)}">${grid}${bars}${axis}${nowLine}<line class="ehqt-selline" visibility="hidden" y1="${Y0-4}" y2="${Y1}"/></svg></div>`;
 }
 function ehQtSelect(chart,i){
  let tips;try{tips=chart._ehTips||(chart._ehTips=JSON.parse(chart.dataset.tips||'[]'));}catch(e){tips=[];}
@@ -8432,9 +8434,9 @@ function ehQtSelect(chart,i){
  if(hint)hint.hidden=true;
  if(box){
   box.hidden=false;
-  const pct=Math.max(18,Math.min(82,cx/EHQT_CHART_W*100));
-  box.style.left=pct+'%';
   box.innerHTML=tip?`<small>${ehEsc(tip.time)}</small><strong>${ehEsc(tip.main)}</strong>${tip.sub?`<span>${ehEsc(tip.sub)}</span>`:''}`:'<small>Geen gegevens</small>';
+  const cw=chart.clientWidth||EHQT_CHART_W,bwid=box.offsetWidth||0,px=cx/EHQT_CHART_W*cw;
+  box.style.left=Math.max(bwid/2,Math.min(cw-bwid/2,px))+'px';
  }
  chart._ehSel=i;
  return i;
@@ -8509,7 +8511,7 @@ function ehQtBackHtml(card,n,now){
  const wrap=body=>`<section class="subsection ehqt" aria-label="Kwartierkosten terugkijken">${pills}${body}</section>`;
  const e=card._ehQtBack&&card._ehQtBack[n];
  if(!e||e.loading)return wrap('<div class="energy-loading">Kwartieren ophalen uit de geschiedenis…</div>');
- if(e.error)return wrap(`<p class="ehqt-warn">${ehEsc(e.error)}</p>`);
+ if(e.error)return wrap(`<p class="ehqt-warn" role="alert">${ehEsc(e.error)}</p><button type="button" class="ehqt-retry" data-ehqt-retry="${n}">Opnieuw proberen</button>`);
  const res=e.res,b=e.bounds;
  if(!res.total.complete)return wrap(`<p class="subtle">Voor ${ehEsc(ehQtDayLabel(now,n))} zijn geen complete kwartieren beschikbaar. Home Assistant bewaart per kwartier ongeveer 10 dagen; verder terug kan alleen per uur (zie Energie › Balans).</p>`);
  const T=res.total,known=T.nettoKnown;
@@ -8525,7 +8527,7 @@ function ehQtBackHtml(card,n,now){
 }
 async function ehQtFetchBack(h,c,n,now){
  const b=ehQtDayBounds(now,-n),iso=ms=>new Date(ms).toISOString();
- const pid=c.kwartier_forecast||c.prijs;
+ const pid=c.prijs&&h?.states?.[c.prijs]?c.prijs:c.kwartier_forecast;
  if(!pid||!h?.states?.[pid])throw new Error('Koppel een prijssensor (prijs of kwartier_forecast) om terug te kijken.');
  if(!c.import||!c.export)throw new Error('Koppel de tellers voor import en export om kosten per kwartier te berekenen.');
  if(typeof h.callWS!=='function')throw new Error('Geschiedenis is niet beschikbaar in deze weergave.');
@@ -8565,13 +8567,13 @@ function ehWxFetch(h,id,type){
 function ehWxLevelText(l){return l==='cheaper'?'Waarschijnlijk goedkoper':l==='pricier'?'Waarschijnlijk duurder':'Gemiddeld';}
 // ---- Terugblik: de weerindicatie naast de werkelijke dagprijzen van de afgelopen dagen ----
 async function ehWxFetchBack(h,c,now){
- const pid=c.kwartier_forecast||c.prijs,wid=c.weather;
+ const pid=c.prijs&&h?.states?.[c.prijs]?c.prijs:c.kwartier_forecast,wid=c.weather;
  if(!pid||!h?.states?.[pid])throw new Error('Geen prijssensor gekoppeld voor de terugblik.');
  if(typeof h.callWS!=='function')throw new Error('Geschiedenis is niet beschikbaar in deze weergave.');
  const first=ehQtDayBounds(now,-9),today=ehQtDayBounds(now,0),iso=ms=>new Date(ms).toISOString();
  const [wh,ph]=await Promise.all([
   h.callWS({type:'history/history_during_period',start_time:iso(first.s),end_time:iso(today.s),entity_ids:[wid],include_start_time_state:true,significant_changes_only:false,minimal_response:false,no_attributes:false}),
-  h.callWS({type:'history/history_during_period',start_time:iso(first.s-3600000),end_time:iso(today.s),entity_ids:[c.kwartier_forecast||c.prijs],include_start_time_state:true,significant_changes_only:false,minimal_response:true,no_attributes:true})
+  h.callWS({type:'history/history_during_period',start_time:iso(first.s-3600000),end_time:iso(today.s),entity_ids:[pid],include_start_time_state:true,significant_changes_only:false,minimal_response:true,no_attributes:true})
  ]);
  const tempUnit=h.states[wid]?.attributes?.temperature_unit,windUnit=h.states[wid]?.attributes?.wind_speed_unit;
  const entries=((wh&&wh[wid])||[]).map(x=>{
@@ -8637,7 +8639,7 @@ function ehQtCss(){
   '.ehqt-chart{position:relative;outline:none;-webkit-tap-highlight-color:transparent}.ehqt-chart:focus-visible{box-shadow:0 0 0 2px #38e8a1aa;border-radius:10px}',
   '.ehqt-chart svg{display:block;width:100%;height:auto;touch-action:pan-y;cursor:crosshair}.ehqt-chart text{fill:#9fbccd;font-size:9px;font-family:inherit}',
   '.ehqt-slot{position:relative;height:60px;margin-bottom:4px}.ehqt-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8fb0c4}',
-  '.ehqt-tip{position:absolute;top:0;transform:translateX(-50%);min-width:120px;white-space:nowrap;padding:5px 10px;border-radius:12px;background:#0b2132;border:1px solid #38e8a199;box-shadow:0 6px 18px #0008;text-align:center;pointer-events:none;z-index:2}',
+  '.ehqt-tip{position:absolute;top:0;transform:translateX(-50%);min-width:120px;max-width:94%;box-sizing:border-box;padding:5px 10px;border-radius:12px;background:#0b2132;border:1px solid #38e8a199;box-shadow:0 6px 18px #0008;text-align:center;pointer-events:none;z-index:2}',
   '.ehqt-tip[hidden]{display:none}.ehqt-tip small{display:block;font-size:10px;color:#9fbccd}.ehqt-tip strong{display:block;font-size:15px;color:#fff;line-height:1.25}.ehqt-tip span{display:block;font-size:10px;color:#cfe3ef}',
   '.ehqt-tip:after{content:"";position:absolute;left:50%;bottom:-6px;width:10px;height:10px;background:#0b2132;border-right:1px solid #38e8a199;border-bottom:1px solid #38e8a199;transform:translateX(-50%) rotate(45deg)}',
   '.ehqt-grid{stroke:#6d99b52e;stroke-dasharray:3 3;stroke-width:1}.ehqt-xt{stroke:#6d99b566}.ehqt-selline{stroke:#fff;stroke-width:1.4}',
@@ -8652,15 +8654,21 @@ function ehQtCss(){
   '.ehqt-wx-cheaper .ehqt-chip{background:#0f4d45;color:#aaffdc}.ehqt-wx-average .ehqt-chip{background:#173a55;color:#bfe0ff}.ehqt-wx-pricier .ehqt-chip{background:#5a2f1b;color:#ffd0b5}',
   '.ehqt-wx-r{text-align:right;max-width:44%}.ehqt-wx-r small{display:block;font-size:10px;color:#9fbccd}.ehqt-wx-r strong{font-size:13px}',
   '.ehqt-all p{font-size:13px;line-height:1.4}.ehqt-sm{display:block;font-size:10px;color:#9fbccd}.ehqt-all td,.ehqt-all th{font-size:11px}',
+  '.ehqt-retry{margin:6px 0;min-height:44px;padding:0 16px;border-radius:12px;background:#17604c;border:1px solid #55dfb1;color:#fff;font:inherit;font-weight:700;cursor:pointer}',
   '.ehqt-all summary{font-size:14px}.ehqt-all[open] summary{margin-bottom:6px}',
   '.ehqt-miss{fill:#143247;stroke:#6d99b544;stroke-dasharray:3 2}',
-  '.ehqt-days select{appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:7px 11px;font:inherit;font-size:10px;font-weight:800;min-height:34px}.ehqt-days select.chosen{background:#0f4d45;border-color:#38e8a199;color:#eafff7}',
+  '.ehqt-days select{appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:7px 11px;font:inherit;font-size:10px;font-weight:800;min-height:44px}.ehqt-days select.chosen{background:#0f4d45;border-color:#38e8a199;color:#eafff7}',
   '.ehqt-all{margin-top:12px}.ehqt-all summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;align-items:center}',
   '.ehqt-all table{width:100%;border-collapse:collapse;font-size:12px}.ehqt-all th,.ehqt-all td{text-align:left;padding:5px 4px;border-bottom:1px solid #6d99b522}'
  ].join('\n');
 }
 (function ehQtInstall(){
- const P=EnergiehuisCard.prototype,previous=P._render;
+ const P=EnergiehuisCard.prototype,previous=P._render,previousConfig=P.setConfig;
+ P.setConfig=function(config){
+  // Nieuwe configuratie (bijvoorbeeld in de editor): oude terugkijk- en weerresultaten horen daar niet meer bij.
+  this._ehQtBack=null;this._ehWx=null;this._ehWxBack=null;
+  return previousConfig.call(this,config);
+ };
  P._render=function(){
   previous.call(this);
   const root=this.shadowRoot;
@@ -8696,11 +8704,19 @@ function ehQtCss(){
    root.addEventListener('pointerup',up);root.addEventListener('pointercancel',up);
    root.addEventListener('keydown',e=>{
     const ch=chartOf(e);if(!ch||!/^Arrow(Left|Right)$|^(Home|End|Escape)$/.test(e.key))return;
+    if(e.key==='Escape'&&!Number.isInteger(ch._ehSel))return;
     e.preventDefault();
     const n=Number(ch.dataset.n),cur=Number.isInteger(ch._ehSel)?ch._ehSel:(e.key==='ArrowLeft'?n:-1);
     const nx=e.key==='ArrowLeft'?cur-1:e.key==='ArrowRight'?cur+1:e.key==='Home'?0:e.key==='End'?n-1:null;
     if(nx===null){this._ehQtSel=null;this._schedule();return;}
     pick2(ch,nx);
+   });
+   root.addEventListener('click',e=>{
+    const r=e.target?.closest?.('[data-ehqt-retry]');
+    if(!r)return;
+    const n=Number(r.dataset.ehqtRetry);
+    if(this._ehQtBack)this._ehQtBack[n]=null;
+    this._ehQtLoadBack(n);this._schedule();
    });
    root.addEventListener('change',e=>{
     const sel=e.target?.closest?.('[data-ehqt-back]');
@@ -8734,13 +8750,14 @@ function ehQtCss(){
  P._ehQtLoadBack=async function(n){
   this._ehQtBack=this._ehQtBack||{};
   const e=this._ehQtBack[n];
-  if(e&&(e.loading||Date.now()-e.at<1800000))return;
-  this._ehQtBack[n]={loading:true,at:Date.now()};
+  const dk=ehQtDayBounds(new Date(),-n).s;
+  if(e&&(e.loading||(e.dk===dk&&Date.now()-e.at<1800000)))return;
+  this._ehQtBack[n]={loading:true,at:Date.now(),dk};
   try{
    const r=await ehQtFetchBack(this._hass,this.config||{},n,new Date());
-   this._ehQtBack[n]={loading:false,at:Date.now(),res:r.res,bounds:r.bounds};
+   this._ehQtBack[n]={loading:false,at:Date.now(),dk,res:r.res,bounds:r.bounds};
   }catch(err){
-   this._ehQtBack[n]={loading:false,at:Date.now()-1500000,error:String(err&&err.message?err.message:'Terugkijken is niet gelukt.')};
+   this._ehQtBack[n]={loading:false,at:Date.now()-1500000,dk,error:String(err&&err.message?err.message:'Terugkijken is niet gelukt.')};
   }
   this._schedule();
  };
