@@ -5794,6 +5794,8 @@ const EhLiveCockpit=(function(){
   // Kwartierprijs-overlay (subtiel, nooit een tikvlak): rechtsonder op de scène; in de lijstweergave (portret) een rij onderaan de vakjes.
   '.eh-price{appearance:none;font-family:inherit;text-align:left;cursor:pointer;display:block;box-sizing:border-box;min-width:44px;min-height:44px;position:absolute;z-index:4;pointer-events:auto;left:62.5%;right:1.5%;bottom:2.2%;padding:calc(var(--u) * 8px) calc(var(--u) * 12px);border-radius:calc(var(--u) * 16px);background:rgba(8,16,28,.58);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.13);color:#e8f2fa;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2}' +
   '.eh-price:hover{border-color:rgba(255,255,255,.3)}.eh-price:focus-visible{outline:2px solid #76c1ef;outline-offset:2px}' +
+  '.eh-price-unit{font-size:.75em;opacity:.7}.eh-price-tier{font-size:.8em;font-weight:700;padding:0 .45em;border-radius:99px;border:1px solid currentColor}.eh-price-tier[data-tier="goedkoop"]{color:#4bd66d}.eh-price-tier[data-tier="duur"]{color:#ffad32}.eh-price-tier[data-tier="gemiddeld"]{color:#9fc8ff}' +
+  '.ehc--master[data-layout="list"] .eh-price-top{flex-wrap:wrap;row-gap:2px;white-space:normal}.ehc--master:not([data-layout="list"]) .eh-price-at{display:none}' +
   '.eh-price-top{display:flex;align-items:baseline;gap:.5em;white-space:nowrap}.eh-price-label{opacity:.78;letter-spacing:.04em;text-transform:uppercase;font-size:.9em}.eh-price-now{font-size:1.5em;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}.eh-price-at{margin-left:auto;opacity:.7;font-variant-numeric:tabular-nums}' +
   '.eh-price-bars{display:block;width:100%;height:calc(var(--u) * 40px);min-height:12px;max-height:26px;margin-top:calc(var(--u) * 5px)}.eh-price-bars rect{fill:rgba(255,255,255,.34)}.eh-price-bars rect.cheap{fill:rgba(95,231,160,.55)}.eh-price-bars rect.now{fill:#fff}.eh-price-bars line.nowline{stroke:#5fe7a0;stroke-width:.5;opacity:.9}.eh-price-bars line.zero{stroke:#fff;stroke-width:.3;opacity:.35}.eh-price-bars rect.past{fill:rgba(255,255,255,.2)}' +
   '.eh-price-bars line.daybreak{stroke:#fff;stroke-width:.65;stroke-dasharray:2 2;opacity:.7}.eh-price-period{display:block;margin-top:2px;font-size:.85em;opacity:.75;white-space:normal}' +
@@ -6986,25 +6988,32 @@ function ehImmPracticeChart(s){
   const plan=c.live_cockpit_planning===true?ehImmPlanningModel(info?.quarters||[],now,h):null;
   const model=plan?.available?plan:ehImmQuarterModel(info?.quarters||[],now),cur=model.cur;
   if(plan&&!plan.available)for(const it of model.items)it.unplanned=true;
+  let tier='',tierRel=null;
   let state='none',label='Kwartierprijs',nowTxt='geen data',at='',aria='Kwartierprijs: geen kwartierdata beschikbaar.',bars='';
   const eur=p=>(p<0?'−':'')+'€ '+ehFmt(Math.abs(p),3);
   if(model.known>=8||(plan?.available&&model.known>0)){
    state='quarter';bars=ehImmQuarterBars(model);
-   if(plan)label=plan.available?'Laadplanning':'Planning n.b.';else if(model.hasTomorrow)label='Vandaag/morgen';
+   if(cur&&model.known>=8){
+    const avg=model.items.reduce((a,x)=>a+x.p,0)/model.items.length;
+    if(avg>0)tierRel=Math.round((cur.p/avg-1)*100);
+    const span=Math.max(0.0001,model.max-model.min);
+    tier=(cur.p-model.min)<=span*.25?'goedkoop':(model.max-cur.p)<=span*.25?'duur':'gemiddeld';
+   }
+   if(plan)label=plan.available?'Laadplanning':'Planning n.b.';else label='Kwartierprijs nu';
    const range=(plan?.available?'Laadplanning, '+model.selected+' geselecteerde kwartieren;':model.hasTomorrow?'Vandaag en morgen':'Vandaag')+' laagste '+eur(model.min)+', hoogste '+eur(model.max)+' per kWh ('+model.known+' van '+model.slots+' kwartieren bekend).';
-   if(cur){nowTxt=eur(cur.p);at=ehClock(cur.t);aria='Kwartierprijs: nu '+eur(cur.p)+' per kWh (kwartier '+ehClock(cur.t)+' tot '+ehClock(cur.t+900000)+'). '+range;}
+   if(cur){nowTxt=eur(cur.p);at=ehClock(cur.t)+'–'+ehClock(cur.t+900000);aria='Kwartierprijs: nu '+eur(cur.p)+' per kWh (kwartier '+ehClock(cur.t)+' tot '+ehClock(cur.t+900000)+'). '+range;}
    else{nowTxt='nu onbekend';aria='Kwartierprijs: het huidige kwartier is niet beschikbaar. '+range;}
   }else if(info&&Number.isFinite(info.currentHour)){
    state='hour';label='Uurprijs';nowTxt=eur(info.currentHour);aria='Uurprijs: nu '+eur(info.currentHour)+' per kWh. Geen kwartierdata beschikbaar.';
   }
   // Handtekening over de ECHTE prijsdata (niet over de tekenlengte): elke gewijzigde prijs of tijdstip rendert opnieuw.
-  const periodText=plan?.available?'Groen: laden · oranje: wachten'+(model.departure?' · tot '+ehClock(model.departure):' · 36 uur'):plan?'Planning niet beschikbaar: '+plan.reason:model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar';
+  const periodText=plan?.available?'Groen: laden · oranje: wachten'+(model.departure?' · tot '+ehClock(model.departure):' · 36 uur'):plan?'Planning niet beschikbaar: '+plan.reason:(model.hasTomorrow?'Vandaag · morgen'+(model.tomorrowKnown<model.slots-model.todaySlots?' (deels)':''):'Vandaag · morgen nog niet beschikbaar')+(state==='quarter'&&tier?' · nu '+tier+(tierRel!==null?' ('+Math.abs(tierRel)+'% '+(tierRel>=0?'boven':'onder')+' daggemiddelde)':'')+' · groen = goedkoopste 25%':'');
   const sig=ehImmHash(state+'|'+label+'|'+periodText+'|'+model.limit+'|'+nowTxt+'|'+at+'|'+model.slots+'|'+model.nowIdx+'|'+model.items.map(x=>x.i+':'+Math.round(x.p*10000)+':'+x.planned).join(','));
   if(el.dataset.sig===sig)return;
   el.dataset.sig=sig;el.dataset.state=state;el.dataset.slots=String(model.slots);
   el.setAttribute('aria-label',aria+' Tik voor het prijsoverzicht.');
   const top=doc.createElement('span');top.className='eh-price-top';
-  for(const [cls,txt,tag] of [['eh-price-label',label,'span'],['eh-price-now',nowTxt,'strong'],['eh-price-at',at,'span']]){if(!txt)continue;const n=doc.createElement(tag);n.className=cls;n.textContent=txt;top.appendChild(n);}
+  for(const [cls,txt,tag] of [['eh-price-label',label,'span'],['eh-price-now',nowTxt,'strong'],['eh-price-unit',/^[−-]?€/.test(nowTxt)?'/kWh':'','span'],['eh-price-at',at,'span'],['eh-price-tier',state==='quarter'?tier:'','span']]){if(!txt)continue;const n=doc.createElement(tag);n.className=cls;n.textContent=txt;if(cls==='eh-price-tier')n.dataset.tier=txt;top.appendChild(n);}
   el.replaceChildren(top);
   if(bars){const t=doc.createElement('template');t.innerHTML='<svg class="eh-price-bars" viewBox="0 0 '+model.slots+' 24" preserveAspectRatio="none" aria-hidden="true">'+bars+'</svg>';el.appendChild(t.content);}
   if(state==='quarter'){

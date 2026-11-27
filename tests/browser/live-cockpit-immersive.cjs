@@ -750,7 +750,7 @@ const PAGE=()=>{
    assert.match(T.cupra.aria,/Huidige laadsessie: 1,99 kWh\./);
    assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,x.sim.quarters);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
    assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,x.sim.quarters);assert.equal(x.price.pe,'auto');
-   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Vandaag · morgen nog niet beschikbaar\. Tik voor het prijsoverzicht\.$/);
+   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Vandaag · morgen nog niet beschikbaar( · nu (goedkoop|gemiddeld|duur)( \(\d+% (boven|onder) daggemiddelde\))? · groen = goedkoopste 25%)?\. Tik voor het prijsoverzicht\.$/);
    if(x.layout!=='list'){
     const p=x.price.rect,ks=Object.keys(T);
     for(const k of ks){const r=T[k].rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
