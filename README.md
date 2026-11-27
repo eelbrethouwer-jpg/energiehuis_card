@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.5 — prijsvoorspelling uit je eigen sensor
+
+Optioneel: `prijsvoorspelling: sensor.naam` (een sensor met een lijst in de attributen `forecast`, `prices` of `data`, uurlijks of per kwartier; €/kWh, ct/kWh of €/MWh). De kaart toont per dag het voorspelde gemiddelde, met "voorspeld goedkoper/duurder" ten opzichte van de andere voorspelde dagen. Bekende prijzen gaan altijd voor; de weerindicatie blijft als aanvulling. De kaart rekent zelf geen prijzen uit en blijft alleen-lezen.
+
 ## Energiehuis 3.4 — terugblik op de weerindicatie
 
 Onder de weerindicatie staat een uitklapper "Hoe goed klopte dit de afgelopen dagen?": per dag het weer (uit de geschiedenis van je `weather`-entiteit), de indicatie die daaruit volgt en de werkelijke gemiddelde dagprijs, met een telling van hoeveel duidelijke signalen uitkwamen. Alleen complete dagen tellen mee; het is een kleine steekproef (maximaal 9 dagen) en dus een richting, geen bewijs.
@@ -7,6 +11,10 @@ Onder de weerindicatie staat een uitklapper "Hoe goed klopte dit de afgelopen da
 ## Energiehuis 3.3 — grafiek met assen en weerindicatie
 
 De kwartiergrafiek heeft nu een verticale as (0 €, daggemiddelde en hoogste prijs), tijden op de horizontale as en een aanwijsbare waarde: tik of sleep over een kwartier (of gebruik de pijltoetsen) en er verschijnt een bubbel met tijd en prijs. Onder Kwartieren staat een indicatie voor de komende dagen op basis van de `weather`-entiteit (wind, bewolking, temperatuur), gelezen via de Home Assistant-voorspelling (alleen lezen, geen externe verbinding). Het is een indicatie, geen prijsvoorspelling; dagen met bekende prijzen tonen de prijs.
+
+## Energiehuis 3.5 — dagbalken met assen
+
+De dagbalken in Home › Praktijkruimte hebben nu dezelfde opzet als de kwartiergrafiek: een verticale as met 0, het gemiddelde en de hoogste dag, de dagen op de horizontale as en een bubbel met datum, kWh en het verschil met het gemiddelde bij tikken, slepen of de pijltoetsen.
 
 ## Energiehuis 3.2 — Geld › Kwartieren
 

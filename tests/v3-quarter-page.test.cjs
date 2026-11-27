@@ -12,7 +12,7 @@ const ctx={console,Date:FakeDate,Math,Map,Set,Array,Object,Number,String,JSON,In
  window:{customCards:[],navigator:{onLine:true},addEventListener(){}},
  customElements:{get:n=>registry.get(n),define:(n,x)=>registry.set(n,x)},
  HTMLElement:class{attachShadow(){this.shadowRoot={innerHTML:'',addEventListener(){},querySelector:()=>null,querySelectorAll:()=>[]};return this.shadowRoot;}}};
-vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};globalThis.API3={load:EnergiehuisCard.prototype._ehWxBackLoad};',ctx);
+vm.runInNewContext(source+'\n;globalThis.API={ehQtHtml,ehQtPills,EHNV_SEGMENTS};globalThis.API2={load:EnergiehuisCard.prototype._ehQtLoadBack};globalThis.API3={load:EnergiehuisCard.prototype._ehWxBackLoad};globalThis.API4={bars:ehQtDayBars};',ctx);
 const {ehQtHtml,ehQtPills,EHNV_SEGMENTS}=ctx.API;
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 const mid=()=>new FakeDate(2026,10,26).getTime();
@@ -153,4 +153,31 @@ test('review: terugkijken-fout heeft een knop om opnieuw te proberen; chart heef
  await ctx.API2.load.call(ok,1);assert.equal(calls,first,'binnen dezelfde dag uit de cache');
  clock+=86400000;
  await ctx.API2.load.call(ok,1);assert.ok(calls>first,'na middernacht opnieuw ophalen');
+});
+
+test('prijsvoorspelling: sensor met lijst toont per dag voorspeld gemiddelde, bekende dagen blijven bekend, ook zonder weer-entiteit',()=>{
+ const hourly=(n,p)=>Array.from({length:24},(_,h)=>({start_time:new FakeDate(2026,10,26+n,h).toISOString(),price:p}));
+ const c=card(quarters(0).concat(quarters(1)),{config:{prijsvoorspelling:'sensor.fc'}});
+ c._hass.states['sensor.fc']={state:'0.3',attributes:{unit_of_measurement:'€/kWh',forecast:[].concat(hourly(0,0.3),hourly(1,0.3),hourly(2,0.30),hourly(3,0.20),hourly(4,0.40))}};
+ const t=text(ehQtHtml(c));
+ assert.match(t,/Vandaag Prijs bekend/);assert.match(t,/Morgen Prijs bekend/);
+ assert.match(t,/Voorspeld goedkoper/);assert.match(t,/Voorspeld duurder/);assert.match(t,/voorspeld € 0,/);
+ assert.match(t,/schatting/);
+ const mwh=card(quarters(0),{config:{prijsvoorspelling:'sensor.fc'}});
+ mwh._hass.states['sensor.fc']={state:'80',attributes:{unit_of_measurement:'EUR/MWh',data:hourly(2,80)}};
+ assert.match(text(ehQtHtml(mwh)),/€ 0,080/);
+ const gone=card(quarters(0),{config:{prijsvoorspelling:'sensor.weg'}});
+ assert.match(text(ehQtHtml(gone)),/sensor\.weg.*niet gevonden/);
+});
+
+test('dagbalken (Praktijkruimte): assen met 0, gemiddeld en hoogste; per dag een aanwijsbare waarde',()=>{
+ const days=Array.from({length:11},(_,i)=>({date:`2026-11-${17+i}`,kwh:8+i*0.5}));
+ const html=ctx.API4.bars(days,{label:'Gemeten dagverbruik'});
+ const t=text(html);
+ assert.match(t,/0,0 kWh/);assert.match(t,/gemiddeld/);assert.match(t,/hoogste/);assert.match(t,/Tik op een dag/);
+ const tips=JSON.parse(/data-tips="([^"]+)"/.exec(html)[1].replace(/&quot;/g,'"'));
+ assert.equal(tips.length,11);assert.equal(tips[10].main,'13,0 kWh');assert.match(tips[0].time,/17 nov/);
+ assert.match(tips[10].sub,/\+\d+% t\.o\.v\. gemiddelde/);
+ assert.equal((html.match(/<rect class="ehqt-neutral"/g)||[]).length,11);
+ assert.equal(ctx.API4.bars([],{}),'');assert.equal(ctx.API4.bars([{date:'x',kwh:NaN}],{}),'');
 });

@@ -750,7 +750,7 @@ const PAGE=()=>{
    assert.match(T.cupra.aria,/Huidige laadsessie: 1,99 kWh\./);
    assert.ok(x.price&&x.price.shown,'kwartierprijs zichtbaar');assert.equal(x.price.tag,'BUTTON');assert.equal(x.price.state,'quarter');assert.equal(x.price.slots,x.sim.quarters);assert.ok(x.price.rect.w>=44&&x.price.rect.h>=44,'tikvlak ≥ 44×44: '+Math.round(x.price.rect.w)+'×'+Math.round(x.price.rect.h));
    assert.match(x.price.text,/Kwartierprijs/i);assert.match(x.price.text,/€ 0,\d{3}/);assert.equal(x.price.now,1);assert.equal(x.price.bars,x.sim.quarters);assert.equal(x.price.pe,'auto');
-   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Vandaag · morgen nog niet beschikbaar\. Tik voor het prijsoverzicht\.$/);
+   assert.match(x.price.aria,/^Kwartierprijs: nu € 0,\d{3} per kWh \(kwartier \d\d:\d\d tot \d\d:\d\d\)\. Vandaag laagste .* \((92|96|100) van (92|96|100) kwartieren bekend\)\. Vandaag · morgen nog niet beschikbaar( · nu (goedkoop|gemiddeld|duur)( \(\d+% (boven|onder) daggemiddelde\))? · groen = goedkoopste 25%)?\. Tik voor het prijsoverzicht\.$/);
    if(x.layout!=='list'){
     const p=x.price.rect,ks=Object.keys(T);
     for(const k of ks){const r=T[k].rect;assert.ok(p.r<=r.l||p.l>=r.r||p.b<=r.t||p.t>=r.b,'kwartierprijs raakt vakje '+k);}
@@ -904,7 +904,7 @@ const PAGE=()=>{
  await check('pil bovenaan: datum en buitentemperatuur naast de tijd (weer-entiteit, anders Cupra-buitentemperatuur; verouderd/onbekend ⇒ alleen datum; offline ⇒ niets extra)',async()=>{
   const PILL=()=>{const sr=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot,p=sr.querySelector('.ehm-pill'),x=p.querySelector('.p-extra'),r=p.getBoundingClientRect(),xr=x?x.getBoundingClientRect():null;
    return {text:p.textContent.replace(/\s+/g,' ').trim(),extra:x&&!x.hidden?x.textContent:null,fits:!!xr&&xr.right<=r.right+0.5&&xr.left>=r.left-0.5&&p.scrollWidth<=p.clientWidth+1,time:p.querySelector('.p-time').textContent};};
-  const date=process.env.EH_TEST_TIME?new Date(process.env.EH_TEST_TIME).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,''):new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const date=process.env.EH_TEST_TIME?new Date(process.env.EH_TEST_TIME).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,''):new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,'');
   const out={};
   for(const [w,h] of [[844,390],[390,844],[1280,800]]){
    const {ctx,page,errors}=await open(IMM,{width:w,height:h});await settle(page);const a=await page.evaluate(PILL);await ctx.close();
