@@ -904,7 +904,7 @@ const PAGE=()=>{
  await check('pil bovenaan: datum en buitentemperatuur naast de tijd (weer-entiteit, anders Cupra-buitentemperatuur; verouderd/onbekend ⇒ alleen datum; offline ⇒ niets extra)',async()=>{
   const PILL=()=>{const sr=document.querySelector('energiehuis-card').shadowRoot.querySelector('.eh-live-home').shadowRoot,p=sr.querySelector('.ehm-pill'),x=p.querySelector('.p-extra'),r=p.getBoundingClientRect(),xr=x?x.getBoundingClientRect():null;
    return {text:p.textContent.replace(/\s+/g,' ').trim(),extra:x&&!x.hidden?x.textContent:null,fits:!!xr&&xr.right<=r.right+0.5&&xr.left>=r.left-0.5&&p.scrollWidth<=p.clientWidth+1,time:p.querySelector('.p-time').textContent};};
-  const date=process.env.EH_TEST_TIME?new Date(process.env.EH_TEST_TIME).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,''):new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\.$/,'');
+  const date=process.env.EH_TEST_TIME?new Date(process.env.EH_TEST_TIME).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,''):new Date().toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'}).replace(/\.$/,'');
   const out={};
   for(const [w,h] of [[844,390],[390,844],[1280,800]]){
    const {ctx,page,errors}=await open(IMM,{width:w,height:h});await settle(page);const a=await page.evaluate(PILL);await ctx.close();
