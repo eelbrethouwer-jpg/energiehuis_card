@@ -117,8 +117,10 @@ test('historisch gat reset SOC en verzint geen ontbrekend netverbruik',()=>{
 test('geen geschiedenis betekent geen eurofantasie in het dashboard',()=>{
  const card=Object.create(EnergiehuisCard.prototype);
  card._eh17Capacity=10;card._eh20Mode='solar';card._eh20Loading=true;card.isConnected=false;
- const empty=eh20BatteryView(card,{states:{}},EH_DEFAULTS);
+ const linked={...EH_DEFAULTS,import:'sensor.import',export:'sensor.export'};
+ const empty=eh20BatteryView(card,{states:{},callWS:async()=>({})},linked);
  assert.match(empty,/P1-uurstatistieken ophalen/);
+ assert.match(eh20BatteryView(card,{states:{}},EH_DEFAULTS),/Koppel de tellers voor import en export|in deze weergave niet beschikbaar/);
  card._eh20Battery={at:Date.now(),rows:[]};
  const missing=eh20BatteryView(card,{states:{}},EH_DEFAULTS);
  assert.match(missing,/minimaal 48 uur/);
