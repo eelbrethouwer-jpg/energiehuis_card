@@ -1,5 +1,9 @@
 # Energiehuis — Home Assistant dashboardkaart
 
+## Energiehuis 3.7 — live batterijdashboard
+
+Energie › Batterij begint met een live paneel over de virtuele batterij: vulling (ring en kWh), laden of teruglevering in watt, tijd tot vol of leeg, vandaag geladen en teruggeleverd en een 24-uursgrafiek (tik voor het uur). De batterij heeft geen vermogenssensor; het vermogen wordt afgeleid uit de verandering van `battery_soc_kwh` en staat op rust als die langer dan 30 minuten gelijk blijft. Optioneel: `battery_power` (W of kW) en `battery_power_sign: discharge_positive`. Gelabeld als simulatie, alleen lezen.
+
 ## Energiehuis 3.5 — prijsvoorspelling uit je eigen sensor
 
 Optioneel: `prijsvoorspelling: sensor.naam` (een sensor met een lijst in de attributen `forecast`, `prices` of `data`, uurlijks of per kwartier; €/kWh, ct/kWh of €/MWh). De kaart toont per dag het voorspelde gemiddelde, met "voorspeld goedkoper/duurder" ten opzichte van de andere voorspelde dagen. Bekende prijzen gaan altijd voor; de weerindicatie blijft als aanvulling. De kaart rekent zelf geen prijzen uit en blijft alleen-lezen.

@@ -38,7 +38,9 @@ const buildSteps=Object.freeze([
   {kind:'legacy',name:'18-balance-page.js'},{kind:'legacy',name:'19-navigation-31.js'},
   // v3.2: kwartierprijzen (Geld › Kwartieren). Zuivere motor vóór het fragment dat hem gebruikt.
   {kind:'engine',name:'quarter-engine.cjs'},
-  {kind:'legacy',name:'20-quarter-prices.js'}
+  {kind:'legacy',name:'20-quarter-prices.js'},
+  {kind:'engine',name:'battery-live-engine.cjs'},
+  {kind:'legacy',name:'21-battery-live.js'}
 ]);
 if(buildSteps.some(s=>!['legacy','engine'].includes(s.kind))){
  console.error('Build aborted: unknown build step kind.');

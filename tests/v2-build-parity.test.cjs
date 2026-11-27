@@ -25,7 +25,7 @@ function fixture(fn){
 }
 test('PR1: source concatenation exactly reproduces deployed HACS JavaScript bytes',()=>{
  const sourceFiles=fs.readdirSync(src).filter(x=>x.endsWith('.js')).sort();
- assert.equal(sourceFiles.length,23); // v1.27: + 16-live-cockpit.js · v1.28-voorstel: + 17-live-immersive.js · v3.0: + 18-balance-page.js · v3.1: + 19-navigation-31.js
+ assert.equal(sourceFiles.length,24); // v1.27: + 16-live-cockpit.js · v1.28-voorstel: + 17-live-immersive.js · v3.0: + 18-balance-page.js · v3.1: + 19-navigation-31.js
  const current=fs.readFileSync(original);
  const r=run('--check');
  assert.equal(r.status,0,'Build parity: '+r.stdout+r.stderr);
@@ -37,7 +37,7 @@ test('PR1: generated file remains valid JavaScript and retains the unchanged pub
  assert.equal(syntax.status,0,syntax.stderr);
  const source=fs.readFileSync(original,'utf8');
  assert.match(source,/customElements\.define\('energiehuis-card',EnergiehuisCard\)/);
- assert.match(source,/const EH_VERSION = '1\.38\.0';/);
+ assert.match(source,/const EH_VERSION = '1\.39\.0';/);
  assert.match(source,/charge_control_enabled: false/);
 });
 test('PR1: changed HACS output is detected; --write deterministically restores it in isolated temp root',()=>fixture(dir=>{

@@ -32,8 +32,8 @@ function ehQtDrawChart(o){
   grid+=`<line class="${t.v===0?'ehqt-base':'ehqt-grid'}" x1="${X0}" x2="${X1}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text class="ehqt-yl" x="${X0-4}" y="${(yy+3).toFixed(1)}" text-anchor="end">${ehEsc(o.fmt(t.v))}</text>`;
   if(t.name)grid+=`<text class="ehqt-yn" x="${X1-2}" y="${(yy-3).toFixed(1)}" text-anchor="end">${ehEsc(t.name)}</text>`;
  }
- for(let i=0;i<n;i+=(o.xEvery||12)){const x=X0+(o.xlabel?(i+0.5)*bw:i*bw);axis+=`<line class="ehqt-xt" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y1}" y2="${Y1+4}"/><text class="ehqt-xl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${ehEsc(o.xlabel?o.xlabel(i):ehQtTime(o.first+i*EH_QT_STEP_MS))}</text>`;}
- const nx=o.nowMs>=o.first&&o.nowMs<o.first+n*EH_QT_STEP_MS?X0+((o.nowMs-o.first)/EH_QT_STEP_MS)*bw:null;
+ for(let i=0;i<n;i+=(o.xEvery||12)){const x=X0+(o.xlabel?(i+0.5)*bw:i*bw);axis+=`<line class="ehqt-xt" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y1}" y2="${Y1+4}"/><text class="ehqt-xl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${ehEsc(o.xlabel?o.xlabel(i):ehQtTime(o.first+i*(o.stepMs||EH_QT_STEP_MS)))}</text>`;}
+ const stepMs=o.stepMs||EH_QT_STEP_MS,nx=o.nowMs>=o.first&&o.nowMs<o.first+n*stepMs?X0+((o.nowMs-o.first)/stepMs)*bw:null;
  const nowLine=nx===null?'':`<line class="ehqt-nowline" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${Y0-4}" y2="${Y1}"/>`;
  return `<div class="ehqt-chart" role="group" tabindex="0" data-ehqt-chart data-key="${ehEsc(o.key)}" data-n="${n}" data-x0="${X0}" data-bw="${bw.toFixed(4)}" data-tips="${ehEsc(JSON.stringify(tips))}" aria-label="${ehEsc(o.label)}. Tik of sleep over de grafiek, of gebruik de pijltoetsen, voor de waarde per balk."><div class="ehqt-slot"><span class="ehqt-hint">${ehEsc(o.hint||'Tik op een kwartier voor de prijs')}</span><div class="ehqt-tip" role="status" aria-live="polite" hidden></div></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ehEsc(o.label)}">${grid}${bars}${axis}${nowLine}<line class="ehqt-selline" visibility="hidden" y1="${Y0-4}" y2="${Y1}"/></svg></div>`;
 }

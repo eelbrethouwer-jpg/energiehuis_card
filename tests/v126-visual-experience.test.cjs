@@ -15,7 +15,7 @@ test('v1.26 RC: JS parses and built bundle ends with identical source fragment',
  assert.ok(addition,'Visual Experience must be in last source fragment');
  // v1.28-voorstel: 17-live-immersive.js volgt als laatste fragment; dit fragment staat er direct vóór, ongewijzigd.
  // v3.0: daarna volgen nog de Balans-motor en 18-balance-page.js (alleen lezen, eigen view).
- assert.ok(bundle.endsWith(fragment+read('src/legacy/17-live-immersive.js')+read('src/engines/balance-engine.cjs')+read('src/legacy/18-balance-page.js')+read('src/legacy/19-navigation-31.js')+read('src/engines/quarter-engine.cjs')+read('src/legacy/20-quarter-prices.js')),'Generated HACS resource must contain identical fragment, followed only by 17-live-immersive.js en de Balans-pagina');
+ assert.ok(bundle.endsWith(fragment+read('src/legacy/17-live-immersive.js')+read('src/engines/balance-engine.cjs')+read('src/legacy/18-balance-page.js')+read('src/legacy/19-navigation-31.js')+read('src/engines/quarter-engine.cjs')+read('src/legacy/20-quarter-prices.js')+read('src/engines/battery-live-engine.cjs')+read('src/legacy/21-battery-live.js')),'Generated HACS resource must contain identical fragment, followed only by 17-live-immersive.js en de Balans-pagina');
  assert.doesNotThrow(()=>new vm.Script(bundle));
 });
 test('v1.26 RC: four navigation destinations and preserved insight pages',()=>{
@@ -38,5 +38,5 @@ test('v1.26 RC: no new HA writes, storage or charging logic',()=>{
  assert.match(note,/NIET TAGGEN OF PUBLICEREN/);
  assert.match(note,/nog geen definitieve versie-update, tag, release of HACS-publicatie/);
  assert.match(note,/geen nieuwe Home Assistant-servicecalls/i);
- assert.match(bundle,/const EH_VERSION = '1\.38\.0'/);
+ assert.match(bundle,/const EH_VERSION = '1\.39\.0'/);
 });
