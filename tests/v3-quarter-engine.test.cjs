@@ -102,6 +102,18 @@ test('weer: indicatie geeft redenen; wind en zon wijzen naar goedkoper, windstil
  assert.equal(E.ehWxIndication({wind:5,cloud:10,temp:20},11).score,0,'zon telt alleen in het zomerhalfjaar');
 });
 
+test('terugblik: dagen uit weergeschiedenis en beoordeling alleen op duidelijke signalen',()=>{
+ const key=ms=>new Date(ms).toISOString().slice(0,10),D=n=>Date.UTC(2026,10,10+n,12);
+ const h=E.ehWxHistoryDays([{t:D(0),wind:10,cloud:null,temp:4},{t:D(0)+3600000,wind:8,cloud:50,temp:6},{t:D(1),wind:2,cloud:90,temp:1},{t:NaN,wind:99}],key);
+ assert.equal(h.length,2);assert.equal(h[0].wind,9);assert.equal(h[0].cloud,50);assert.equal(h[0].temp,5);
+ const days=[{dayKey:'a',t:D(0),wind:10,cloud:50,temp:6,avg:0.20},{dayKey:'b',t:D(1),wind:2,cloud:90,temp:5,avg:0.40},{dayKey:'c',t:D(2),wind:5,cloud:50,temp:6,avg:0.30},{dayKey:'d',t:D(3),wind:9,cloud:50,temp:6,avg:0.35},{dayKey:'e',t:D(4),wind:5,cloud:50,temp:6,avg:null}];
+ const r=E.ehWxBacktest(days,ms=>new Date(ms).getUTCMonth());
+ assert.equal(r.priced,4);assert.ok(Math.abs(r.ref-0.3125)<1e-12);
+ assert.equal(r.signals,3);assert.equal(r.hits,2,'a goedkoper klopt, b duurder klopt, d (veel wind, +12%) klopt niet');
+ assert.equal(r.rows.find(x=>x.dayKey==='c').hit,null);
+ assert.deepEqual(E.ehWxBacktest([],()=>0),{rows:[],priced:0,signals:0,hits:0,ref:null});
+});
+
 test('motor is zuiver: geen HA, DOM, opslag of netwerk',()=>{
  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src','engines','quarter-engine.cjs'),'utf8');
  assert.doesNotMatch(src,/\bdocument\b|\bwindow\b|localStorage|fetch\(|callWS|callService|hass/);

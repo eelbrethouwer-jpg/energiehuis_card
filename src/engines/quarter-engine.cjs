@@ -168,8 +168,42 @@ function ehWxIndication(day, month) {
   return { score, level, reasons };
 }
 
+// ---- Terugblik: hoe goed klopte de weerindicatie de afgelopen dagen? ----
+// entries: [{t, wind(m/s), cloud, temp}] uit de toestandsgeschiedenis van de weer-entiteit; geeft per dag het gemiddelde.
+function ehWxHistoryDays(entries, dayKey) {
+  const by = new Map();
+  for (const e of Array.isArray(entries) ? entries : []) {
+    if (!e || !Number.isFinite(e.t)) continue;
+    const k = dayKey(e.t);
+    if (!by.has(k)) by.set(k, { dayKey: k, t: e.t, w: [], c: [], tp: [] });
+    const g = by.get(k);
+    if (g.t > e.t) g.t = e.t;
+    if (Number.isFinite(e.wind)) g.w.push(e.wind);
+    if (Number.isFinite(e.cloud)) g.c.push(e.cloud);
+    if (Number.isFinite(e.temp)) g.tp.push(e.temp);
+  }
+  const mean = a => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  return [...by.values()].sort((a, b) => a.t - b.t).map(g => ({ dayKey: g.dayKey, t: g.t, wind: mean(g.w), cloud: mean(g.c), temp: mean(g.tp) }));
+}
+// days: [{dayKey,t,wind,cloud,temp,avg}] met avg = gemiddelde dagprijs (alleen complete dagen, anders null).
+// Werkelijk duurder/goedkoper = minstens 10% boven/onder het gemiddelde van de beoordeelde dagen; alleen duidelijke signalen tellen mee.
+function ehWxBacktest(days, monthOf) {
+  const priced = (Array.isArray(days) ? days : []).filter(d => d && Number.isFinite(d.avg) && d.avg > 0);
+  if (!priced.length) return { rows: [], priced: 0, signals: 0, hits: 0, ref: null };
+  const ref = priced.reduce((a, d) => a + d.avg, 0) / priced.length;
+  const rows = priced.map(d => {
+    const ind = ehWxIndication(d, monthOf(d.t));
+    const rel = d.avg / ref - 1;
+    const actual = rel >= 0.1 ? 'pricier' : rel <= -0.1 ? 'cheaper' : 'average';
+    const signal = ind.level !== 'average';
+    return { dayKey: d.dayKey, t: d.t, wind: d.wind, cloud: d.cloud, temp: d.temp, avg: d.avg, rel, indication: ind.level, reasons: ind.reasons, actual, signal, hit: signal ? ind.level === actual : null };
+  });
+  const sig = rows.filter(r => r.signal);
+  return { rows, priced: priced.length, signals: sig.length, hits: sig.filter(r => r.hit).length, ref };
+}
+
 if (typeof module !== 'undefined' && module) {
   try {
-    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay, ehWxMs, ehWxCloud, ehWxDays, ehWxIndication });
+    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay, ehWxMs, ehWxCloud, ehWxDays, ehWxIndication, ehWxHistoryDays, ehWxBacktest });
   } catch (_) {}
 }
