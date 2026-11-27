@@ -20,7 +20,7 @@ const EHNV_SEGMENTS=Object.freeze({
  energy:Object.freeze([
   {id:'balance',label:'Balans',view:'balance',mode:'main',show:(el,h)=>!/Meetcontrole/.test(h),folds:[[(el,h)=>/Wat het kost/.test(h),'Wat het kost']]},
   {id:'sun',label:'Zon',view:'more',title:['Zon','Opbrengst, eigen gebruik en historie'],show:(el,h)=>ehNvIsSun(el,h)||ehNvIsHead(el)},
-  {id:'battery',label:'Batterij',view:'battery',show:()=>true},
+  {id:'battery',label:'Batterij',view:'battery',show:()=>true,injectTop:card=>ehBlHtml(card)},
   {id:'gas',label:'Gas & water',view:'more',show:(el,h)=>ehNvIsGas(el,h)||ehNvIsHead(el)}
  ]),
  auto:Object.freeze([
@@ -157,6 +157,11 @@ function ehNvCss(){
   if(s.title){
    const head=main.querySelector(':scope > .subpage-head h2');
    if(head){head.textContent=s.title[0];const p=head.parentElement?.querySelector('p');if(p)p.textContent=s.title[1];const ey=head.parentElement?.querySelector('.eyebrow');if(ey)ey.textContent='ENERGIEHUIS';}
+  }
+  if(s.injectTop){
+   // Paneel direct onder de kop van de pagina (bijvoorbeeld het live batterijdashboard).
+   const hd0=main.querySelector(':scope > .subpage-head'),top=s.injectTop(this);
+   if(top){if(hd0)hd0.insertAdjacentHTML('afterend',top);else main.insertAdjacentHTML('afterbegin',top);}
   }
   if(s.inject){
    // Alleen de titel van de kop: de oorspronkelijke kopstegel (huidige prijs e.d.) hoort bij een andere pagina.
