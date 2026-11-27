@@ -6,8 +6,8 @@ const foundation=read('src/legacy/00-foundation.js'),shell=read('src/legacy/02-c
 const bundle=read('energiehuis-card.js'),notes=read('RELEASE_NOTES_v1.30.0.md');
 const workflow=read('.github/workflows/publish-v1300.yml');
 test('v1.30.0: versie in source, HACS-bundel en catalogus gelijk',()=>{
- for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.37\.1';/);
- for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.37\.1'/);
+ for(const s of [foundation,bundle])assert.match(s,/const EH_VERSION = '1\.38\.0';/);
+ for(const s of [shell,bundle])assert.match(s,/name:'Energiehuis v1\.38\.0'/);
  assert.match(bundle,/function ehImmPracticeCompute\(/);
  assert.match(bundle,/function ehImmPracticeChart\(/);
 });
