@@ -133,3 +133,15 @@ test('motor is zuiver: geen HA, DOM, opslag of netwerk',()=>{
  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','src','engines','quarter-engine.cjs'),'utf8');
  assert.doesNotMatch(src,/\bdocument\b|\bwindow\b|localStorage|fetch\(|callWS|callService|hass/);
 });
+
+test('voorspelling: gemiddelde per dag, compleet bij 20 uren, niveau ten opzichte van de complete dagen',()=>{
+ const key=ms=>{const d=new Date(ms);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
+ const now=new Date(2026,10,26,9).getTime();
+ const day=(n,price,hours=24)=>Array.from({length:hours},(_,h)=>({t:new Date(2026,10,26+n,h).getTime(),p:price(h)}));
+ const entries=[].concat(day(1,()=>0.30),day(2,()=>0.20),day(3,()=>0.40),day(4,()=>0.30,6),[{t:new Date(2026,10,25,5).getTime(),p:9}],[{t:NaN,p:1},{t:now+3600000,p:'x'}]);
+ const d=E.ehQtForecastDays(entries,now,key);
+ assert.equal(d.length,4);assert.ok(Math.abs(d[0].avg-0.30)<1e-12);assert.equal(d[0].complete,true);
+ assert.equal(d[1].level,'cheaper');assert.equal(d[2].level,'pricier');assert.equal(d[0].level,'average');
+ assert.equal(d[3].complete,false);assert.equal(d[3].level,null,'onvolledige dag krijgt geen niveau');
+ assert.deepEqual(E.ehQtForecastDays(null,now,key),[]);
+});

@@ -204,8 +204,34 @@ function ehWxBacktest(days, monthOf) {
   return { rows, priced: priced.length, signals: sig.length, hits: sig.filter(r => r.hit).length, ref };
 }
 
+// ---- Voorspelde prijzen van een externe bron (bijvoorbeeld een prijsvoorspellingsintegratie), per dag ----
+// entries: [{t(ms), p(€/kWh)}] met uurlijkse of kwartierwaarden. Geeft per dag het gemiddelde; een dag is "compleet" bij minstens 20 verschillende uren.
+function ehQtForecastDays(entries, nowMs, dayKey) {
+  const n0 = new Date(nowMs), todayStart = new Date(n0.getFullYear(), n0.getMonth(), n0.getDate()).getTime();
+  const by = new Map();
+  for (const e of Array.isArray(entries) ? entries : []) {
+    const t = Number(e && e.t), p = ehQtNum(e && e.p);
+    if (!Number.isFinite(t) || p === null || t < todayStart) continue;
+    const k = dayKey(t);
+    if (!by.has(k)) by.set(k, { dayKey: k, t, sum: 0, n: 0, min: p, max: p, hours: new Set() });
+    const g = by.get(k);
+    if (g.t > t) g.t = t;
+    g.sum += p; g.n++; g.min = Math.min(g.min, p); g.max = Math.max(g.max, p);
+    const d = new Date(t); g.hours.add(d.getHours() + ':' + (d.getTimezoneOffset()));
+  }
+  const days = [...by.values()].sort((a, b) => a.t - b.t).slice(0, 8)
+    .map(g => ({ dayKey: g.dayKey, t: g.t, avg: g.sum / g.n, min: g.min, max: g.max, n: g.n, complete: g.hours.size >= 20 }));
+  // Niveau ten opzichte van het gemiddelde van de complete voorspelde dagen: minstens 10% onder/boven.
+  const ref = days.filter(d => d.complete);
+  const mean = ref.length ? ref.reduce((a, d) => a + d.avg, 0) / ref.length : null;
+  return days.map(d => {
+    const rel = mean !== null && mean > 0 ? d.avg / mean - 1 : null;
+    return { ...d, rel, level: !d.complete || rel === null ? null : rel >= 0.1 ? 'pricier' : rel <= -0.1 ? 'cheaper' : 'average' };
+  });
+}
+
 if (typeof module !== 'undefined' && module) {
   try {
-    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay, ehWxMs, ehWxCloud, ehWxDays, ehWxIndication, ehWxHistoryDays, ehWxBacktest });
+    if (module.exports) Object.assign(module.exports, { EH_QT_STEP_MS, ehQtNum, ehQtDay, ehQtStats, ehQtWindow, ehQtTier, ehQtPricesFromHistory, ehQtSumQuarters, ehQtCostDay, ehWxMs, ehWxCloud, ehWxDays, ehWxIndication, ehWxHistoryDays, ehWxBacktest, ehQtForecastDays });
   } catch (_) {}
 }
