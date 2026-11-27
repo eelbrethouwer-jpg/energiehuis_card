@@ -66,7 +66,8 @@ function ehQtPricesFromHistory(states, startMs, endMs) {
   if (!list.length) return out;
   for (let t = startMs; t < endMs; t += EH_QT_STEP_MS) {
     let cur = null;
-    for (const x of list) { if (x.t <= t) cur = x; else break; }
+    // Prijs op het midden van het kwartier: een sensor die enkele seconden na de kwartiergrens bijwerkt, hoort nog bij dit kwartier.
+    for (const x of list) { if (x.t <= t + EH_QT_STEP_MS / 2) cur = x; else break; }
     // Geen waarde vóór dit kwartier: onbekend (niet aanvullen met een latere waarde).
     if (cur && ehQtNum(cur.p) !== null) out.set(t, cur.p);
   }
@@ -139,12 +140,13 @@ function ehWxCloud(entry) {
 // Normaliseert een dagelijkse voorspelling van een weather-entiteit tot [{dayKey,t,wind,cloud,temp}] vanaf vandaag, maximaal 7 dagen.
 function ehWxDays(daily, nowMs, unit, dayKey) {
   const out = [], seen = new Set();
-  const today = dayKey(nowMs);
+  const n0 = new Date(nowMs), todayStart = new Date(n0.getFullYear(), n0.getMonth(), n0.getDate()).getTime();
   for (const e of Array.isArray(daily) ? daily : []) {
     const t = Date.parse(e && e.datetime);
     if (!Number.isFinite(t)) continue;
     const key = dayKey(t);
-    if (key < today || seen.has(key)) continue;
+    // Vergelijk op tijd: dagsleutels zijn niet opgevuld met nullen ('2026-11-10' < '2026-11-9' als tekst).
+    if (t < todayStart || seen.has(key)) continue;
     seen.add(key);
     const hi = ehQtNum(e.temperature), lo = ehQtNum(e.templow);
     out.push({ dayKey: key, t, wind: ehWxMs(e.wind_speed, unit), cloud: ehWxCloud(e), temp: hi !== null && lo !== null ? (hi + lo) / 2 : hi });

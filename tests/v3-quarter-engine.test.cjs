@@ -102,6 +102,21 @@ test('weer: indicatie geeft redenen; wind en zon wijzen naar goedkoper, windstil
  assert.equal(E.ehWxIndication({wind:5,cloud:10,temp:20},11).score,0,'zon telt alleen in het zomerhalfjaar');
 });
 
+test('weer: voorspelling blijft compleet na de 9e van de maand (niet-opgevulde dagsleutels)',()=>{
+ const key=ms=>{const d=new Date(ms);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
+ const now=new Date(2026,10,9,12).getTime();
+ const f=[0,1,2,3,4,5,6].map(i=>({datetime:new Date(2026,10,9+i,12).toISOString(),wind_speed:10}));
+ assert.equal(E.ehWxDays(f,now,'km/h',key).length,7);
+ const sep=new Date(2026,8,28,9).getTime();
+ assert.equal(E.ehWxDays([0,1,2,3,4].map(i=>({datetime:new Date(2026,8,28+i,12).toISOString(),wind_speed:10})),sep,'km/h',key).length,5,'ook over een maandgrens');
+ assert.equal(E.ehWxDays([{datetime:new Date(2026,8,27,12).toISOString(),wind_speed:10}],sep,'km/h',key).length,0,'gisteren telt niet');
+});
+
+test('geschiedenis: een sensor die enkele seconden na de kwartiergrens bijwerkt geeft het nieuwe kwartier de nieuwe prijs',()=>{
+ const m=E.ehQtPricesFromHistory([{t:D0,p:0.2},{t:D0+Q+3000,p:0.3}],D0,D0+3*Q);
+ assert.equal(m.get(D0),0.2);assert.equal(m.get(D0+Q),0.3);assert.equal(m.get(D0+2*Q),0.3);
+});
+
 test('terugblik: dagen uit weergeschiedenis en beoordeling alleen op duidelijke signalen',()=>{
  const key=ms=>new Date(ms).toISOString().slice(0,10),D=n=>Date.UTC(2026,10,10+n,12);
  const h=E.ehWxHistoryDays([{t:D(0),wind:10,cloud:null,temp:4},{t:D(0)+3600000,wind:8,cloud:50,temp:6},{t:D(1),wind:2,cloud:90,temp:1},{t:NaN,wind:99}],key);

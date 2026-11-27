@@ -79,7 +79,7 @@ function ehNvCss(){
   '[hidden]{display:none!important}',
   '.ehnv-seg{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:2px 0 12px;padding:2px 1px 4px;-webkit-overflow-scrolling:touch}',
   '.ehnv-seg::-webkit-scrollbar{display:none}',
-  '.ehnv-seg button{flex:none;appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:9px 14px;min-height:40px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}',
+  '.ehnv-seg button{flex:none;appearance:none;border:1px solid #6d99b53d;background:#0b2132;color:#a9c5d6;border-radius:999px;padding:9px 14px;min-height:44px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}',
   '.ehnv-seg button.chosen{background:#0f4d45;border-color:#38e8a199;color:#eafff7}',
   '.ehnv-seg button:focus-visible{outline:2px solid #38e8a1;outline-offset:2px}',
   '.ehnv-linklist{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-top:10px}',

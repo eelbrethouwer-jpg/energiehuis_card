@@ -137,3 +137,20 @@ test('terugblik: loader vergelijkt weer en dagprijs; de uitleg noemt de kleine s
  bad._ehWx={loading:false,at:Date.now(),daily:[]};
  assert.match(text(ehQtHtml(bad)),/Terugblik niet beschikbaar: geen recorder|geen dagelijkse voorspelling/);
 });
+
+test('review: terugkijken-fout heeft een knop om opnieuw te proberen; chart heeft rol; oude dagcache wordt niet hergebruikt',async()=>{
+ const c=card(quarters(0),{day:'back:1',callWS:async()=>{throw new Error('geen recorder');}});
+ c._hass.states['sensor.imp']={state:'1',attributes:{unit_of_measurement:'kWh'}};
+ c._hass.states['sensor.exp']={state:'1',attributes:{unit_of_measurement:'kWh'}};
+ await ctx.API2.load.call(c,1);
+ assert.match(ehQtHtml(c),/data-ehqt-retry="1"/);assert.match(ehQtHtml(c),/role="alert"/);
+ assert.match(ehQtHtml(card(quarters(0))),/class="ehqt-chart" role="group"/);
+ let calls=0;
+ const ok=card(quarters(0),{day:'back:1',callWS:async m=>{calls++;return m.type==='history/history_during_period'?{'sensor.kw':[]}:{};}});
+ ok._hass.states['sensor.imp']={state:'1',attributes:{unit_of_measurement:'kWh'}};
+ ok._hass.states['sensor.exp']={state:'1',attributes:{unit_of_measurement:'kWh'}};
+ await ctx.API2.load.call(ok,1);const first=calls;
+ await ctx.API2.load.call(ok,1);assert.equal(calls,first,'binnen dezelfde dag uit de cache');
+ clock+=86400000;
+ await ctx.API2.load.call(ok,1);assert.ok(calls>first,'na middernacht opnieuw ophalen');
+});
