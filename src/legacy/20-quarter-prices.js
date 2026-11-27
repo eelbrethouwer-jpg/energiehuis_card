@@ -32,10 +32,24 @@ function ehQtDrawChart(o){
   grid+=`<line class="${t.v===0?'ehqt-base':'ehqt-grid'}" x1="${X0}" x2="${X1}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text class="ehqt-yl" x="${X0-4}" y="${(yy+3).toFixed(1)}" text-anchor="end">${ehEsc(o.fmt(t.v))}</text>`;
   if(t.name)grid+=`<text class="ehqt-yn" x="${X1-2}" y="${(yy-3).toFixed(1)}" text-anchor="end">${ehEsc(t.name)}</text>`;
  }
- for(let i=0;i<n;i+=12){const x=X0+i*bw;axis+=`<line class="ehqt-xt" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y1}" y2="${Y1+4}"/><text class="ehqt-xl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${ehEsc(ehQtTime(o.first+i*EH_QT_STEP_MS))}</text>`;}
+ for(let i=0;i<n;i+=(o.xEvery||12)){const x=X0+(o.xlabel?(i+0.5)*bw:i*bw);axis+=`<line class="ehqt-xt" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y1}" y2="${Y1+4}"/><text class="ehqt-xl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${ehEsc(o.xlabel?o.xlabel(i):ehQtTime(o.first+i*EH_QT_STEP_MS))}</text>`;}
  const nx=o.nowMs>=o.first&&o.nowMs<o.first+n*EH_QT_STEP_MS?X0+((o.nowMs-o.first)/EH_QT_STEP_MS)*bw:null;
  const nowLine=nx===null?'':`<line class="ehqt-nowline" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${Y0-4}" y2="${Y1}"/>`;
- return `<div class="ehqt-chart" role="group" tabindex="0" data-ehqt-chart data-key="${ehEsc(o.key)}" data-n="${n}" data-x0="${X0}" data-bw="${bw.toFixed(4)}" data-tips="${ehEsc(JSON.stringify(tips))}" aria-label="${ehEsc(o.label)}. Tik of sleep over de grafiek, of gebruik de pijltoetsen, voor de waarde per kwartier."><div class="ehqt-slot"><span class="ehqt-hint">Tik op een kwartier voor de prijs</span><div class="ehqt-tip" role="status" aria-live="polite" hidden></div></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ehEsc(o.label)}">${grid}${bars}${axis}${nowLine}<line class="ehqt-selline" visibility="hidden" y1="${Y0-4}" y2="${Y1}"/></svg></div>`;
+ return `<div class="ehqt-chart" role="group" tabindex="0" data-ehqt-chart data-key="${ehEsc(o.key)}" data-n="${n}" data-x0="${X0}" data-bw="${bw.toFixed(4)}" data-tips="${ehEsc(JSON.stringify(tips))}" aria-label="${ehEsc(o.label)}. Tik of sleep over de grafiek, of gebruik de pijltoetsen, voor de waarde per balk."><div class="ehqt-slot"><span class="ehqt-hint">${ehEsc(o.hint||'Tik op een kwartier voor de prijs')}</span><div class="ehqt-tip" role="status" aria-live="polite" hidden></div></div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${ehEsc(o.label)}">${grid}${bars}${axis}${nowLine}<line class="ehqt-selline" visibility="hidden" y1="${Y0-4}" y2="${Y1}"/></svg></div>`;
+}
+// Dagbalken (bijvoorbeeld verbruik per dag): dezelfde assen en tikbare bubbel als de kwartiergrafiek.
+function ehQtDayBars(days,o){
+ const list=(Array.isArray(days)?days:[]).filter(d=>d&&Number.isFinite(d.kwh));
+ if(!list.length)return '';
+ const vals=list.map(d=>d.kwh),avg=vals.reduce((a,v)=>a+v,0)/vals.length;
+ const dec=Math.max(...vals)<2?2:1,fmt=v=>ehFmt(v,dec)+' kWh';
+ const items=list.map((d,i)=>{
+  const dt=new Date(d.date+'T12:00:00'),lbl=dt.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
+  const rel=avg>0?Math.round((d.kwh/avg-1)*100):null;
+  return {i,v:d.kwh,cls:'ehqt-neutral',tip:{time:lbl,main:fmt(d.kwh),sub:rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. gemiddelde'}};
+ });
+ const label=`${o.label||'Verbruik per dag'}: gemiddeld ${fmt(avg)}, hoogste ${fmt(Math.max(...vals))}, laagste ${fmt(Math.min(...vals))}`;
+ return ehQtDrawChart({key:'d'+list[list.length-1].date,n:list.length,first:0,items,lo:Math.min(...vals),hi:Math.max(...vals),avg,fmt,nowMs:-1,label,xEvery:list.length>10?2:1,xlabel:i=>list[i].date.slice(8),hint:o.hint||'Tik op een dag voor het verbruik'});
 }
 function ehQtSelect(chart,i){
  let tips;try{tips=chart._ehTips||(chart._ehTips=JSON.parse(chart.dataset.tips||'[]'));}catch(e){tips=[];}
@@ -258,7 +272,7 @@ function ehQtCss(){
   '.ehqt-grid{stroke:#6d99b52e;stroke-dasharray:3 3;stroke-width:1}.ehqt-xt{stroke:#6d99b566}.ehqt-selline{stroke:#fff;stroke-width:1.4}',
   '.ehqt-chart .ehqt-yl{fill:#cfe3ef;font-size:8.5px;font-weight:700}.ehqt-chart .ehqt-yn{fill:#8fb0c4;font-size:8px;paint-order:stroke;stroke:#0f2a3d;stroke-width:2.5px}',
   '.ehqt-base{stroke:#6d99b53d;stroke-width:1}.ehqt-nowline{stroke:#fff;stroke-width:1.2;stroke-dasharray:2 2}',
-  '.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
+  '.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
   '.ehqt-windows{margin-top:10px}.ehqt-windows>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}',
   '.ehqt-warn{margin:10px 0;padding:10px 12px;border-radius:12px;background:#3b2a0d;border:1px solid #ffca4455;color:#ffe2a1;font-size:12px;line-height:1.4}',
   '.ehqt-wx{margin-top:18px;padding-top:6px}.ehqt-wx-title{font-size:15px;margin:0 0 8px}',

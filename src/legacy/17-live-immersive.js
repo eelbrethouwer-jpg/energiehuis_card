@@ -410,15 +410,9 @@ function ehImmPracticeCostText(s){
  return 'Kosten deze maand: ± '+(s.cost<0?'−':'')+'€ '+ehFmt(Math.abs(s.cost),2)+(s.partial?' (deels)':'');
 }
 function ehImmPracticeChart(s){
+ // Dagbalken met assen (0, gemiddeld, hoogste) en een tikbare waarde: ehQtDayBars staat in 20-quarter-prices.js.
  const days=(s?.days||[]).slice(-14);
- if(!days.length)return '';
- const max=Math.max(.01,...days.map(d=>d.kwh)),w=12+days.length*28;
- const bars=days.map((d,i)=>{
-  const height=Math.max(1,Math.round(76*d.kwh/max)),x=10+i*28;
-  return '<rect x="'+x+'" y="'+(84-height)+'" width="17" height="'+height+'" rx="3" fill="#69d5bd"/>'+
-   '<text x="'+(x+8)+'" y="102" font-size="9" fill="#9dbbd1" text-anchor="middle">'+ehEsc(d.date.slice(8))+'</text>';
- }).join('');
- return '<svg role="img" aria-label="Gemeten dagverbruik afgelopen maximaal 14 dagen; onvolledige meetdagen zijn mogelijk" style="display:block;width:100%;height:auto;margin:8px 0" viewBox="0 0 '+w+' 110"><line x1="6" x2="'+w+'" y1="84" y2="84" stroke="#9dbbd177"/>'+bars+'</svg>';
+ return ehQtDayBars(days,{label:'Gemeten dagverbruik afgelopen maximaal 14 dagen; onvolledige meetdagen zijn mogelijk',hint:'Tik op een dag voor het verbruik'});
 }
 
 (function ehImmInstall(){
