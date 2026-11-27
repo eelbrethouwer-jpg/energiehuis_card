@@ -154,3 +154,18 @@ test('review: terugkijken-fout heeft een knop om opnieuw te proberen; chart heef
  clock+=86400000;
  await ctx.API2.load.call(ok,1);assert.ok(calls>first,'na middernacht opnieuw ophalen');
 });
+
+test('prijsvoorspelling: sensor met lijst toont per dag voorspeld gemiddelde, bekende dagen blijven bekend, ook zonder weer-entiteit',()=>{
+ const hourly=(n,p)=>Array.from({length:24},(_,h)=>({start_time:new FakeDate(2026,10,26+n,h).toISOString(),price:p}));
+ const c=card(quarters(0).concat(quarters(1)),{config:{prijsvoorspelling:'sensor.fc'}});
+ c._hass.states['sensor.fc']={state:'0.3',attributes:{unit_of_measurement:'€/kWh',forecast:[].concat(hourly(0,0.3),hourly(1,0.3),hourly(2,0.30),hourly(3,0.20),hourly(4,0.40))}};
+ const t=text(ehQtHtml(c));
+ assert.match(t,/Vandaag Prijs bekend/);assert.match(t,/Morgen Prijs bekend/);
+ assert.match(t,/Voorspeld goedkoper/);assert.match(t,/Voorspeld duurder/);assert.match(t,/voorspeld € 0,/);
+ assert.match(t,/schatting/);
+ const mwh=card(quarters(0),{config:{prijsvoorspelling:'sensor.fc'}});
+ mwh._hass.states['sensor.fc']={state:'80',attributes:{unit_of_measurement:'EUR/MWh',data:hourly(2,80)}};
+ assert.match(text(ehQtHtml(mwh)),/€ 0,080/);
+ const gone=card(quarters(0),{config:{prijsvoorspelling:'sensor.weg'}});
+ assert.match(text(ehQtHtml(gone)),/sensor\.weg.*niet gevonden/);
+});

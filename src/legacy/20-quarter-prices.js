@@ -220,28 +220,56 @@ function ehQtWeatherBackHtml(card,now){
  }).join('');
  return `<details class="ehqt-all"><summary>Hoe goed klopte dit de afgelopen dagen?</summary><p>${ehEsc(sum)}</p><table><thead><tr><th>Dag</th><th>Weer</th><th>Indicatie</th><th>Werkelijk</th><th></th></tr></thead><tbody>${rows}</tbody></table><p class="subtle">Werkelijk = gemiddelde dagprijs minstens 10% onder of boven het gemiddelde van deze dagen. Kleine steekproef: lees dit als richting, niet als bewijs.</p></details>`;
 }
-function ehQtWeatherHtml(card,now){
- const c=card.config||{},h=card._hass;
- const head='<h3 class="ehqt-wx-title">Komende dagen · indicatie op basis van weer</h3>';
- if(!c.weather||!h?.states?.[c.weather])return `<section class="ehqt-wx">${head}<p class="subtle">Koppel een weer-entiteit (<code>weather</code>) om per dag te zien of wind en zon wijzen op goedkopere of duurdere stroom.</p></section>`;
- const e=card._ehWx;
- if(!e||e.loading)return `<section class="ehqt-wx">${head}<div class="energy-loading">Weersverwachting ophalen…</div></section>`;
- if(e.error)return `<section class="ehqt-wx">${head}<p class="ehqt-warn">${ehEsc(e.error)}</p></section>`;
- const info=ehPricesForDay(h,c,now),nowMs=now.getTime();
- const unit=h.states[c.weather].attributes?.wind_speed_unit;
- const days=ehWxDays(e.daily,nowMs,unit,ms=>ehDayKey(new Date(ms)));
- if(!days.length)return `<section class="ehqt-wx">${head}<p class="subtle">De weer-entiteit gaf geen dagelijkse voorspelling terug.</p></section>`;
- const rows=days.map(d=>{
-  const off=Math.round((new Date(new Date(d.t).getFullYear(),new Date(d.t).getMonth(),new Date(d.t).getDate())-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
-  const b=ehQtDayBounds(now,off),known=ehQtDay(info.quarters,b.s,b.e),st=known.complete?ehQtStats(known.slots,nowMs):null;
-  const ind=ehWxIndication(d,new Date(d.t).getMonth());
-  const facts=[d.wind!==null?'wind '+ehFmt(d.wind,0)+' m/s':'',d.cloud!==null?'bewolking '+Math.round(d.cloud)+'%':'',d.temp!==null?ehFmt(d.temp,0)+'°C':''].filter(Boolean).join(' · ');
-  const right=st?`<small>bekend gem.</small><strong>${ehEsc(ehQtPrice(st.avg))}</strong>`:`<small>${ehEsc(ind.reasons.join(', ')||'geen duidelijk signaal')}</small>`;
-  return `<li class="ehqt-wx-${st?'average':ind.level}"><div><b>${ehEsc(off===0?'Vandaag':off===1?'Morgen':ehQtDayLabel(now,-off))}</b><span class="ehqt-chip">${ehEsc(st?'Prijs bekend':ehWxLevelText(ind.level))}</span><em>${ehEsc(facts)}</em></div><div class="ehqt-wx-r">${right}</div></li>`;
- }).join('');
- return `<section class="ehqt-wx">${head}<ul class="ehqt-wx-list">${rows}</ul><p class="subtle">Een indicatie, geen prijsvoorspelling: veel wind wijst vaak naar goedkoper, windstil en donker weer naar duurder. Gasprijs, vraag en buitenlandse productie tellen ook mee. Zodra de prijzen van een dag bekend zijn, tonen we die.</p>${ehQtWeatherBackHtml(card,now)}</section>`;
+function ehQtForecastEntries(h,id){
+ const st=h&&h.states&&h.states[id];
+ if(!st)return null;
+ const a=st.attributes||{},u=String(a.unit_of_measurement||'').toLowerCase();
+ const raw=[].concat(Array.isArray(a.forecast)?a.forecast:[],Array.isArray(a.prices)?a.prices:[],Array.isArray(a.data)?a.data:[],Array.isArray(a.raw_today)?a.raw_today:[],Array.isArray(a.raw_tomorrow)?a.raw_tomorrow:[]);
+ const conv=v=>{const n=ehNum(v);if(n===null)return null;if(u.includes('mwh'))return n/1000;if(u.includes('cent')||u.includes('ct/'))return n/100;return n;};
+ return raw.map(x=>{
+  const t=Date.parse(((x&&(x.start_date??x.start??x.start_time??x.startsAt??x.datetime??x.time??x.from??x.date))??'')+'');
+  let v=x&&(x.price_tax_included??x.price_incl_tax??x.price??x.value??x.price_per_kwh??x.tariff??x.amount);
+  if(v&&typeof v==='object')v=v.amount??v.value;
+  return {t,p:conv(v)};
+ }).filter(x=>Number.isFinite(x.t)&&x.p!==null&&x.p>-5&&x.p<5);
 }
-
+function ehQtWeatherHtml(card,now){
+ const c=card.config||{},h=card._hass,nowMs=now.getTime();
+ const hasWx=!!(c.weather&&h?.states?.[c.weather]),fcId=c.prijsvoorspelling;
+ const head='<h3 class="ehqt-wx-title">Komende dagen · indicatie en voorspelling</h3>';
+ let fcMap=null,fcNote='';
+ if(fcId){
+  const ent=ehQtForecastEntries(h,fcId);
+  if(ent===null)fcNote=`<p class="ehqt-warn">De prijsvoorspelling-sensor <code>${ehEsc(fcId)}</code> is niet gevonden.</p>`;
+  else{const fd=ehQtForecastDays(ent,nowMs,ms=>ehDayKey(new Date(ms)));fcMap=new Map(fd.map(d=>[d.dayKey,d]));if(!fd.length)fcNote='<p class="subtle">De prijsvoorspelling-sensor bevat geen toekomstige prijzen (verwacht een lijst in <code>forecast</code>, <code>prices</code> of <code>data</code>).</p>';}
+ }
+ if(!hasWx&&!fcMap)return `<section class="ehqt-wx">${head}${fcNote}<p class="subtle">Koppel een weer-entiteit (<code>weather</code>) voor een indicatie op basis van wind en zon, en/of een sensor met voorspelde prijzen (<code>prijsvoorspelling</code>).</p></section>`;
+ let days=[];
+ if(hasWx){
+  const e=card._ehWx;
+  if(!e||e.loading)return `<section class="ehqt-wx">${head}<div class="energy-loading">Weersverwachting ophalen…</div></section>`;
+  if(e.error&&!fcMap)return `<section class="ehqt-wx">${head}<p class="ehqt-warn">${ehEsc(e.error)}</p></section>`;
+  if(!e.error)days=ehWxDays(e.daily,nowMs,h.states[c.weather].attributes?.wind_speed_unit,ms=>ehDayKey(new Date(ms)));
+ }
+ if(!days.length&&fcMap)days=[...fcMap.values()].map(d=>({dayKey:d.dayKey,t:d.t,wind:null,cloud:null,temp:null}));
+ if(!days.length)return `<section class="ehqt-wx">${head}${fcNote}<p class="subtle">Er is geen dagelijkse voorspelling om te tonen.</p></section>`;
+ const info=ehPricesForDay(h,c,now);
+ const rows=days.map(d=>{
+  const dt=new Date(d.t),off=Math.round((new Date(dt.getFullYear(),dt.getMonth(),dt.getDate())-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
+  const b=ehQtDayBounds(now,off),known=ehQtDay(info.quarters,b.s,b.e),st=known.complete?ehQtStats(known.slots,nowMs):null;
+  const fc=fcMap&&fcMap.get(d.dayKey);
+  const ind=ehWxIndication(d,dt.getMonth());
+  const facts=[d.wind!==null?'wind '+ehFmt(d.wind,0)+' m/s':'',d.cloud!==null?'bewolking '+Math.round(d.cloud)+'%':'',d.temp!==null?ehFmt(d.temp,0)+'°C':''].filter(Boolean).join(' · ');
+  let level,chip,right;
+  if(st){level='average';chip='Prijs bekend';right=`<small>bekend gem.</small><strong>${ehEsc(ehQtPrice(st.avg))}</strong>`;}
+  else if(fc){level=fc.level||'average';chip=fc.level?'Voorspeld '+ehWxLevelText(fc.level).replace('Waarschijnlijk ','').toLowerCase():'Voorspeld';right=`<small>voorspeld${fc.complete?'':' (deels)'}</small><strong>${ehEsc(ehQtPrice(fc.avg))}</strong>`;}
+  else{level=ind.level;chip=ehWxLevelText(ind.level);right=`<small>${ehEsc(ind.reasons.join(', ')||'geen duidelijk signaal')}</small>`;}
+  const sub=[facts,fc&&!st&&hasWx&&ind.reasons.length?'weer: '+ind.reasons.join(', '):''].filter(Boolean).join(' · ');
+  return `<li class="ehqt-wx-${level}"><div><b>${ehEsc(off===0?'Vandaag':off===1?'Morgen':ehQtDayLabel(now,-off))}</b><span class="ehqt-chip">${ehEsc(chip)}</span><em>${ehEsc(sub)}</em></div><div class="ehqt-wx-r">${right}</div></li>`;
+ }).join('');
+ const foot=(fcMap?'Voorspelde prijzen komen van je sensor <code>'+ehEsc(fcId)+'</code> en zijn een schatting; het kan marktprijs zonder belasting en opslag zijn, vergelijk dagen dus onderling en niet met je kwartierprijzen. ':'')+(hasWx?'De weerindicatie is geen prijsvoorspelling: veel wind wijst vaak naar goedkoper, windstil en donker weer naar duurder. ':'')+'Zodra de prijzen van een dag bekend zijn, tonen we die.';
+ return `<section class="ehqt-wx">${head}${fcNote}<ul class="ehqt-wx-list">${rows}</ul><p class="subtle">${foot}</p>${hasWx?ehQtWeatherBackHtml(card,now):''}</section>`;
+}
 function ehQtCss(){
  return [
   '/* EHQT KWARTIEREN */',
@@ -265,7 +293,7 @@ function ehQtCss(){
   '.ehqt-wx-list{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:6px}.ehqt-wx-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 11px;border-radius:12px;background:#0b2132;border:1px solid #6d99b52e}',
   '.ehqt-wx-list b{font-size:13px;margin-right:8px}.ehqt-wx-list em{display:block;font-style:normal;font-size:11px;color:#9fbccd;margin-top:3px}.ehqt-chip{display:inline-block;font-size:10px;font-weight:800;border-radius:999px;padding:3px 8px}',
   '.ehqt-wx-cheaper .ehqt-chip{background:#0f4d45;color:#aaffdc}.ehqt-wx-average .ehqt-chip{background:#173a55;color:#bfe0ff}.ehqt-wx-pricier .ehqt-chip{background:#5a2f1b;color:#ffd0b5}',
-  '.ehqt-wx-r{text-align:right;max-width:44%}.ehqt-wx-r small{display:block;font-size:10px;color:#9fbccd}.ehqt-wx-r strong{font-size:13px}',
+  '.ehqt-wx-r{text-align:right;max-width:44%;white-space:nowrap}.ehqt-wx-r small{display:block;font-size:10px;color:#9fbccd}.ehqt-wx-r strong{font-size:13px}',
   '.ehqt-all p{font-size:13px;line-height:1.4}.ehqt-sm{display:block;font-size:10px;color:#9fbccd}.ehqt-all td,.ehqt-all th{font-size:11px}',
   '.ehqt-retry{margin:6px 0;min-height:44px;padding:0 16px;border-radius:12px;background:#17604c;border:1px solid #55dfb1;color:#fff;font:inherit;font-weight:700;cursor:pointer}',
   '.ehqt-all summary{font-size:14px}.ehqt-all[open] summary{margin-bottom:6px}',
