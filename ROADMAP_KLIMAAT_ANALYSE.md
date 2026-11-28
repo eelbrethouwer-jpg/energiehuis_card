@@ -7,7 +7,7 @@ Vastgelegd en uitgebreid op 28 november 2026. Doel: begrijpen wat verwarmen en k
 | Bron | Via | Wat het geeft |
 |---|---|---|
 | Thermostaat praktijkruimte | Tuya (`climate.*`, soms losse `sensor.*`) | Ruimtetemperatuur, setpoint, actie (verwarmt of niet) |
-| Thermostaat woning (Rameha) | Rameha-integratie in Home Assistant | Idem voor de woning |
+| Thermostaat woning (Remeha, via OpenTherm-gateway WGW) | `climate.wgw_ot_on_off` (is al gekoppeld als woonkamerthermostaat) | Idem voor de woning |
 | Airco's | `climate.*` per unit | Modus, setpoint, binnentemperatuur; soms vermogen of energie |
 | Woonkamerthermostaat (bestaat) | `thermostaat: climate.wgw_ot_on_off` | OpenTherm-aan/uit en setpoint |
 | Buitentemperatuur en wind | bestaande weersentiteit (`weather`) | Referentie voor alles |
@@ -76,7 +76,7 @@ Per getal een vaste herkomst: **gemeten** (sensor), **afgeleid** (uit gemeten wa
 
 ## 5. Voorgestelde volgorde
 
-1. Entiteitenlijst uit Home Assistant verzamelen (Tuya, Rameha, airco's, weer, vochtigheid, vermogen).
+1. Entiteitenlijst uit Home Assistant verzamelen (Tuya, airco's, weer, vochtigheid, vermogen).
 2. Fase 1: klimaattegel en temperatuurgrafiek per ruimte (analyses 1, 2, 4).
 3. Fase 2: kosten en gradendagen (3, 8, 9, 15, 16).
 4. Fase 3: efficiëntie en waarschuwingen (6, 7, 10, 11, 23).
@@ -85,7 +85,7 @@ Per getal een vaste herkomst: **gemeten** (sensor), **afgeleid** (uit gemeten wa
 
 ## 6. Nog te beslissen
 
-- Welke Tuya- en Rameha-entiteiten precies beschikbaar zijn.
+- Welke Tuya-entiteiten precies beschikbaar zijn.
 - Of de airco's een eigen energiesensor hebben (bepaalt of kosten gemeten of geschat zijn).
 - Of er vochtigheid, CO₂ of raamcontacten beschikbaar zijn.
 - Gewenste comfortband per ruimte en de openingstijden van de praktijk.
