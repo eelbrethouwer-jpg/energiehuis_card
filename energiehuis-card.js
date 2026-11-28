@@ -2,7 +2,7 @@
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.39.1';
+const EH_VERSION = '1.40.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -741,16 +741,10 @@ function ehCupraInsightMetrics(result,capacity){
 function ehCupraKmChart(buckets,period){
  const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
  if(!rows.length)return '<div class="no-chart">Nog geen kilometerhistorie voor deze periode beschikbaar.</div>';
- const W=690,H=220,L=48,R=12,T=18,B=38,CW=W-L-R,CH=H-T-B,max=Math.max(1,...rows.map(x=>x.km));
- const minT=Math.min(...rows.map(x=>x.t)),maxT=Math.max(...rows.map(x=>x.t));
- const step=rows.length>1?CW/(rows.length-1):CW/2,bw=Math.max(3,Math.min(28,CW/Math.max(1,rows.length)*.62));
- const xp=(row,i)=>rows.length===1?L+CW/2:L+i*step;
- const yp=v=>T+(max-v)/max*CH;
- const grid=Array.from({length:4},(_,i)=>max-max*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
- const bars=rows.map((r,i)=>{const x=xp(r,i)-bw/2,y=yp(r.km),h=Math.max(1,T+CH-y);return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#69b8ff" opacity=".9"><title>'+ehEsc(r.label||'')+' · '+ehEsc(ehFmt(r.km,1))+' km</title></rect>';}).join('');
- const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1].filter((v,i,a)=>a.indexOf(v)===i);
- const ticks=tickIdx.map(i=>'<text x="'+xp(rows[i],i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===rows.length-1?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(rows[i].label||'')+'</text>').join('');
- return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
+ // Gedeelde grafiekbouwer: dezelfde assen en tikbare bubbel als de prijs- en verbruiksgrafieken.
+ const km=rows.map(r=>r.km),avg=km.reduce((a,v)=>a+v,0)/km.length,fmt=v=>ehFmt(v,v<10?1:0)+' km',per=period==='year'?'maand':'dag';
+ const items=rows.map((r,i)=>{const rel=avg>0?Math.round((r.km/avg-1)*100):null;return {i,v:r.km,cls:'ehqt-neutral',tip:{time:String(r.label||''),main:fmt(r.km),sub:rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. gemiddelde'}};});
+ return ehQtDrawChart({key:'km'+period+rows[0].t,n:rows.length,first:0,items,lo:0,hi:Math.max(1,...km),avg,fmt,nowMs:-1,xEvery:Math.max(1,Math.ceil(rows.length/6)),xlabel:i=>String(rows[i].label||''),hint:'Tik op een '+per+' voor de kilometers',label:'Gereden kilometers per '+per+': gemiddeld '+fmt(avg)+', hoogste '+fmt(Math.max(...km))});
 }
 
 function ehCupraTempRangeChart(groups,currentTemp){
@@ -1659,7 +1653,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.39.1',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.40.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2803,22 +2797,12 @@ if(typeof module !== 'undefined' && module){
 }
 function eh20Chart(result,pickedIndex){
  if(!result||!result.points?.length)return '<p class="subtle">Geen betrouwbare uurpunten voor de grafiek.</p>';
- const points=result.points;
- const segments=[];let current=[];
- for(let i=0;i<points.length;i++){
-  const p=points[i];
-  if(p.soc===null){if(current.length)segments.push(current);current=[];continue;}
-  current.push(((i/Math.max(1,points.length-1))*640).toFixed(1)+','+(117-(p.soc/(result.usableCapacity||result.capacity))*100).toFixed(1));
- }
- if(current.length)segments.push(current);
- const lines=segments.map(s=>'<polyline fill="none" stroke="#54e8b7" stroke-width="3" stroke-linejoin="round" points="'+s.join(' ')+'"/>').join('');
- const selected=points[Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))];
- const marker=selected?.soc!==null?'<circle cx="'+((Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))/Math.max(1,points.length-1))*640).toFixed(1)+'" cy="'+(117-(selected.soc/(result.usableCapacity||result.capacity))*100).toFixed(1)+'" r="6" fill="#ffcc65" stroke="#fff" stroke-width="2"/>':'';
- return '<svg class="eh20-soc-chart" viewBox="0 0 640 144" role="img" aria-label="Historische berekende batterijvulling per uur, 0 tot '+(result.usableCapacity||result.capacity)+' kWh">'+
-  '<line x1="0" y1="117" x2="640" y2="117" stroke="#849cab" stroke-width="1"/>'+
-  '<line x1="0" y1="17" x2="640" y2="17" stroke="#849cab" stroke-width="1" stroke-dasharray="5 5"/>'+
-  '<text x="3" y="13" fill="#bdd5e4" font-size="11">'+(result.usableCapacity||result.capacity)+' kWh</text>'+
-  '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
+ const points=result.points,cap=result.usableCapacity||result.capacity;
+ // Gedeelde grafiekbouwer: assen (0, gemiddeld, vol), tikbare bubbel per uur; gaten blijven grijs.
+ const known=points.filter(p=>p.soc!==null),avg=known.length?known.reduce((a,p)=>a+p.soc,0)/known.length:0;
+ const fmt=v=>ehFmt(v,1)+' kWh',long=t=>new Date(t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).replace(/\./g,'');
+ const items=points.map((p,i)=>p.soc===null?{i,miss:true,tip:{time:long(p.t),main:'Geen betrouwbare meting',sub:''}}:{i,v:p.soc,cls:'ehqt-mid',tip:{time:long(p.t),main:fmt(p.soc),sub:Math.round(p.soc/cap*100)+'% van '+ehFmt(cap,0)+' kWh'}});
+ return ehQtDrawChart({key:'soc'+points[0].t+points.length,n:points.length,first:0,items,lo:0,hi:cap,avg,fmt,hiName:'vol',nowMs:-1,xEvery:Math.max(1,Math.ceil(points.length/6)),xlabel:i=>new Date(points[i].t).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}).replace('.',''),hint:'Tik op een uur voor de vulling',label:'Historische berekende batterijvulling per uur, 0 tot '+cap+' kWh, gemiddeld '+fmt(avg)});
 }
 
 function eh30PersonalEvidence(rows){
