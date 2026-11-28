@@ -30,8 +30,10 @@ test('dagtotalen: geladen en ontladen apart; resets en gaten maken het onvolledi
  const reset=E.ehBlDayTotals([{t:T0,v:2},{t:T0+H,v:9},{t:T0+2*H,v:9.5}],T0,T0+3*H,{maxStepKwh:6});
  assert.equal(reset.complete,false);assert.ok(Math.abs(reset.charged-0.5)<1e-12);
  const gap=E.ehBlDayTotals([{t:T0,v:2},{t:T0+5*H,v:3}],T0,T0+6*H);
- assert.equal(gap.complete,false);assert.equal(gap.charged,0);
- assert.deepEqual(E.ehBlDayTotals([],T0,T0),{charged:0,discharged:0,complete:false,steps:0});
+ assert.equal(gap.complete,true,'lange stilte = ongewijzigd');assert.equal(gap.charged,1);
+ const still=E.ehBlDayTotals([{t:T0-H,v:1}],T0,T0+6*H);
+ assert.deepEqual(still,{charged:0,discharged:0,complete:true,steps:0});
+ assert.equal(E.ehBlDayTotals([],T0,T0).complete,false);
 });
 
 test('per uur: stapfunctie, onbekend vóór de eerste stand en geen aanvulling met latere waarden',()=>{
