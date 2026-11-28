@@ -34,9 +34,9 @@ function makeCard(config,h){
 }
 const text=html=>html.replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ');
 
-test('Home-lagen zijn vastgezet (v1.33.1: de tegel Huis en (v1.38) de dagbalken van de Praktijkruimte zijn bewust aangepast; elke verdere wijziging vraagt een nieuwe hash)',()=>{
+test('Home-lagen zijn vastgezet (v1.33.1: de tegel Huis en (v1.38) de dagbalken, (v1.39.1) het omslaan van de dagregel van de Praktijkruimte zijn bewust aangepast; elke verdere wijziging vraagt een nieuwe hash)',()=>{
  const sha=f=>crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'src','legacy',f))).digest('hex');
- assert.equal(sha('16-live-cockpit.js'),'ea8a5a5654d41ba94ddc12ddfd2a0b0bb4f5fc90cfde74941759d85ff8bd0e55');
+ assert.equal(sha('16-live-cockpit.js'),'701dd7b935d5a04d4892d0fa447889266ef7ce6f99eeb3f7c93c23ad2b60b5fa');
  assert.equal(sha('17-live-immersive.js'),'1a936b10ecf816b1eb9f7fa573d501657fa9bcd443261d256e161e48d87d5bd3');
 });
 
