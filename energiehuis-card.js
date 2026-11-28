@@ -7795,29 +7795,19 @@ function eh3ChartHtml(r){
  const {unit,list}=eh3Buckets(r);
  if(list.length<2||!list.some(b=>b.ok))return '';
  const label=t=>{const d=new Date(t);return unit==='hour'?String(d.getHours()).padStart(2,'0'):unit==='day'?d.getDate()+' '+d.toLocaleDateString('nl-NL',{month:'short'}).replace('.',''):d.toLocaleDateString('nl-NL',{month:'short'}).replace('.','');};
+ const long=t=>{const d=new Date(t);return unit==='hour'?d.toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).replace(/\./g,''):unit==='day'?d.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,''):d.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});};
  const vals=list.map(b=>({w:Math.max(0,b.w),p:r.praktijkOn?Math.max(0,b.p):0,c:Math.max(0,b.c)}));
- const top=Math.max(0.1,...vals.map(v=>v.w+v.p+v.c));
- const W=360,H=132,X0=4,Y0=16,Y1=106,bw=(W-X0*2)/list.length,gap=Math.min(2,bw*.2);
- const y=v=>Y1-(v/top)*(Y1-Y0);
- const every=Math.max(1,Math.ceil(list.length/8));
+ const totals=vals.map((v,i)=>list[i].ok?v.w+v.p+v.c:null);
+ const known=totals.filter(v=>v!==null),top=Math.max(0.1,...known),avg=known.length?known.reduce((a,v)=>a+v,0)/known.length:0;
  const unitName=unit==='hour'?'uur':unit==='day'?'dag':'maand';
- let bars='',axis='';
- list.forEach((b,i)=>{
-  const x=X0+i*bw+gap/2,w=Math.max(1,bw-gap),v=vals[i],tip=label(b.t)+': '+(b.ok<b.n?'niet volledig':ehFmt(v.w+v.p+v.c,1)+' kWh');
-  if(b.ok<b.n&&!b.ok){bars+=`<rect class="eh3-miss" x="${x.toFixed(1)}" y="${Y0}" width="${w.toFixed(1)}" height="${Y1-Y0}" rx="2"><title>${ehEsc(tip)}</title></rect>`;}
-  else{
-   let acc=0;const seg=(k,val)=>{if(val<=0)return '';const y2=y(acc+val),h=y(acc)-y2;acc+=val;return `<rect class="eh3-c-${k}" x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5,h).toFixed(1)}"></rect>`;};
-   bars+=`<g>${seg('c',v.c)}${seg('p',v.p)}${seg('w',v.w)}<title>${ehEsc(tip+(b.ok<b.n?' (deels)':''))}</title></g>`;
-  }
-  if(i%every===0){
-   const cx=x+w/2,left=cx<24,right=cx>W-24;
-   axis+=`<text x="${(left?X0:right?W-X0:cx).toFixed(1)}" y="${H-6}" text-anchor="${left?'start':right?'end':'middle'}">${ehEsc(label(b.t))}</text>`;
-  }
+ const fmt=v=>ehFmt(v,1)+' kWh';
+ const items=list.map((b,i)=>{
+  if(!b.ok)return {i,miss:true,tip:{time:long(b.t),main:'Niet volledig',sub:'Geen betrouwbare meting'}};
+  const v=vals[i],parts=[['Woning',v.w],...(r.praktijkOn?[['Praktijk',v.p]]:[]),['Cupra',v.c]].map(x=>x[0]+' '+ehFmt(x[1],1)).join(' · ');
+  return {i,v:totals[i],segs:[{v:v.c,cls:'ehqt-s-c'},{v:v.p,cls:'ehqt-s-p'},{v:v.w,cls:'ehqt-s-w'}],tip:{time:long(b.t)+(b.ok<b.n?' (deels)':''),main:fmt(totals[i]),sub:parts+' kWh'}};
  });
- const total=vals.reduce((s,v)=>s+v.w+v.p+v.c,0);
- return `<div class="eh3-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verbruik per ${unitName}: ${ehEsc(ehFmt(total,1))} kWh in totaal, hoogste ${ehEsc(ehFmt(top,1))} kWh">
-  <text x="${X0}" y="10" class="eh3-axis-top">${ehEsc(ehFmt(top,1))} kWh per ${unitName}</text>
-  <line x1="${X0}" y1="${Y1}" x2="${W-X0}" y2="${Y1}" class="eh3-base"/>${bars}${axis}</svg></div>`;
+ const total=known.reduce((s,v)=>s+v,0);
+ return ehQtDrawChart({key:'3'+unit+list[0].t,n:list.length,first:0,items,lo:0,hi:top,avg,fmt,hiName:'hoogste',nowMs:-1,xEvery:Math.max(1,Math.ceil(list.length/8)),xlabel:i=>label(list[i].t),hint:'Tik op een '+unitName+' voor het verbruik',label:`Verbruik per ${unitName}: ${ehFmt(total,1)} kWh in totaal, gemiddeld ${fmt(avg)}, hoogste ${fmt(top)}`});
 }
 function eh3UseHtml(r){
  const title=`<div class="section-title" id="eh3-use">${ehIcon('home')} Wie verbruikt wat</div>`;
@@ -8439,6 +8429,11 @@ function ehQtDrawChart(o){
   const x=X0+it.i*bw,w=Math.max(0.6,bw-0.4).toFixed(2);
   tips[it.i]=it.tip;
   if(it.miss){bars+=`<rect class="ehqt-miss" x="${x.toFixed(2)}" y="${Y0}" width="${w}" height="${Y1-Y0}"/>`;continue;}
+  if(it.segs){ // gestapeld (bijvoorbeeld verbruik per bron): alleen positieve delen, vanaf 0
+   let acc=0;
+   for(const sg of it.segs){if(!(sg.v>0))continue;const y2=y(acc+sg.v),hh=y(acc)-y2;acc+=sg.v;bars+=`<rect class="${sg.cls}" x="${x.toFixed(2)}" y="${y2.toFixed(1)}" width="${w}" height="${Math.max(0.5,hh).toFixed(1)}"/>`;}
+   continue;
+  }
   const yv=y(it.v),top=Math.min(yv,y0),h=Math.max(1,Math.abs(yv-y0));
   bars+=`<rect class="${it.cls}" x="${x.toFixed(2)}" y="${top.toFixed(1)}" width="${w}" height="${h.toFixed(1)}"/>`;
  }
@@ -8722,7 +8717,7 @@ function ehQtCss(){
   '.ehqt-grid{stroke:#6d99b52e;stroke-dasharray:3 3;stroke-width:1}.ehqt-xt{stroke:#6d99b566}.ehqt-selline{stroke:#fff;stroke-width:1.4}',
   '.ehqt-chart .ehqt-yl{fill:#cfe3ef;font-size:8.5px;font-weight:700}.ehqt-chart .ehqt-yn{fill:#8fb0c4;font-size:8px;paint-order:stroke;stroke:#0f2a3d;stroke-width:2.5px}',
   '.ehqt-base{stroke:#6d99b53d;stroke-width:1}.ehqt-nowline{stroke:#fff;stroke-width:1.2;stroke-dasharray:2 2}',
-  '.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
+  '.ehqt-s-w{fill:#ffb48a}.ehqt-s-p{fill:#61b7ff}.ehqt-s-c{fill:#38e8a1}.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
   '.ehqt-windows{margin-top:10px}.ehqt-windows>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}',
   '.ehqt-warn{margin:10px 0;padding:10px 12px;border-radius:12px;background:#3b2a0d;border:1px solid #ffca4455;color:#ffe2a1;font-size:12px;line-height:1.4}',
   '.ehqt-wx{margin-top:18px;padding-top:6px}.ehqt-wx-title{font-size:15px;margin:0 0 8px}',

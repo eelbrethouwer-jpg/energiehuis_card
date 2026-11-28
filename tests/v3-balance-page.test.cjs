@@ -341,13 +341,15 @@ test('verloopgrafiek: een kolom per uur, drie lagen, gaten als grijs vlak, toega
  const per={...HOURLY,'sensor.imp':()=>{hit++;return hit===5?null:{change:1.0};}};
  const {card,h}=await load({},per);
  const n=card._balResult.hours,html=card._balanceHtml(h,card.config);
- const svg=html.match(/<div class="eh3-chart">[\s\S]*?<\/svg>/)[0];
- assert.equal((svg.match(/<title>/g)||[]).length,n,'één tooltip per uur');
- assert.equal((svg.match(/class="eh3-miss"/g)||[]).length,1,'het uur met een gat is een grijs vlak');
- assert.equal((svg.match(/class="eh3-c-w"/g)||[]).length,n-1);
- assert.equal((svg.match(/class="eh3-c-c"/g)||[]).length,n-1);
- assert.match(svg,/role="img" aria-label="Verbruik per uur: [\d.,]+ kWh in totaal/);
- assert.match(svg,/niet volledig/);
+ const svg=html.match(/<div class="ehqt-chart"[\s\S]*?<\/svg>/)[0];
+ const tips=JSON.parse(svg.match(/data-tips="([^"]*)"/)[1].replace(/&quot;/g,'"').replace(/&amp;/g,'&'));
+ assert.equal(tips.filter(Boolean).length,n,'één tikbubbel per uur');
+ assert.equal((svg.match(/class="ehqt-miss"/g)||[]).length,1,'het uur met een gat is een grijs vlak');
+ assert.equal((svg.match(/class="ehqt-s-w"/g)||[]).length,n-1);
+ assert.equal((svg.match(/class="ehqt-s-c"/g)||[]).length,n-1);
+ assert.match(svg,/aria-label="Verbruik per uur: [\d.,]+ kWh in totaal/);
+ assert.ok(tips.some(t=>t&&/Niet volledig/.test(t.main)));
+ assert.ok(tips.some(t=>t&&/Woning [\d.,]+ · .*Cupra/.test(t.sub)));
 });
 
 test('verloopgrafiek: 7 dagen per dag, geen grafiek zonder complete uren',async()=>{
