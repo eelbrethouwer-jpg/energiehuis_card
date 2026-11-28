@@ -181,3 +181,14 @@ test('dagbalken (Praktijkruimte): assen met 0, gemiddeld en hoogste; per dag een
  assert.equal((html.match(/<rect class="ehqt-neutral"/g)||[]).length,11);
  assert.equal(ctx.API4.bars([],{}),'');assert.equal(ctx.API4.bars([{date:'x',kwh:NaN}],{}),'');
 });
+
+test('Nu +24 u: vanaf het huidige kwartier 24 uur vooruit over de dagwissel, "morgen" in de bubbel',()=>{
+ const html=ehQtHtml(card(quarters(0).concat(quarters(1)),{day:'next24'}));
+ assert.match(html,/data-ehqt-day="next24"[^>]*aria-pressed="true"/);
+ assert.equal((html.match(/<rect class="ehqt-(low|mid|high)/g)||[]).length,96);
+ assert.match(text(html),/Nu € 0,\d{3} per kWh.*gemiddelde van de komende 24 uur/);
+ assert.match(html,/morgen \d\d:\d\d/);
+ assert.match(text(html),/Goedkoopste 2 uur vanaf nu/);
+ const part=ehQtHtml(card(quarters(0),{day:'next24'}));
+ assert.match(text(part),/Nog niet volledig: \d+ van 96 kwartieren bekend/);
+});
