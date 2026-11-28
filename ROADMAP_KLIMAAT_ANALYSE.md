@@ -15,6 +15,17 @@ Vastgelegd en uitgebreid op 28 november 2026. Doel: begrijpen wat verwarmen en k
 | Gas | bestaande gasmeting | Verwarmingsvraag |
 | Ramen/deuren, aanwezigheid, luchtvochtigheid, CO₂ | optioneel, als je ze hebt | Verklaart pieken en verspilling |
 
+### Gevonden entiteiten (28 november 2026, uit Home Assistant)
+
+| Entiteit | Apparaat | Betekenis | Bruikbaar voor |
+|---|---|---|---|
+| `climate.wgw_ot_on_off` | WGW OT/ON-OFF | Remeha-thermostaat via OpenTherm (al gekoppeld) | Setpoint, aan/uit |
+| `sensor.wgw_ot_on_off_current_schedule…` (naam in screenshot afgekapt, waarschijnlijk `…_setpoint`; waarde 20,0 °C) | WGW OT/ON-OFF | Setpoint volgens het klokprogramma | Verschil klokprogramma versus werkelijk setpoint, nachtverlaging (analyse 12) |
+| `sensor.dhw_water_temperature` | DHW | Temperatuur van het warmtapwater | Warmwatergebruik en boilerverlies, scheiden van ruimteverwarming |
+| `sensor.home_outdoor_temperature` | Home | Buitentemperatuur van de ketel/gateway | Referentie voor gradendagen (analyse 8, 9) als alternatief voor de weersentiteit |
+
+Gevolgen: warm tapwater kan van ruimteverwarming gescheiden worden (DHW), en de buitentemperatuur komt ook uit het eigen systeem, onafhankelijk van een weerdienst. Nog niet gezien: aanvoertemperatuur, modulatie, vlam/aan-status en gasverbruik per functie. Controleer of die onder dezelfde apparaten bestaan.
+
 Eerst controleren: welke entiteiten komen binnen, hoe vaak werken ze bij, en is er per airco een vermogens- of energiesensor? Zonder die sensor is elke kostenregel een **schatting** en wordt dat zo getoond.
 
 ## 2. Meten, niet verzinnen
