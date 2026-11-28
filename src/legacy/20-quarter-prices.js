@@ -74,25 +74,26 @@ function ehQtChart(day,stats,nowMs,isToday){
   const i=Math.round((s.t-first)/EH_QT_STEP_MS),tier=ehQtTier(s.p,stats.min.p,stats.max.p);
   const cur=isToday&&nowMs>=s.t&&nowMs<s.t+EH_QT_STEP_MS;
   const rel=stats.avg>0?Math.round((s.p/stats.avg-1)*100):null;
-  return {i,v:s.p,cls:'ehqt-'+tier+(cur?' ehqt-now':''),tip:{time:ehQtTime(s.t)+'–'+ehQtTime(s.t+EH_QT_STEP_MS),main:ehQtPrice(s.p)+' per kWh',sub:(rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. daggemiddelde')+(cur?' · nu':'')}};
+  return {i,v:s.p,cls:'ehqt-'+tier+(cur?' ehqt-now':''),tip:{time:(new Date(s.t).getDate()!==new Date(first).getDate()?'morgen ':'')+ehQtTime(s.t)+'–'+ehQtTime(s.t+EH_QT_STEP_MS),main:ehQtPrice(s.p)+' per kWh',sub:(rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. gemiddelde')+(cur?' · nu':'')}};
  });
  const label=`Prijs per kwartier: laagste ${ehQtPrice(stats.min.p)} om ${ehQtTime(stats.min.t)}, hoogste ${ehQtPrice(stats.max.p)} om ${ehQtTime(stats.max.t)}, gemiddeld ${ehQtPrice(stats.avg)}`;
  return ehQtDrawChart({key:'p'+first,n,first,items,lo:stats.min.p,hi:stats.max.p,avg:stats.avg,fmt:ehQtPrice,nowMs:isToday?nowMs:-1,label});
 }
 function ehQtDayLabel(now,n){return new Date(now.getFullYear(),now.getMonth(),now.getDate()-n).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');}
 function ehQtPills(sel,now){
- const one=[['today','Vandaag'],['tomorrow','Morgen'],['back:1','Gisteren']];
+ const one=[['next24','Nu +24 u'],['today','Vandaag'],['tomorrow','Morgen'],['back:1','Gisteren']];
  const n=/^back:(\d+)$/.test(sel)?Number(sel.split(':')[1]):0;
  const opts=['<option value="">Eerder…</option>'].concat(Array.from({length:8},(_,i)=>i+2).map(d=>`<option value="${d}"${n===d?' selected':''}>${ehEsc(ehQtDayLabel(now,d))}</option>`)).join('');
  return `<div class="insight-periods ehqt-days" role="group" aria-label="Dag">${one.map(([id,l])=>`<button type="button" data-ehqt-day="${id}" aria-pressed="${sel===id}" class="${sel===id?'chosen':''}">${l}</button>`).join('')}<select data-ehqt-back aria-label="Eerdere dag" class="${n>=2?'chosen':''}">${opts}</select></div>`;
 }
 function ehQtPricesHtml(card){
  const h=card._hass,c=card.config||{},now=new Date(),nowMs=now.getTime();
- const sel=card._ehQtDay||'today';
+ const sel=card._ehQtDay||'next24';
  if(/^back:\d+$/.test(sel))return ehQtBackHtml(card,Number(sel.split(':')[1]),now);
- const which=sel==='tomorrow'?'tomorrow':'today',off=which==='tomorrow'?1:0;
+ const n24=sel==='next24',which=n24?'next24':sel==='tomorrow'?'tomorrow':'today',off=which==='tomorrow'?1:0;
  const info=ehPricesForDay(h,c,now);
- const b=ehQtDayBounds(now,off),day=ehQtDay(info.quarters,b.s,b.e);day.start=b.s;
+ // Nu +24 u: vanaf het huidige kwartier 24 uur vooruit, over de dagwissel heen.
+ const b=n24?{s:Math.floor(nowMs/EH_QT_STEP_MS)*EH_QT_STEP_MS,e:Math.floor(nowMs/EH_QT_STEP_MS)*EH_QT_STEP_MS+24*3600000}:ehQtDayBounds(now,off),day=ehQtDay(info.quarters,b.s,b.e);day.start=b.s;
  const pills=ehQtPills(which,now);
  const wrap=body=>`<section class="subsection ehqt" aria-label="Kwartierprijzen">${pills}${body}</section>`;
  if(!day.known){
@@ -102,7 +103,7 @@ function ehQtPricesHtml(card){
  const stats=ehQtStats(day.slots,nowMs),isToday=off===0;
  const from=isToday?nowMs:b.s;
  const w2=ehQtWindow(day.slots,2,from),w4=ehQtWindow(day.slots,4,from);
- const head=isToday&&stats.current?`<p class="ehqt-headline">Nu ${ehEsc(ehQtPrice(stats.current.p))} per kWh${stats.vsAvg===null?'':' · '+ehEsc(ehFmt(Math.abs(stats.vsAvg)*100,0))+'% '+(stats.vsAvg>=0?'boven':'onder')+' het daggemiddelde'}</p>`:'';
+ const head=isToday&&stats.current?`<p class="ehqt-headline">Nu ${ehEsc(ehQtPrice(stats.current.p))} per kWh${stats.vsAvg===null?'':' · '+ehEsc(ehFmt(Math.abs(stats.vsAvg)*100,0))+'% '+(stats.vsAvg>=0?'boven':'onder')+' het '+(n24?'gemiddelde van de komende 24 uur':'daggemiddelde')}</p>`:'';
  const tile=(k,v,sub)=>`<div class="ehqt-tile"><small>${ehEsc(k)}</small><strong>${ehEsc(v)}</strong><span>${ehEsc(sub)}</span></div>`;
  const tiles=`<div class="ehqt-tiles">${tile('Goedkoopste',ehQtPrice(stats.min.p),'om '+ehQtTime(stats.min.t))}${tile('Duurste',ehQtPrice(stats.max.p),'om '+ehQtTime(stats.max.t))}${tile('Gemiddeld',ehQtPrice(stats.avg),'per kWh')}</div>`;
  const win=w=>w?`<div><span>Goedkoopste ${w.hours} uur${isToday?' vanaf nu':''}</span><strong>${ehEsc(ehQtTime(w.start)+'–'+ehQtTime(w.end))}</strong><small>gemiddeld ${ehEsc(ehQtPrice(w.avg))}</small></div>`:'';
