@@ -1519,7 +1519,7 @@ const EhLiveCockpit=(function(){
   ':host([data-immersive]) .ehm-pill:not([data-state="offline"]) .p-text{display:none}' +
   '.ehm-pill .p-extra{margin-left:.55em;padding-left:.6em;border-left:1px solid rgba(255,255,255,.28);color:#d6e4ef;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.ehm-pill .p-extra[hidden]{display:none}' +
   '.ehc--master[data-layout="compact"][data-density="xs"] .ehm-pill .p-extra{display:none}' +
-  '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+  '.t-day{display:grid;gap:1px;margin-top:.25rem;font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}.t-day[hidden]{display:none}.t-day span{white-space:normal;overflow-wrap:anywhere;text-overflow:ellipsis}' +
   '.ehc--master[data-layout="list"] .t-day span{white-space:normal;overflow:visible}' +
   '.ehc--master:not([data-layout="list"]) .t-day{margin:calc(var(--u) * 2px) 0 0;font-size:clamp(9px,calc(var(--u) * 13px),11px);line-height:1.2;color:rgba(255,255,255,.86);letter-spacing:-.01em}' +
   '.ehc--master[data-layout="compact"] .t-day{text-align:center;justify-items:center}' +
