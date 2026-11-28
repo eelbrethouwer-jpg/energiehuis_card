@@ -415,16 +415,10 @@ function ehCupraInsightMetrics(result,capacity){
 function ehCupraKmChart(buckets,period){
  const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
  if(!rows.length)return '<div class="no-chart">Nog geen kilometerhistorie voor deze periode beschikbaar.</div>';
- const W=690,H=220,L=48,R=12,T=18,B=38,CW=W-L-R,CH=H-T-B,max=Math.max(1,...rows.map(x=>x.km));
- const minT=Math.min(...rows.map(x=>x.t)),maxT=Math.max(...rows.map(x=>x.t));
- const step=rows.length>1?CW/(rows.length-1):CW/2,bw=Math.max(3,Math.min(28,CW/Math.max(1,rows.length)*.62));
- const xp=(row,i)=>rows.length===1?L+CW/2:L+i*step;
- const yp=v=>T+(max-v)/max*CH;
- const grid=Array.from({length:4},(_,i)=>max-max*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
- const bars=rows.map((r,i)=>{const x=xp(r,i)-bw/2,y=yp(r.km),h=Math.max(1,T+CH-y);return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#69b8ff" opacity=".9"><title>'+ehEsc(r.label||'')+' · '+ehEsc(ehFmt(r.km,1))+' km</title></rect>';}).join('');
- const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1].filter((v,i,a)=>a.indexOf(v)===i);
- const ticks=tickIdx.map(i=>'<text x="'+xp(rows[i],i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===rows.length-1?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(rows[i].label||'')+'</text>').join('');
- return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
+ // Gedeelde grafiekbouwer: dezelfde assen en tikbare bubbel als de prijs- en verbruiksgrafieken.
+ const km=rows.map(r=>r.km),avg=km.reduce((a,v)=>a+v,0)/km.length,fmt=v=>ehFmt(v,v<10?1:0)+' km',per=period==='year'?'maand':'dag';
+ const items=rows.map((r,i)=>{const rel=avg>0?Math.round((r.km/avg-1)*100):null;return {i,v:r.km,cls:'ehqt-neutral',tip:{time:String(r.label||''),main:fmt(r.km),sub:rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. gemiddelde'}};});
+ return ehQtDrawChart({key:'km'+period+rows[0].t,n:rows.length,first:0,items,lo:0,hi:Math.max(1,...km),avg,fmt,nowMs:-1,xEvery:Math.max(1,Math.ceil(rows.length/6)),xlabel:i=>String(rows[i].label||''),hint:'Tik op een '+per+' voor de kilometers',label:'Gereden kilometers per '+per+': gemiddeld '+fmt(avg)+', hoogste '+fmt(Math.max(...km))});
 }
 
 function ehCupraTempRangeChart(groups,currentTemp){

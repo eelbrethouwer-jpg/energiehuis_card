@@ -2,7 +2,7 @@
  * Batterijsimulator leest uitsluitend data; optionele laadbediening uit v1.10.0 blijft standaard uitgeschakeld.
  * Historische P1-uursimulaties; bestaande Alfen-loadbalancing blijft leidend.
  */
-const EH_VERSION = '1.39.1';
+const EH_VERSION = '1.40.0';
 const EH_DEFAULTS = {
   net: 'sensor.p1_meter_vermogen',
   zonnepanelen: 'sensor.goodwe_pv_power',
@@ -741,16 +741,10 @@ function ehCupraInsightMetrics(result,capacity){
 function ehCupraKmChart(buckets,period){
  const rows=(buckets||[]).filter(x=>Number.isFinite(x.km));
  if(!rows.length)return '<div class="no-chart">Nog geen kilometerhistorie voor deze periode beschikbaar.</div>';
- const W=690,H=220,L=48,R=12,T=18,B=38,CW=W-L-R,CH=H-T-B,max=Math.max(1,...rows.map(x=>x.km));
- const minT=Math.min(...rows.map(x=>x.t)),maxT=Math.max(...rows.map(x=>x.t));
- const step=rows.length>1?CW/(rows.length-1):CW/2,bw=Math.max(3,Math.min(28,CW/Math.max(1,rows.length)*.62));
- const xp=(row,i)=>rows.length===1?L+CW/2:L+i*step;
- const yp=v=>T+(max-v)/max*CH;
- const grid=Array.from({length:4},(_,i)=>max-max*i/3).map(v=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yp(v).toFixed(1)+'" y2="'+yp(v).toFixed(1)+'" stroke="#c5deee22"/><text x="'+(L-7)+'" y="'+(yp(v)+4).toFixed(1)+'" text-anchor="end" fill="#9fbdd0" font-size="11">'+ehEsc(ehFmt(v,0))+'</text>').join('');
- const bars=rows.map((r,i)=>{const x=xp(r,i)-bw/2,y=yp(r.km),h=Math.max(1,T+CH-y);return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="#69b8ff" opacity=".9"><title>'+ehEsc(r.label||'')+' · '+ehEsc(ehFmt(r.km,1))+' km</title></rect>';}).join('');
- const tickIdx=[0,Math.floor((rows.length-1)/2),rows.length-1].filter((v,i,a)=>a.indexOf(v)===i);
- const ticks=tickIdx.map(i=>'<text x="'+xp(rows[i],i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="'+(i===0?'start':i===rows.length-1?'end':'middle')+'" fill="#9fbdd0" font-size="11">'+ehEsc(rows[i].label||'')+'</text>').join('');
- return '<svg class="cupra-km-chart" role="img" aria-label="Gereden kilometers per '+(period==='year'?'maand':'dag')+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><text x="7" y="12" fill="#9fbdd0" font-size="11">km</text>'+grid+bars+ticks+'</svg>';
+ // Gedeelde grafiekbouwer: dezelfde assen en tikbare bubbel als de prijs- en verbruiksgrafieken.
+ const km=rows.map(r=>r.km),avg=km.reduce((a,v)=>a+v,0)/km.length,fmt=v=>ehFmt(v,v<10?1:0)+' km',per=period==='year'?'maand':'dag';
+ const items=rows.map((r,i)=>{const rel=avg>0?Math.round((r.km/avg-1)*100):null;return {i,v:r.km,cls:'ehqt-neutral',tip:{time:String(r.label||''),main:fmt(r.km),sub:rel===null?'':(rel>=0?'+':'−')+Math.abs(rel)+'% t.o.v. gemiddelde'}};});
+ return ehQtDrawChart({key:'km'+period+rows[0].t,n:rows.length,first:0,items,lo:0,hi:Math.max(1,...km),avg,fmt,nowMs:-1,xEvery:Math.max(1,Math.ceil(rows.length/6)),xlabel:i=>String(rows[i].label||''),hint:'Tik op een '+per+' voor de kilometers',label:'Gereden kilometers per '+per+': gemiddeld '+fmt(avg)+', hoogste '+fmt(Math.max(...km))});
 }
 
 function ehCupraTempRangeChart(groups,currentTemp){
@@ -1659,7 +1653,7 @@ class EnergiehuisCard extends HTMLElement {
 if(!customElements.get('energiehuis-card'))customElements.define('energiehuis-card',EnergiehuisCard);
 window.customCards=window.customCards||[];
 if(!window.customCards.some(x=>x.type==='energiehuis-card')){
- window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.39.1',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
+ window.customCards.push({type:'energiehuis-card',name:'Energiehuis v1.40.0',description:'EnergieRegisseur Cockpit, live meetstatus, slim laden, budget, batterijvergelijker en veilig meterbeheer.'});
 }
 
 /* v1.7.0 Smart Energy Intelligence: read-only analytics + confirmed helper-only baselines. */
@@ -2803,22 +2797,12 @@ if(typeof module !== 'undefined' && module){
 }
 function eh20Chart(result,pickedIndex){
  if(!result||!result.points?.length)return '<p class="subtle">Geen betrouwbare uurpunten voor de grafiek.</p>';
- const points=result.points;
- const segments=[];let current=[];
- for(let i=0;i<points.length;i++){
-  const p=points[i];
-  if(p.soc===null){if(current.length)segments.push(current);current=[];continue;}
-  current.push(((i/Math.max(1,points.length-1))*640).toFixed(1)+','+(117-(p.soc/(result.usableCapacity||result.capacity))*100).toFixed(1));
- }
- if(current.length)segments.push(current);
- const lines=segments.map(s=>'<polyline fill="none" stroke="#54e8b7" stroke-width="3" stroke-linejoin="round" points="'+s.join(' ')+'"/>').join('');
- const selected=points[Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))];
- const marker=selected?.soc!==null?'<circle cx="'+((Math.max(0,Math.min(points.length-1,pickedIndex??points.length-1))/Math.max(1,points.length-1))*640).toFixed(1)+'" cy="'+(117-(selected.soc/(result.usableCapacity||result.capacity))*100).toFixed(1)+'" r="6" fill="#ffcc65" stroke="#fff" stroke-width="2"/>':'';
- return '<svg class="eh20-soc-chart" viewBox="0 0 640 144" role="img" aria-label="Historische berekende batterijvulling per uur, 0 tot '+(result.usableCapacity||result.capacity)+' kWh">'+
-  '<line x1="0" y1="117" x2="640" y2="117" stroke="#849cab" stroke-width="1"/>'+
-  '<line x1="0" y1="17" x2="640" y2="17" stroke="#849cab" stroke-width="1" stroke-dasharray="5 5"/>'+
-  '<text x="3" y="13" fill="#bdd5e4" font-size="11">'+(result.usableCapacity||result.capacity)+' kWh</text>'+
-  '<text x="3" y="135" fill="#bdd5e4" font-size="11">0 kWh</text>'+lines+marker+'</svg>';
+ const points=result.points,cap=result.usableCapacity||result.capacity;
+ // Gedeelde grafiekbouwer: assen (0, gemiddeld, vol), tikbare bubbel per uur; gaten blijven grijs.
+ const known=points.filter(p=>p.soc!==null),avg=known.length?known.reduce((a,p)=>a+p.soc,0)/known.length:0;
+ const fmt=v=>ehFmt(v,1)+' kWh',long=t=>new Date(t).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).replace(/\./g,'');
+ const items=points.map((p,i)=>p.soc===null?{i,miss:true,tip:{time:long(p.t),main:'Geen betrouwbare meting',sub:''}}:{i,v:p.soc,cls:'ehqt-mid',tip:{time:long(p.t),main:fmt(p.soc),sub:Math.round(p.soc/cap*100)+'% van '+ehFmt(cap,0)+' kWh'}});
+ return ehQtDrawChart({key:'soc'+points[0].t+points.length,n:points.length,first:0,items,lo:0,hi:cap,avg,fmt,hiName:'vol',nowMs:-1,xEvery:Math.max(1,Math.ceil(points.length/6)),xlabel:i=>new Date(points[i].t).toLocaleDateString('nl-NL',{day:'numeric',month:'short'}).replace('.',''),hint:'Tik op een uur voor de vulling',label:'Historische berekende batterijvulling per uur, 0 tot '+cap+' kWh, gemiddeld '+fmt(avg)});
 }
 
 function eh30PersonalEvidence(rows){
@@ -7795,29 +7779,19 @@ function eh3ChartHtml(r){
  const {unit,list}=eh3Buckets(r);
  if(list.length<2||!list.some(b=>b.ok))return '';
  const label=t=>{const d=new Date(t);return unit==='hour'?String(d.getHours()).padStart(2,'0'):unit==='day'?d.getDate()+' '+d.toLocaleDateString('nl-NL',{month:'short'}).replace('.',''):d.toLocaleDateString('nl-NL',{month:'short'}).replace('.','');};
+ const long=t=>{const d=new Date(t);return unit==='hour'?d.toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).replace(/\./g,''):unit==='day'?d.toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,''):d.toLocaleDateString('nl-NL',{month:'long',year:'numeric'});};
  const vals=list.map(b=>({w:Math.max(0,b.w),p:r.praktijkOn?Math.max(0,b.p):0,c:Math.max(0,b.c)}));
- const top=Math.max(0.1,...vals.map(v=>v.w+v.p+v.c));
- const W=360,H=132,X0=4,Y0=16,Y1=106,bw=(W-X0*2)/list.length,gap=Math.min(2,bw*.2);
- const y=v=>Y1-(v/top)*(Y1-Y0);
- const every=Math.max(1,Math.ceil(list.length/8));
+ const totals=vals.map((v,i)=>list[i].ok?v.w+v.p+v.c:null);
+ const known=totals.filter(v=>v!==null),top=Math.max(0.1,...known),avg=known.length?known.reduce((a,v)=>a+v,0)/known.length:0;
  const unitName=unit==='hour'?'uur':unit==='day'?'dag':'maand';
- let bars='',axis='';
- list.forEach((b,i)=>{
-  const x=X0+i*bw+gap/2,w=Math.max(1,bw-gap),v=vals[i],tip=label(b.t)+': '+(b.ok<b.n?'niet volledig':ehFmt(v.w+v.p+v.c,1)+' kWh');
-  if(b.ok<b.n&&!b.ok){bars+=`<rect class="eh3-miss" x="${x.toFixed(1)}" y="${Y0}" width="${w.toFixed(1)}" height="${Y1-Y0}" rx="2"><title>${ehEsc(tip)}</title></rect>`;}
-  else{
-   let acc=0;const seg=(k,val)=>{if(val<=0)return '';const y2=y(acc+val),h=y(acc)-y2;acc+=val;return `<rect class="eh3-c-${k}" x="${x.toFixed(1)}" y="${y2.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0.5,h).toFixed(1)}"></rect>`;};
-   bars+=`<g>${seg('c',v.c)}${seg('p',v.p)}${seg('w',v.w)}<title>${ehEsc(tip+(b.ok<b.n?' (deels)':''))}</title></g>`;
-  }
-  if(i%every===0){
-   const cx=x+w/2,left=cx<24,right=cx>W-24;
-   axis+=`<text x="${(left?X0:right?W-X0:cx).toFixed(1)}" y="${H-6}" text-anchor="${left?'start':right?'end':'middle'}">${ehEsc(label(b.t))}</text>`;
-  }
+ const fmt=v=>ehFmt(v,1)+' kWh';
+ const items=list.map((b,i)=>{
+  if(!b.ok)return {i,miss:true,tip:{time:long(b.t),main:'Niet volledig',sub:'Geen betrouwbare meting'}};
+  const v=vals[i],parts=[['Woning',v.w],...(r.praktijkOn?[['Praktijk',v.p]]:[]),['Cupra',v.c]].map(x=>x[0]+' '+ehFmt(x[1],1)).join(' · ');
+  return {i,v:totals[i],segs:[{v:v.c,cls:'ehqt-s-c'},{v:v.p,cls:'ehqt-s-p'},{v:v.w,cls:'ehqt-s-w'}],tip:{time:long(b.t)+(b.ok<b.n?' (deels)':''),main:fmt(totals[i]),sub:parts+' kWh'}};
  });
- const total=vals.reduce((s,v)=>s+v.w+v.p+v.c,0);
- return `<div class="eh3-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verbruik per ${unitName}: ${ehEsc(ehFmt(total,1))} kWh in totaal, hoogste ${ehEsc(ehFmt(top,1))} kWh">
-  <text x="${X0}" y="10" class="eh3-axis-top">${ehEsc(ehFmt(top,1))} kWh per ${unitName}</text>
-  <line x1="${X0}" y1="${Y1}" x2="${W-X0}" y2="${Y1}" class="eh3-base"/>${bars}${axis}</svg></div>`;
+ const total=known.reduce((s,v)=>s+v,0);
+ return ehQtDrawChart({key:'3'+unit+list[0].t,n:list.length,first:0,items,lo:0,hi:top,avg,fmt,hiName:'hoogste',nowMs:-1,xEvery:Math.max(1,Math.ceil(list.length/8)),xlabel:i=>label(list[i].t),hint:'Tik op een '+unitName+' voor het verbruik',label:`Verbruik per ${unitName}: ${ehFmt(total,1)} kWh in totaal, gemiddeld ${fmt(avg)}, hoogste ${fmt(top)}`});
 }
 function eh3UseHtml(r){
  const title=`<div class="section-title" id="eh3-use">${ehIcon('home')} Wie verbruikt wat</div>`;
@@ -8439,6 +8413,11 @@ function ehQtDrawChart(o){
   const x=X0+it.i*bw,w=Math.max(0.6,bw-0.4).toFixed(2);
   tips[it.i]=it.tip;
   if(it.miss){bars+=`<rect class="ehqt-miss" x="${x.toFixed(2)}" y="${Y0}" width="${w}" height="${Y1-Y0}"/>`;continue;}
+  if(it.segs){ // gestapeld (bijvoorbeeld verbruik per bron): alleen positieve delen, vanaf 0
+   let acc=0;
+   for(const sg of it.segs){if(!(sg.v>0))continue;const y2=y(acc+sg.v),hh=y(acc)-y2;acc+=sg.v;bars+=`<rect class="${sg.cls}" x="${x.toFixed(2)}" y="${y2.toFixed(1)}" width="${w}" height="${Math.max(0.5,hh).toFixed(1)}"/>`;}
+   continue;
+  }
   const yv=y(it.v),top=Math.min(yv,y0),h=Math.max(1,Math.abs(yv-y0));
   bars+=`<rect class="${it.cls}" x="${x.toFixed(2)}" y="${top.toFixed(1)}" width="${w}" height="${h.toFixed(1)}"/>`;
  }
@@ -8722,7 +8701,7 @@ function ehQtCss(){
   '.ehqt-grid{stroke:#6d99b52e;stroke-dasharray:3 3;stroke-width:1}.ehqt-xt{stroke:#6d99b566}.ehqt-selline{stroke:#fff;stroke-width:1.4}',
   '.ehqt-chart .ehqt-yl{fill:#cfe3ef;font-size:8.5px;font-weight:700}.ehqt-chart .ehqt-yn{fill:#8fb0c4;font-size:8px;paint-order:stroke;stroke:#0f2a3d;stroke-width:2.5px}',
   '.ehqt-base{stroke:#6d99b53d;stroke-width:1}.ehqt-nowline{stroke:#fff;stroke-width:1.2;stroke-dasharray:2 2}',
-  '.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
+  '.ehqt-s-w{fill:#ffb48a}.ehqt-s-p{fill:#61b7ff}.ehqt-s-c{fill:#38e8a1}.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
   '.ehqt-windows{margin-top:10px}.ehqt-windows>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}',
   '.ehqt-warn{margin:10px 0;padding:10px 12px;border-radius:12px;background:#3b2a0d;border:1px solid #ffca4455;color:#ffe2a1;font-size:12px;line-height:1.4}',
   '.ehqt-wx{margin-top:18px;padding-top:6px}.ehqt-wx-title{font-size:15px;margin:0 0 8px}',

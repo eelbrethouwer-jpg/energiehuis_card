@@ -85,7 +85,7 @@ test('alleen zonneladen: energiebegrenzing, verliezen en latere ontlading',()=>{
  assert.ok(s.savings>0);
  assert.equal(s.hours,3);
  assert.equal(s.endingSoc,0);
- assert.match(eh20Chart(s),/polyline/);
+ assert.match(eh20Chart(s),/data-ehqt-chart/);
 });
 test('geen dubbele winst: export en import in hetzelfde uur worden niet tegelijk ontladen',()=>{
  const s=eh20Simulate([bin(0,0,5),bin(1,5,2),bin(2,5,0)],5,.81,3,'solar',.25,.08);
@@ -146,5 +146,5 @@ test('uurinspectie toont gekozen uur, historische P1 en SOC in de simulator',()=
  assert.match(html,/Historisch uurtarief/);
  assert.match(html,/Netafname/);
  assert.match(html,/Vermeden netafname/);
- assert.match(html,/circle/);
+ assert.match(html,/data-ehqt-chart/);
 });

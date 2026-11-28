@@ -18,6 +18,11 @@ function ehQtDrawChart(o){
   const x=X0+it.i*bw,w=Math.max(0.6,bw-0.4).toFixed(2);
   tips[it.i]=it.tip;
   if(it.miss){bars+=`<rect class="ehqt-miss" x="${x.toFixed(2)}" y="${Y0}" width="${w}" height="${Y1-Y0}"/>`;continue;}
+  if(it.segs){ // gestapeld (bijvoorbeeld verbruik per bron): alleen positieve delen, vanaf 0
+   let acc=0;
+   for(const sg of it.segs){if(!(sg.v>0))continue;const y2=y(acc+sg.v),hh=y(acc)-y2;acc+=sg.v;bars+=`<rect class="${sg.cls}" x="${x.toFixed(2)}" y="${y2.toFixed(1)}" width="${w}" height="${Math.max(0.5,hh).toFixed(1)}"/>`;}
+   continue;
+  }
   const yv=y(it.v),top=Math.min(yv,y0),h=Math.max(1,Math.abs(yv-y0));
   bars+=`<rect class="${it.cls}" x="${x.toFixed(2)}" y="${top.toFixed(1)}" width="${w}" height="${h.toFixed(1)}"/>`;
  }
@@ -301,7 +306,7 @@ function ehQtCss(){
   '.ehqt-grid{stroke:#6d99b52e;stroke-dasharray:3 3;stroke-width:1}.ehqt-xt{stroke:#6d99b566}.ehqt-selline{stroke:#fff;stroke-width:1.4}',
   '.ehqt-chart .ehqt-yl{fill:#cfe3ef;font-size:8.5px;font-weight:700}.ehqt-chart .ehqt-yn{fill:#8fb0c4;font-size:8px;paint-order:stroke;stroke:#0f2a3d;stroke-width:2.5px}',
   '.ehqt-base{stroke:#6d99b53d;stroke-width:1}.ehqt-nowline{stroke:#fff;stroke-width:1.2;stroke-dasharray:2 2}',
-  '.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
+  '.ehqt-s-w{fill:#ffb48a}.ehqt-s-p{fill:#61b7ff}.ehqt-s-c{fill:#38e8a1}.ehqt-neutral{fill:#69d5bd}.ehqt-low{fill:#38e8a1}.ehqt-mid{fill:#61b7ff}.ehqt-high{fill:#ffb48a}.ehqt-now{stroke:#fff;stroke-width:1}',
   '.ehqt-windows{margin-top:10px}.ehqt-windows>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}',
   '.ehqt-warn{margin:10px 0;padding:10px 12px;border-radius:12px;background:#3b2a0d;border:1px solid #ffca4455;color:#ffe2a1;font-size:12px;line-height:1.4}',
   '.ehqt-wx{margin-top:18px;padding-top:6px}.ehqt-wx-title{font-size:15px;margin:0 0 8px}',
