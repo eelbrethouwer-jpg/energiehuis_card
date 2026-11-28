@@ -37,17 +37,18 @@ function ehBlDerivePower(kwhPoints, nowMs) {
 // Geladen en ontladen kWh sinds startMs uit opeenvolgende kWh-standen. Sprongen groter dan maxStepKwh (reset) en gaten groter
 // dan maxGapMs tellen niet mee en maken het resultaat onvolledig.
 function ehBlDayTotals(kwhPoints, startMs, nowMs, opts) {
-  const maxStep = (opts && opts.maxStepKwh) || 6, maxGap = (opts && opts.maxGapMs) || 3 * EH_BL_HOUR_MS;
+  // Home Assistant bewaart alleen wijzigingen: een lange stilte betekent 'ongewijzigd', geen ontbrekende data.
+  const maxStep = (opts && opts.maxStepKwh) || 6;
   const s = ehBlSeries(kwhPoints).filter(p => p.t <= nowMs);
-  let charged = 0, discharged = 0, complete = s.length >= 2, steps = 0;
+  let charged = 0, discharged = 0, complete = s.length >= 1, steps = 0;
   for (let i = 1; i < s.length; i++) {
     if (s[i].t < startMs) continue;
     const d = s[i].v - s[i - 1].v;
-    if (s[i].t - s[i - 1].t > maxGap || Math.abs(d) > maxStep) { complete = false; continue; }
+    if (Math.abs(d) > maxStep) { complete = false; continue; }
     steps++;
     if (d > 0) charged += d; else discharged += -d;
   }
-  return { charged, discharged, complete: complete && steps > 0, steps };
+  return { charged, discharged, complete, steps };
 }
 
 // Stapfunctie per uur: de laatste bekende stand op elk uur-einde. Vóór de eerste stand blijft het uur onbekend (null).
